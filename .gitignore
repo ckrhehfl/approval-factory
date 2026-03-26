@@ -1,0 +1,47 @@
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Python cache / build
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Environment / secrets
+.env
+.env.*
+*.secret
+*.key
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Runtime artifacts for this repo
+runs/latest/*
+runs/archive/*
+!runs/latest/.gitkeep
+!runs/archive/.gitkeep
+
+# Optional local approval artifacts
+approval_queue/pending/*
+approval_queue/approved/*
+approval_queue/rejected/*
+approval_queue/exceptions/*
+!approval_queue/pending/.gitkeep
+!approval_queue/approved/.gitkeep
+!approval_queue/rejected/.gitkeep
+!approval_queue/exceptions/.gitkeep
