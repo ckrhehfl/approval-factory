@@ -1,0 +1,27 @@
+project:
+  name: approval-factory
+  local_root: c:\dev\approval-factory
+  repo_type: single-repo
+  source_of_truth: repo
+  primary_language: typescript
+  ci_system: github_actions
+  default_branch: main
+
+quality:
+  required_checks:
+    - lint
+    - test
+    - build
+    - eval
+    - docs_sync
+
+docs:
+  architecture_doc: docs/design/architecture.md
+  domain_model_doc: docs/design/domain-model.md
+  adr_dir: docs/adr
+  pr_dir: docs/prs
+
+operating_mode:
+  approval_first: true
+  pr_sized_execution: true
+  evidence_before_approval: true

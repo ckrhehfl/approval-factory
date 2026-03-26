@@ -1,0 +1,28 @@
+approval_request:
+  id: APR-000
+  work_item_id: WI-000
+  pr_id: PR-000
+  gate_type: merge_approval
+  decision_required:
+    - approve
+    - reject
+    - request_changes
+    - approve_with_exception
+  summary:
+    problem: ""
+    proposed_change: ""
+    user_impact: ""
+  checks:
+    lint: pending
+    test: pending
+    build: pending
+    review: pending
+    qa: pending
+    docs_sync: pending
+  risks: []
+  exceptions: []
+  changed_docs: []
+  changed_files: []
+  adr_refs: []
+  evidence_bundle: ""
+  recommended_decision: ""

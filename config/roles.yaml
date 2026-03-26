@@ -1,0 +1,44 @@
+roles:
+  approver:
+    human_required: true
+    can_auto_progress: false
+    outputs:
+      - approval_decision
+  architect:
+    human_required: false
+    can_auto_progress: true
+    outputs:
+      - design_doc
+      - adr_draft
+      - impact_analysis
+  planner:
+    human_required: false
+    can_auto_progress: true
+    outputs:
+      - pr_plan
+      - task_breakdown
+  implementer:
+    human_required: false
+    can_auto_progress: true
+    outputs:
+      - code_changes
+      - test_changes
+      - implementation_notes
+  reviewer:
+    human_required: false
+    can_auto_progress: true
+    outputs:
+      - review_report
+      - risk_report
+  qa:
+    human_required: false
+    can_auto_progress: true
+    outputs:
+      - qa_report
+      - evidence_items
+  docs_sync:
+    human_required: false
+    can_auto_progress: true
+    outputs:
+      - updated_docs
+      - docs_sync_report

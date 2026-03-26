@@ -1,0 +1,35 @@
+gates:
+  scope_approval:
+    required_human_approval: true
+    triggered_by:
+      - new_work_item
+      - scope_change
+  architecture_approval:
+    required_human_approval: true
+    triggered_by:
+      - structural_change
+      - new_dependency
+      - data_model_change
+      - adr_required
+  exception_approval:
+    required_human_approval: true
+    triggered_by:
+      - security_exception
+      - cost_exception
+      - performance_exception
+      - failed_test_override
+  merge_approval:
+    required_human_approval: true
+    prerequisites:
+      - lint_pass
+      - test_pass
+      - build_pass
+      - review_complete
+      - qa_complete
+      - docs_sync_complete
+      - evidence_bundle_complete
+  release_approval:
+    required_human_approval: true
+    prerequisites:
+      - merge_complete
+      - release_checklist_complete

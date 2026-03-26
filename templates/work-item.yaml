@@ -1,0 +1,12 @@
+work_item:
+  id: WI-000
+  title: ""
+  problem: ""
+  goal: ""
+  non_goals: []
+  acceptance_criteria: []
+  constraints: []
+  risks: []
+  requested_by: ""
+  approver: ""
+  status: draft

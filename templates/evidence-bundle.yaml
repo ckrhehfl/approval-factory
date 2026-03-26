@@ -1,0 +1,27 @@
+evidence_bundle:
+  id: EV-000
+  work_item_id: WI-000
+  pr_id: PR-000
+  summary: ""
+  checks:
+    lint:
+      status: pending
+      notes: ""
+    test:
+      status: pending
+      notes: ""
+    build:
+      status: pending
+      notes: ""
+    eval:
+      status: pending
+      notes: ""
+  review_findings: []
+  qa_findings: []
+  sample_outputs: []
+  screenshots: []
+  docs_sync:
+    required: true
+    status: pending
+    changed_docs: []
+  residual_risks: []
