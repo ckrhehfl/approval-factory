@@ -21,6 +21,7 @@
 
 - lint pass
 - test pass
+- type_check pass
 - build pass
 - review complete
 - qa complete

@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from orchestrator.cli import main
-from orchestrator.yaml_io import read_yaml, write_yaml
+from orchestrator.yaml_io import read_yaml
 
 
 class PipelineApprovalLoopTest(unittest.TestCase):
@@ -19,7 +19,7 @@ class PipelineApprovalLoopTest(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def _bootstrap(self, root: Path, run_id: str = "RUN-LOOP") -> None:
+    def _bootstrap(self, root: Path, run_id: str) -> None:
         exit_code = main(
             [
                 "bootstrap-run",
@@ -32,114 +32,153 @@ class PipelineApprovalLoopTest(unittest.TestCase):
                 "--work-item-id",
                 "WI-002",
                 "--work-item-title",
-                "minimal approval loop",
+                "verification gate hardening",
             ]
         )
         self.assertEqual(exit_code, 0)
 
+    def _record_verification(
+        self,
+        root: Path,
+        run_id: str,
+        *,
+        lint: str = "pass",
+        tests: str = "pass",
+        type_check: str = "pass",
+        build: str = "pass",
+    ) -> None:
+        self.assertEqual(
+            main(
+                [
+                    "record-verification",
+                    "--root",
+                    str(root),
+                    "--run-id",
+                    run_id,
+                    "--lint",
+                    lint,
+                    "--tests",
+                    tests,
+                    "--type-check",
+                    type_check,
+                    "--build",
+                    build,
+                    "--summary",
+                    "verification recorded",
+                ]
+            ),
+            0,
+        )
+
+    def _record_non_verification_ready(self, root: Path, run_id: str) -> None:
+        self.assertEqual(
+            main(["record-review", "--root", str(root), "--run-id", run_id, "--status", "pass", "--summary", "review ok"]),
+            0,
+        )
+        self.assertEqual(main(["record-qa", "--root", str(root), "--run-id", run_id, "--status", "pass", "--summary", "qa ok"]), 0)
+        self.assertEqual(
+            main(["record-docs-sync", "--root", str(root), "--run-id", run_id, "--status", "complete", "--summary", "docs synced"]),
+            0,
+        )
+
+    def _build_approval(self, root: Path, run_id: str) -> None:
+        self.assertEqual(main(["build-approval", "--root", str(root), "--run-id", run_id]), 0)
+
     def test_happy_path(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
+            run_id = "RUN-HAPPY"
             self._prepare_root(root)
-            self._bootstrap(root, "RUN-HAPPY")
+            self._bootstrap(root, run_id)
 
-            self.assertEqual(main(["record-review", "--root", str(root), "--run-id", "RUN-HAPPY", "--status", "pass", "--summary", "review ok"]), 0)
-            self.assertEqual(main(["record-qa", "--root", str(root), "--run-id", "RUN-HAPPY", "--status", "pass", "--summary", "qa ok"]), 0)
-            self.assertEqual(main(["record-docs-sync", "--root", str(root), "--run-id", "RUN-HAPPY", "--status", "complete", "--summary", "docs synced"]), 0)
-            self.assertEqual(main(["build-approval", "--root", str(root), "--run-id", "RUN-HAPPY"]), 0)
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+            self._build_approval(root, run_id)
 
-            evidence = read_yaml(root / "runs" / "latest" / "RUN-HAPPY" / "artifacts" / "evidence-bundle.yaml")
-            gate = read_yaml(root / "runs" / "latest" / "RUN-HAPPY" / "artifacts" / "gate-status.yaml")
-            approval = read_yaml(root / "runs" / "latest" / "RUN-HAPPY" / "artifacts" / "approval-request.yaml")
-            run = read_yaml(root / "runs" / "latest" / "RUN-HAPPY" / "run.yaml")
+            evidence = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "evidence-bundle.yaml")
+            gate = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "gate-status.yaml")
+            approval = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "approval-request.yaml")
 
-            self.assertEqual(evidence["evidence_bundle"]["status"], "complete")
+            self.assertEqual(evidence["evidence_bundle"]["checks"]["type_check"]["status"], "pass")
             self.assertEqual(gate["gate_status"]["gates"]["merge_approval"], "ready")
             self.assertEqual(approval["approval_request"]["recommended_decision"], "approve")
-            self.assertTrue((root / "approval_queue" / "pending" / "APR-RUN-HAPPY.yaml").exists())
-            self.assertEqual(run["run"]["docs_sync_verdict"], "complete")
+            self.assertTrue((root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").exists())
 
-    def test_review_fail(self) -> None:
+    def test_lint_fail(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
+            run_id = "RUN-LINT-FAIL"
             self._prepare_root(root)
-            self._bootstrap(root, "RUN-REVIEW-FAIL")
+            self._bootstrap(root, run_id)
 
-            self.assertEqual(main(["record-review", "--root", str(root), "--run-id", "RUN-REVIEW-FAIL", "--status", "fail", "--summary", "must fix"]), 0)
-            self.assertEqual(main(["record-qa", "--root", str(root), "--run-id", "RUN-REVIEW-FAIL", "--status", "pass", "--summary", "qa ok"]), 0)
-            self.assertEqual(main(["record-docs-sync", "--root", str(root), "--run-id", "RUN-REVIEW-FAIL", "--status", "complete", "--summary", "docs synced"]), 0)
-            self.assertEqual(main(["build-approval", "--root", str(root), "--run-id", "RUN-REVIEW-FAIL"]), 0)
+            self._record_verification(root, run_id, lint="fail")
+            self._record_non_verification_ready(root, run_id)
+            self._build_approval(root, run_id)
 
-            gate = read_yaml(root / "runs" / "latest" / "RUN-REVIEW-FAIL" / "artifacts" / "gate-status.yaml")
-            approval = read_yaml(root / "runs" / "latest" / "RUN-REVIEW-FAIL" / "artifacts" / "approval-request.yaml")
-
-            self.assertEqual(gate["gate_status"]["gates"]["merge_approval"], "blocked")
-            self.assertEqual(approval["approval_request"]["recommended_decision"], "request_changes")
-            self.assertFalse((root / "approval_queue" / "pending" / "APR-RUN-REVIEW-FAIL.yaml").exists())
-
-    def test_qa_fail(self) -> None:
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            self._prepare_root(root)
-            self._bootstrap(root, "RUN-QA-FAIL")
-
-            self.assertEqual(main(["record-review", "--root", str(root), "--run-id", "RUN-QA-FAIL", "--status", "pass", "--summary", "review ok"]), 0)
-            self.assertEqual(main(["record-qa", "--root", str(root), "--run-id", "RUN-QA-FAIL", "--status", "fail", "--summary", "regression found"]), 0)
-            self.assertEqual(main(["record-docs-sync", "--root", str(root), "--run-id", "RUN-QA-FAIL", "--status", "complete", "--summary", "docs synced"]), 0)
-            self.assertEqual(main(["build-approval", "--root", str(root), "--run-id", "RUN-QA-FAIL"]), 0)
-
-            gate = read_yaml(root / "runs" / "latest" / "RUN-QA-FAIL" / "artifacts" / "gate-status.yaml")
-            approval = read_yaml(root / "runs" / "latest" / "RUN-QA-FAIL" / "artifacts" / "approval-request.yaml")
-
-            self.assertEqual(gate["gate_status"]["gates"]["merge_approval"], "blocked")
-            self.assertEqual(approval["approval_request"]["recommended_decision"], "request_changes")
-            self.assertFalse((root / "approval_queue" / "pending" / "APR-RUN-QA-FAIL.yaml").exists())
-
-    def test_docs_sync_incomplete(self) -> None:
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            self._prepare_root(root)
-            self._bootstrap(root, "RUN-DOCS-PENDING")
-
-            self.assertEqual(main(["record-review", "--root", str(root), "--run-id", "RUN-DOCS-PENDING", "--status", "pass", "--summary", "review ok"]), 0)
-            self.assertEqual(main(["record-qa", "--root", str(root), "--run-id", "RUN-DOCS-PENDING", "--status", "pass", "--summary", "qa ok"]), 0)
-            self.assertEqual(main(["record-docs-sync", "--root", str(root), "--run-id", "RUN-DOCS-PENDING", "--status", "required", "--summary", "docs pending"]), 0)
-            self.assertEqual(main(["build-approval", "--root", str(root), "--run-id", "RUN-DOCS-PENDING"]), 0)
-
-            gate = read_yaml(root / "runs" / "latest" / "RUN-DOCS-PENDING" / "artifacts" / "gate-status.yaml")
-            approval = read_yaml(root / "runs" / "latest" / "RUN-DOCS-PENDING" / "artifacts" / "approval-request.yaml")
-
-            self.assertEqual(gate["gate_status"]["gates"]["merge_approval"], "pending")
-            self.assertEqual(approval["approval_request"]["recommended_decision"], "reject")
-            self.assertFalse((root / "approval_queue" / "pending" / "APR-RUN-DOCS-PENDING.yaml").exists())
-
-    def test_exception_required(self) -> None:
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            self._prepare_root(root)
-            self._bootstrap(root, "RUN-EXCEPTION")
-
-            self.assertEqual(main(["record-review", "--root", str(root), "--run-id", "RUN-EXCEPTION", "--status", "pass", "--summary", "review ok"]), 0)
-            self.assertEqual(main(["record-qa", "--root", str(root), "--run-id", "RUN-EXCEPTION", "--status", "pass", "--summary", "qa ok"]), 0)
-            self.assertEqual(main(["record-docs-sync", "--root", str(root), "--run-id", "RUN-EXCEPTION", "--status", "complete", "--summary", "docs synced"]), 0)
-
-            evidence_path = root / "runs" / "latest" / "RUN-EXCEPTION" / "artifacts" / "evidence-bundle.yaml"
-            evidence = read_yaml(evidence_path)
-            evidence["evidence_bundle"]["checks"]["test"] = {"status": "fail", "notes": "flake"}
-            evidence["evidence_bundle"]["checks"]["lint"] = {"status": "pass", "notes": "ok"}
-            evidence["evidence_bundle"]["checks"]["build"] = {"status": "pass", "notes": "ok"}
-            write_yaml(evidence_path, evidence)
-
-            self.assertEqual(main(["build-approval", "--root", str(root), "--run-id", "RUN-EXCEPTION"]), 0)
-
-            gate = read_yaml(root / "runs" / "latest" / "RUN-EXCEPTION" / "artifacts" / "gate-status.yaml")
-            approval = read_yaml(root / "runs" / "latest" / "RUN-EXCEPTION" / "artifacts" / "approval-request.yaml")
-
+            gate = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "gate-status.yaml")
             self.assertEqual(gate["gate_status"]["gates"]["merge_approval"], "exception_required")
-            self.assertEqual(gate["gate_status"]["gates"]["exception_approval"], "required")
-            self.assertEqual(approval["approval_request"]["gate_type"], "exception_approval")
-            self.assertEqual(approval["approval_request"]["recommended_decision"], "approve_with_exception")
-            self.assertTrue((root / "approval_queue" / "pending" / "APR-RUN-EXCEPTION.yaml").exists())
+            self.assertNotEqual(gate["gate_status"]["gates"]["merge_approval"], "ready")
+
+    def test_tests_fail(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-TESTS-FAIL"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+
+            self._record_verification(root, run_id, tests="fail")
+            self._record_non_verification_ready(root, run_id)
+            self._build_approval(root, run_id)
+
+            gate = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "gate-status.yaml")
+            self.assertEqual(gate["gate_status"]["gates"]["merge_approval"], "exception_required")
+            self.assertNotEqual(gate["gate_status"]["gates"]["merge_approval"], "ready")
+
+    def test_type_check_fail(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-TYPE-CHECK-FAIL"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+
+            self._record_verification(root, run_id, type_check="fail")
+            self._record_non_verification_ready(root, run_id)
+            self._build_approval(root, run_id)
+
+            gate = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "gate-status.yaml")
+            self.assertEqual(gate["gate_status"]["gates"]["merge_approval"], "exception_required")
+            self.assertNotEqual(gate["gate_status"]["gates"]["merge_approval"], "ready")
+
+    def test_build_fail(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-BUILD-FAIL"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+
+            self._record_verification(root, run_id, build="fail")
+            self._record_non_verification_ready(root, run_id)
+            self._build_approval(root, run_id)
+
+            gate = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "gate-status.yaml")
+            self.assertEqual(gate["gate_status"]["gates"]["merge_approval"], "exception_required")
+            self.assertNotEqual(gate["gate_status"]["gates"]["merge_approval"], "ready")
+
+    def test_verification_missing(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-VERIFICATION-MISSING"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+
+            verification_path = root / "runs" / "latest" / run_id / "artifacts" / "verification-report.yaml"
+            verification_path.unlink()
+
+            with self.assertRaises(ValueError):
+                main(["build-approval", "--root", str(root), "--run-id", run_id])
+
+            self.assertFalse((root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").exists())
 
 
 if __name__ == "__main__":

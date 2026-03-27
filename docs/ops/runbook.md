@@ -8,12 +8,13 @@
 4. Architecture 승인 필요 여부 판정
 5. PR 분해
 6. PR별 구현
-7. Review
-8. QA
-9. Docs Sync 완료
-10. Evidence Bundle 생성
-11. Merge Approval 요청
-12. Merge
+7. Verification 기록(lint/tests/type_check/build)
+8. Review
+9. QA
+10. Docs Sync 완료
+11. Evidence Bundle 생성
+12. Merge Approval 요청
+13. Merge
 
 ## 실패 시 복구
 
@@ -23,6 +24,9 @@ Architect/Planner 단계로 되돌린다.
 ### 테스트 실패
 Implementer로 되돌린다.  
 예외 허용이 필요하면 exception approval로 올린다.
+
+### verification artifact 누락
+`verification-report.yaml`을 먼저 생성/갱신한 뒤 gate-check 및 build-approval을 다시 실행한다.
 
 ### 문서 누락
 Docs Sync 단계로 되돌린다.

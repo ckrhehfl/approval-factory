@@ -40,6 +40,7 @@ class BootstrapCliTest(unittest.TestCase):
             artifacts = run_root / "artifacts"
             self.assertTrue((artifacts / "work-item.yaml").exists())
             self.assertTrue((artifacts / "pr-plan.yaml").exists())
+            self.assertTrue((artifacts / "verification-report.yaml").exists())
             self.assertTrue((artifacts / "review-report.yaml").exists())
             self.assertTrue((artifacts / "qa-report.yaml").exists())
             self.assertTrue((artifacts / "docs-sync-report.yaml").exists())

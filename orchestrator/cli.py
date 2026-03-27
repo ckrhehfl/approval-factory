@@ -12,6 +12,7 @@ from orchestrator.pipeline import (
     record_docs_sync,
     record_qa,
     record_review,
+    record_verification,
 )
 
 
@@ -35,6 +36,15 @@ def build_parser() -> argparse.ArgumentParser:
     record_review_parser.add_argument("--run-id", required=True)
     record_review_parser.add_argument("--status", choices=["pass", "fail"], required=True)
     record_review_parser.add_argument("--summary", required=True)
+
+    record_verification_parser = subparsers.add_parser("record-verification", help="Record verification checks result")
+    record_verification_parser.add_argument("--root", default=".", help="Repository root path")
+    record_verification_parser.add_argument("--run-id", required=True)
+    record_verification_parser.add_argument("--lint", choices=["pass", "fail", "pending"], required=True)
+    record_verification_parser.add_argument("--tests", choices=["pass", "fail", "pending"], required=True)
+    record_verification_parser.add_argument("--type-check", choices=["pass", "fail", "pending"], required=True)
+    record_verification_parser.add_argument("--build", choices=["pass", "fail", "pending"], required=True)
+    record_verification_parser.add_argument("--summary", required=True)
 
     record_qa_parser = subparsers.add_parser("record-qa", help="Record QA result")
     record_qa_parser.add_argument("--root", default=".", help="Repository root path")
@@ -79,6 +89,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             root_dir=Path(args.root),
             run_id=args.run_id,
             status=args.status,
+            summary=args.summary,
+        )
+        print(path.as_posix())
+        return 0
+
+    if args.command == "record-verification":
+        path = record_verification(
+            root_dir=Path(args.root),
+            run_id=args.run_id,
+            lint=args.lint,
+            tests=args.tests,
+            type_check=args.type_check,
+            build=args.build,
             summary=args.summary,
         )
         print(path.as_posix())

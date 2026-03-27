@@ -10,7 +10,8 @@ project:
 quality:
   required_checks:
     - lint
-    - test
+    - tests
+    - type_check
     - build
     - docs_sync
   optional_checks:

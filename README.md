@@ -6,7 +6,7 @@
 
 1. 이 저장소 안의 **설계, 정책, 계약, ADR, 운영 기준**이 SSOT다.
 2. 노션 문서는 이해를 돕는 how-to 용도이며, 충돌 시 이 레포 문서가 우선한다.
-3. 모든 작업은 Work Item → 설계 → PR 계획 → 구현 → 리뷰 → QA → Evidence → 승인 → 문서 동기화 → Merge 흐름을 따른다.
+3. 모든 작업은 Work Item → 설계 → PR 계획 → 구현 → Verification(lint/tests/type_check/build) → 리뷰 → QA → Evidence → 승인 → 문서 동기화 → Merge 흐름을 따른다.
 4. 승인 없는 구조 변경, 범위 변경, 예외 허용, 릴리즈는 금지한다.
 5. 코드 변경은 문서 영향도를 반드시 함께 판정한다.
 

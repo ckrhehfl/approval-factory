@@ -25,6 +25,7 @@ class PipelineState(StrEnum):
 ARTIFACT_FILENAMES = (
     "work-item.yaml",
     "pr-plan.yaml",
+    "verification-report.yaml",
     "review-report.yaml",
     "qa-report.yaml",
     "docs-sync-report.yaml",
@@ -103,22 +104,32 @@ def _set_docs_sync_verdict(root_dir: Path, run_id: str, verdict: str, summary: s
     _write_run(root_dir, run_id, run_payload)
 
 
-def _normalize_check(value: Any) -> dict[str, str]:
-    if isinstance(value, dict):
-        return {
-            "status": str(value.get("status", "pending")),
-            "notes": str(value.get("notes", "")),
-        }
-    return {"status": str(value or "pending"), "notes": ""}
-
-
-def _check_status(evidence: dict[str, Any], key: str) -> str:
-    checks = evidence.get("checks", {})
-    return _normalize_check(checks.get(key, "pending"))["status"]
-
-
 def _docs_sync_complete(status: str) -> bool:
     return status in {"complete", "not-needed"}
+
+
+def _verification_status(value: Any) -> str:
+    status = str(value or "pending")
+    if status not in {"pass", "fail", "pending"}:
+        raise ValueError(f"verification status must be pass|fail|pending (got: {status})")
+    return status
+
+
+def _read_verification_report(root_dir: Path, run_id: str) -> dict[str, Any]:
+    return _read_artifact(root_dir, run_id, "verification-report.yaml")["verification_report"]
+
+
+def _verification_payload_or_pending(root_dir: Path, run_id: str) -> dict[str, Any]:
+    report_path = _artifact_path(root_dir, run_id, "verification-report.yaml")
+    if not report_path.exists():
+        return {
+            "lint": "pending",
+            "tests": "pending",
+            "type_check": "pending",
+            "build": "pending",
+            "summary": "verification artifact missing",
+        }
+    return _read_verification_report(root_dir, run_id)
 
 
 def bootstrap_run(
@@ -159,6 +170,19 @@ def bootstrap_run(
                 "pr_id": pr_id,
                 "scope": "",
                 "status": PipelineState.planned.value,
+            }
+        },
+    )
+    write_yaml(
+        artifacts_dir / "verification-report.yaml",
+        {
+            "verification_report": {
+                "pr_id": pr_id,
+                "summary": "",
+                "lint": "pending",
+                "tests": "pending",
+                "type_check": "pending",
+                "build": "pending",
             }
         },
     )
@@ -206,7 +230,8 @@ def bootstrap_run(
                 "summary": "",
                 "checks": {
                     "lint": {"status": "pending", "notes": ""},
-                    "test": {"status": "pending", "notes": ""},
+                    "tests": {"status": "pending", "notes": ""},
+                    "type_check": {"status": "pending", "notes": ""},
                     "build": {"status": "pending", "notes": ""},
                 },
                 "review_findings": [],
@@ -242,7 +267,8 @@ def bootstrap_run(
                 },
                 "checks": {
                     "lint": "pending",
-                    "test": "pending",
+                    "tests": "pending",
+                    "type_check": "pending",
                     "build": "pending",
                     "review": "pending",
                     "qa": "pending",
@@ -305,6 +331,30 @@ def record_review(*, root_dir: Path, run_id: str, status: str, summary: str) -> 
     return _artifact_path(root_dir, run_id, "review-report.yaml")
 
 
+def record_verification(
+    *,
+    root_dir: Path,
+    run_id: str,
+    lint: str,
+    tests: str,
+    type_check: str,
+    build: str,
+    summary: str,
+) -> Path:
+    report = _read_artifact(root_dir, run_id, "verification-report.yaml")
+    verification = report["verification_report"]
+    verification["lint"] = _verification_status(lint)
+    verification["tests"] = _verification_status(tests)
+    verification["type_check"] = _verification_status(type_check)
+    verification["build"] = _verification_status(build)
+    verification["summary"] = summary
+    verification["recorded_at"] = _now_iso()
+    _write_artifact(root_dir, run_id, "verification-report.yaml", report)
+
+    _update_pipeline_state(root_dir, run_id, PipelineState.in_progress)
+    return _artifact_path(root_dir, run_id, "verification-report.yaml")
+
+
 def record_qa(*, root_dir: Path, run_id: str, status: str, summary: str) -> Path:
     if status not in {"pass", "fail"}:
         raise ValueError("qa status must be pass|fail")
@@ -342,26 +392,33 @@ def build_evidence_bundle(*, root_dir: Path, run_id: str) -> Path:
     review = _read_artifact(root_dir, run_id, "review-report.yaml")["review_report"]
     qa = _read_artifact(root_dir, run_id, "qa-report.yaml")["qa_report"]
     docs_sync = _read_artifact(root_dir, run_id, "docs-sync-report.yaml")["docs_sync_report"]
+    verification = _verification_payload_or_pending(root_dir, run_id)
 
     existing = _read_artifact(root_dir, run_id, "evidence-bundle.yaml").get("evidence_bundle", {})
-    lint = _normalize_check(existing.get("checks", {}).get("lint", "pending"))
-    test = _normalize_check(existing.get("checks", {}).get("test", "pending"))
-    build = _normalize_check(existing.get("checks", {}).get("build", "pending"))
-
-    if qa.get("status") == "pass":
-        if lint["status"] == "pending":
-            lint = {"status": "pass", "notes": "inferred from QA pass"}
-        if test["status"] == "pending":
-            test = {"status": "pass", "notes": "inferred from QA pass"}
-        if build["status"] == "pending":
-            build = {"status": "pass", "notes": "inferred from QA pass"}
+    lint = {
+        "status": _verification_status(verification.get("lint", "pending")),
+        "notes": str(verification.get("lint_notes", "")),
+    }
+    tests = {
+        "status": _verification_status(verification.get("tests", "pending")),
+        "notes": str(verification.get("tests_notes", "")),
+    }
+    type_check = {
+        "status": _verification_status(verification.get("type_check", "pending")),
+        "notes": str(verification.get("type_check_notes", "")),
+    }
+    build = {
+        "status": _verification_status(verification.get("build", "pending")),
+        "notes": str(verification.get("build_notes", "")),
+    }
 
     docs_sync_status = str(docs_sync.get("status", "pending"))
     complete = (
         review.get("status") == "pass"
         and qa.get("status") == "pass"
         and lint["status"] == "pass"
-        and test["status"] == "pass"
+        and tests["status"] == "pass"
+        and type_check["status"] == "pass"
         and build["status"] == "pass"
         and _docs_sync_complete(docs_sync_status)
     )
@@ -373,11 +430,13 @@ def build_evidence_bundle(*, root_dir: Path, run_id: str) -> Path:
             "pr_id": run["pr_id"],
             "summary": (
                 f"review={review.get('status', 'pending')}, "
-                f"qa={qa.get('status', 'pending')}, docs_sync={docs_sync_status}"
+                f"qa={qa.get('status', 'pending')}, docs_sync={docs_sync_status}, "
+                f"verification={verification.get('summary', '')}"
             ),
             "checks": {
                 "lint": lint,
-                "test": test,
+                "tests": tests,
+                "type_check": type_check,
                 "build": build,
             },
             "review_findings": review.get("findings", []),
@@ -406,15 +465,18 @@ def evaluate_gates(*, root_dir: Path, run_id: str, gates_config_path: Path | Non
     qa = _read_artifact(root_dir, run_id, "qa-report.yaml")["qa_report"]
     docs_sync = _read_artifact(root_dir, run_id, "docs-sync-report.yaml")["docs_sync_report"]
     evidence = _read_artifact(root_dir, run_id, "evidence-bundle.yaml")["evidence_bundle"]
+    verification = _verification_payload_or_pending(root_dir, run_id)
 
     prerequisite_results: dict[str, bool] = {}
     for prerequisite in prerequisites:
         if prerequisite == "lint_pass":
-            prerequisite_results[prerequisite] = _check_status(evidence, "lint") == "pass"
+            prerequisite_results[prerequisite] = _verification_status(verification.get("lint")) == "pass"
         elif prerequisite == "test_pass":
-            prerequisite_results[prerequisite] = _check_status(evidence, "test") == "pass"
+            prerequisite_results[prerequisite] = _verification_status(verification.get("tests")) == "pass"
+        elif prerequisite == "type_check_pass":
+            prerequisite_results[prerequisite] = _verification_status(verification.get("type_check")) == "pass"
         elif prerequisite == "build_pass":
-            prerequisite_results[prerequisite] = _check_status(evidence, "build") == "pass"
+            prerequisite_results[prerequisite] = _verification_status(verification.get("build")) == "pass"
         elif prerequisite == "review_complete":
             prerequisite_results[prerequisite] = review.get("status") == "pass"
         elif prerequisite == "qa_complete":
@@ -427,13 +489,15 @@ def evaluate_gates(*, root_dir: Path, run_id: str, gates_config_path: Path | Non
             prerequisite_results[prerequisite] = False
 
     has_review_or_qa_failure = review.get("status") == "fail" or qa.get("status") == "fail"
-    has_build_failure = any(_check_status(evidence, name) == "fail" for name in ("lint", "test", "build"))
+    has_verification_failure = any(
+        _verification_status(verification.get(name)) == "fail" for name in ("lint", "tests", "type_check", "build")
+    )
 
     merge_gate: str
     exception_gate = "pending"
     if has_review_or_qa_failure:
         merge_gate = "blocked"
-    elif has_build_failure:
+    elif has_verification_failure:
         merge_gate = "exception_required"
         exception_gate = "required"
     elif all(prerequisite_results.values()):
@@ -455,12 +519,16 @@ def evaluate_gates(*, root_dir: Path, run_id: str, gates_config_path: Path | Non
 def build_approval_request(*, root_dir: Path, run_id: str) -> tuple[Path, Path | None]:
     run_payload = _load_run(root_dir, run_id)
     run = run_payload["run"]
+    verification_path = _artifact_path(root_dir, run_id, "verification-report.yaml")
+    if not verification_path.exists():
+        raise ValueError("cannot build approval request without verification report")
 
     evidence_path = build_evidence_bundle(root_dir=root_dir, run_id=run_id)
     gate_path = evaluate_gates(root_dir=root_dir, run_id=run_id)
 
     evidence = read_yaml(evidence_path)["evidence_bundle"]
     gate = read_yaml(gate_path)["gate_status"]
+    verification = _read_verification_report(root_dir, run_id)
     review = _read_artifact(root_dir, run_id, "review-report.yaml")["review_report"]
     qa = _read_artifact(root_dir, run_id, "qa-report.yaml")["qa_report"]
     docs_sync = _read_artifact(root_dir, run_id, "docs-sync-report.yaml")["docs_sync_report"]
@@ -501,9 +569,10 @@ def build_approval_request(*, root_dir: Path, run_id: str) -> tuple[Path, Path |
                 "user_impact": f"merge gate status={merge_gate}",
             },
             "checks": {
-                "lint": _check_status(evidence, "lint"),
-                "test": _check_status(evidence, "test"),
-                "build": _check_status(evidence, "build"),
+                "lint": _verification_status(verification.get("lint")),
+                "tests": _verification_status(verification.get("tests")),
+                "type_check": _verification_status(verification.get("type_check")),
+                "build": _verification_status(verification.get("build")),
                 "review": review.get("status", "pending"),
                 "qa": qa.get("status", "pending"),
                 "docs_sync": docs_sync_status,
