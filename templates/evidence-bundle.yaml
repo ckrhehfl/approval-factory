@@ -13,7 +13,7 @@ evidence_bundle:
     build:
       status: pending
       notes: ""
-    eval:
+    eval_optional:
       status: pending
       notes: ""
   review_findings: []

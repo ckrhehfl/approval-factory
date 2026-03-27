@@ -3,17 +3,19 @@ project:
   local_root: c:\dev\approval-factory
   repo_type: single-repo
   source_of_truth: repo
-  primary_language: typescript
+  primary_language: python
   ci_system: github_actions
   default_branch: main
 
 quality:
   required_checks:
     - lint
-    - test
+    - tests
+    - type_check
     - build
-    - eval
     - docs_sync
+  optional_checks:
+    - eval
 
 docs:
   architecture_doc: docs/design/architecture.md

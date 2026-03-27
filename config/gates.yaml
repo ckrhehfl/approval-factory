@@ -23,6 +23,7 @@ gates:
     prerequisites:
       - lint_pass
       - test_pass
+      - type_check_pass
       - build_pass
       - review_complete
       - qa_complete

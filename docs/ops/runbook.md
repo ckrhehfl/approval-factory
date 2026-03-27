@@ -8,12 +8,19 @@
 4. Architecture 승인 필요 여부 판정
 5. PR 분해
 6. PR별 구현
-7. Review
-8. QA
-9. Evidence Bundle 생성
-10. Merge Approval 요청
-11. Docs Sync 완료
-12. Merge
+7. Verification 기록(lint/tests/type_check/build)
+8. Review
+9. QA
+10. Docs Sync 완료
+11. `gate-check`로 gate 판정 확인
+12. `build-approval`로 Evidence Bundle + Approval Request 생성
+13. Merge
+
+## gate-check와 build-approval의 역할 차이
+
+- `gate-check`는 `gate-status.yaml` 판정만 갱신한다.
+- `build-approval`는 evidence를 재생성하고 gate를 다시 계산한 뒤 `approval-request.yaml`를 만든다.
+- 최종 승인 요청 판단은 `build-approval` 이후 산출물을 기준으로 한다.
 
 ## 실패 시 복구
 
@@ -24,11 +31,35 @@ Architect/Planner 단계로 되돌린다.
 Implementer로 되돌린다.  
 예외 허용이 필요하면 exception approval로 올린다.
 
+### verification artifact 누락
+`verification-report.yaml`을 먼저 생성/갱신한 뒤 gate-check 및 build-approval을 다시 실행한다.
+
 ### 문서 누락
 Docs Sync 단계로 되돌린다.
 
 ### 승인 반려
 해당 반려 사유를 기준으로 Planner 또는 Architect 단계로 되돌린다.
+
+## 재실행/재시도 운영 규칙
+
+### canonical artifact 규칙
+- `runs/latest/<run-id>/artifacts/*.yaml`는 canonical 파일이며 재실행 시 **overwrite** 된다.
+- `bootstrap-run`을 동일 `run-id`로 다시 실행하면 기존 artifact를 초기화하지 않고 **누락 파일만 생성**한다.
+
+### approval queue 규칙
+- 기본 queue 파일명은 `approval_queue/pending/APR-<run-id>.yaml` 이다.
+- 동일 내용으로 `build-approval`를 재실행하면 queue 파일을 중복 생성하지 않는다.
+- 같은 파일명이 이미 존재하고 내용이 다르면 `APR-<run-id>--r2.yaml`, `--r3` 순으로 append한다.
+
+### pending 이후 승인자 운영 (현재 MVP)
+- 자동 승인 처리 CLI는 아직 없다.
+- 승인자는 `approval_queue/pending/*.yaml`와 `runs/latest/<run-id>/artifacts/{evidence-bundle,approval-request}.yaml`를 함께 검토한다.
+- 승인자 결정(`approve`, `reject`, `request_changes`, `approve_with_exception`)은 현재 MVP에서 수동으로 기록/운영한다.
+- 필요 시 운영자가 `approved/`, `rejected/`, `exceptions/` 디렉터리로 수동 분류한다.
+
+### gate/build 재실행 추적
+- `run.yaml`의 `run.operations`에 `gate_check`, `build_approval` 실행 횟수(`count`)와 마지막 실행 정보(`last_at`, `last_details`)를 남긴다.
+- 운영자는 재실행 이력이 많을 때 `last_details`의 gate/decision 값이 최신 산출물과 일치하는지 확인한다.
 
 ## 운영자 원칙
 

@@ -5,7 +5,8 @@ Evidence Bundle은 승인자를 위해 검증 자료를 요약한 패키지다.
 ## 필수 포함
 
 - lint 결과
-- test 결과
+- tests 결과
+- type_check 결과
 - build 결과
 - review 핵심 발견사항
 - qa 핵심 발견사항

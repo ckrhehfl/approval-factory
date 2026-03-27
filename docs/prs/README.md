@@ -6,6 +6,7 @@
 - plan.md
 - review.md
 - qa.md
+- docs-sync.md
 - evidence.md
 - decision.md
 
