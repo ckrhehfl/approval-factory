@@ -237,6 +237,29 @@ def create_goal(
     return goal_path
 
 
+def _queue_item_name(run_id: str) -> str:
+    return f"APR-{run_id}.yaml"
+
+
+def _queue_item_relative_path(queue_name: str, run_id: str) -> str:
+    return f"approval_queue/{queue_name}/{_queue_item_name(run_id)}"
+
+
+def _decision_to_queue(decision: str) -> str:
+    mapping = {
+        "approve": "approved",
+        "reject": "rejected",
+        "exception": "exceptions",
+    }
+    if decision not in mapping:
+        raise ValueError(f"decision must be approve|reject|exception (got: {decision})")
+    return mapping[decision]
+
+
+def _resolved_at_now() -> str:
+    return _now_iso()
+
+
 def bootstrap_run(
     *,
     root_dir: Path,
@@ -741,3 +764,67 @@ def build_approval_request(*, root_dir: Path, run_id: str) -> tuple[Path, Path |
     )
 
     return approval_path, queue_path
+
+
+def resolve_approval(*, root_dir: Path, run_id: str, decision: str, actor: str, note: str) -> tuple[Path, Path]:
+    source_relative = _queue_item_relative_path("pending", run_id)
+    source_path = root_dir / source_relative
+
+    target_queue = _decision_to_queue(decision)
+    target_relative = _queue_item_relative_path(target_queue, run_id)
+    target_path = root_dir / target_relative
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    other_queues = {"approved", "rejected", "exceptions"} - {target_queue}
+    already_other = [name for name in sorted(other_queues) if (root_dir / _queue_item_relative_path(name, run_id)).exists()]
+    if already_other:
+        locations = ", ".join(_queue_item_relative_path(name, run_id) for name in already_other)
+        raise ValueError(f"approval already resolved in a different queue: {locations}")
+
+    if source_path.exists():
+        payload = read_yaml(source_path)
+        if target_path.exists():
+            if read_yaml(target_path) != payload:
+                raise ValueError(f"target queue item already exists with different content: {target_relative}")
+            source_path.unlink()
+        else:
+            source_path.replace(target_path)
+    else:
+        if not target_path.exists():
+            raise ValueError(
+                f"pending queue item not found: {source_relative}; expected resolved item: {target_relative}"
+            )
+
+    decision_payload = {
+        "approval_decision": {
+            "run_id": run_id,
+            "decision": decision,
+            "actor": actor,
+            "note": note,
+            "resolved_at": _resolved_at_now(),
+            "source_queue_item": source_relative,
+            "target_queue_item": target_relative,
+        }
+    }
+    decision_path = _artifact_path(root_dir, run_id, "approval-decision.yaml")
+    _write_artifact(root_dir, run_id, "approval-decision.yaml", decision_payload)
+
+    _record_run_operation(
+        root_dir,
+        run_id,
+        "resolve_approval",
+        {
+            "decision": decision,
+            "actor": actor,
+            "target_queue_item": target_relative,
+        },
+    )
+
+    if decision == "approve":
+        _update_pipeline_state(root_dir, run_id, PipelineState.approved)
+    elif decision == "reject":
+        _update_pipeline_state(root_dir, run_id, PipelineState.rejected)
+    else:
+        _update_pipeline_state(root_dir, run_id, PipelineState.approval_pending)
+
+    return decision_path, target_path

@@ -84,6 +84,26 @@ class PipelineApprovalLoopTest(unittest.TestCase):
     def _build_approval(self, root: Path, run_id: str) -> None:
         self.assertEqual(main(["build-approval", "--root", str(root), "--run-id", run_id]), 0)
 
+    def _resolve_approval(self, root: Path, run_id: str, decision: str) -> None:
+        self.assertEqual(
+            main(
+                [
+                    "resolve-approval",
+                    "--root",
+                    str(root),
+                    "--run-id",
+                    run_id,
+                    "--decision",
+                    decision,
+                    "--actor",
+                    "approver.local",
+                    "--note",
+                    f"{decision} recorded",
+                ]
+            ),
+            0,
+        )
+
     def test_happy_path(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -247,6 +267,108 @@ class PipelineApprovalLoopTest(unittest.TestCase):
 
             verification = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "verification-report.yaml")
             self.assertEqual(verification["verification_report"]["lint"], "fail")
+
+    def test_resolve_approval_approve_moves_queue_and_records_decision(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-RESOLVE-APPROVE"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+            self._build_approval(root, run_id)
+
+            self._resolve_approval(root, run_id, "approve")
+
+            self.assertFalse((root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").exists())
+            self.assertTrue((root / "approval_queue" / "approved" / f"APR-{run_id}.yaml").exists())
+            decision = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "approval-decision.yaml")
+            payload = decision["approval_decision"]
+            self.assertEqual(payload["run_id"], run_id)
+            self.assertEqual(payload["decision"], "approve")
+            self.assertEqual(payload["actor"], "approver.local")
+            self.assertEqual(payload["source_queue_item"], f"approval_queue/pending/APR-{run_id}.yaml")
+            self.assertEqual(payload["target_queue_item"], f"approval_queue/approved/APR-{run_id}.yaml")
+
+    def test_resolve_approval_reject_moves_queue_and_records_decision(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-RESOLVE-REJECT"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+            self._build_approval(root, run_id)
+
+            self._resolve_approval(root, run_id, "reject")
+
+            self.assertFalse((root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").exists())
+            self.assertTrue((root / "approval_queue" / "rejected" / f"APR-{run_id}.yaml").exists())
+            decision = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "approval-decision.yaml")
+            self.assertEqual(decision["approval_decision"]["decision"], "reject")
+
+    def test_resolve_approval_exception_moves_queue_and_records_decision(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-RESOLVE-EXCEPTION"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id, tests="fail")
+            self._record_non_verification_ready(root, run_id)
+            self._build_approval(root, run_id)
+
+            self._resolve_approval(root, run_id, "exception")
+
+            self.assertFalse((root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").exists())
+            self.assertTrue((root / "approval_queue" / "exceptions" / f"APR-{run_id}.yaml").exists())
+            decision = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "approval-decision.yaml")
+            self.assertEqual(decision["approval_decision"]["decision"], "exception")
+
+    def test_resolve_approval_is_idempotent_after_first_resolution(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-RESOLVE-IDEMPOTENT"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+            self._build_approval(root, run_id)
+
+            self._resolve_approval(root, run_id, "approve")
+            self._resolve_approval(root, run_id, "approve")
+
+            self.assertFalse((root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").exists())
+            self.assertTrue((root / "approval_queue" / "approved" / f"APR-{run_id}.yaml").exists())
+            run_payload = read_yaml(root / "runs" / "latest" / run_id / "run.yaml")
+            self.assertEqual(run_payload["run"]["operations"]["resolve_approval"]["count"], 2)
+
+    def test_resolve_approval_fails_when_already_resolved_to_other_queue(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-RESOLVE-CONFLICT"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+            self._build_approval(root, run_id)
+
+            self._resolve_approval(root, run_id, "approve")
+            with self.assertRaises(ValueError):
+                main(
+                    [
+                        "resolve-approval",
+                        "--root",
+                        str(root),
+                        "--run-id",
+                        run_id,
+                        "--decision",
+                        "reject",
+                        "--actor",
+                        "approver.local",
+                        "--note",
+                        "reject after approval",
+                    ]
+                )
 
 
 if __name__ == "__main__":

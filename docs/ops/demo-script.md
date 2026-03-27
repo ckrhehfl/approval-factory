@@ -122,6 +122,25 @@ sed -n '1,220p' "runs/latest/$RUN_ID/artifacts/evidence-bundle.yaml"
 find approval_queue/pending -maxdepth 1 -type f -name "APR-$RUN_ID*.yaml" | sort
 ```
 
+## 9) resolve-approval
+
+```bash
+factory resolve-approval \
+  --root . \
+  --run-id "$RUN_ID" \
+  --decision approve \
+  --actor "approver.local" \
+  --note "all merge prerequisites satisfied"
+```
+
+확인:
+
+```bash
+sed -n '1,220p' "runs/latest/$RUN_ID/artifacts/approval-decision.yaml"
+find approval_queue/approved -maxdepth 1 -type f -name "APR-$RUN_ID*.yaml" | sort
+find approval_queue/pending -maxdepth 1 -type f -name "APR-$RUN_ID*.yaml" | sort
+```
+
 ## 참고: queue 적재 조건
 
 - docs-sync 상태가 `complete` 또는 `not-needed`
@@ -129,6 +148,5 @@ find approval_queue/pending -maxdepth 1 -type f -name "APR-$RUN_ID*.yaml" | sort
 
 ## 참고: pending 이후 운영 (현재 MVP)
 
-- 자동 승인 처리 명령은 없다.
-- 승인자는 `approval_queue/pending/APR-<run-id>.yaml`와 run artifact를 보고 수동으로 결정한다.
-- 결정 이후 `approved/`, `rejected/`, `exceptions/`로의 분류/이동도 수동 운영이다.
+- 승인자는 `approval_queue/pending/APR-<run-id>.yaml`와 run artifact를 보고 결정을 내린다.
+- 결정 반영은 `factory resolve-approval`로 수행한다.

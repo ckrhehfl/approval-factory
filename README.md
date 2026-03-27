@@ -31,6 +31,7 @@
 - `record-verification`
 - `gate-check`
 - `build-approval`
+- `resolve-approval`
 
 도움말:
 
@@ -50,6 +51,7 @@ factory <command> --help
 7. `record-docs-sync` 기록
 8. `gate-check`로 merge/exception gate 판정
 9. `build-approval`로 evidence/approval-request 생성 및 조건 충족 시 queue 적재
+10. `resolve-approval`로 승인자 결정을 기록하고 queue를 pending에서 최종 queue로 이동
 
 조건 요약:
 - review/qa 실패 시 `merge_approval=blocked`
@@ -79,10 +81,9 @@ factory <command> --help
 
 현재 MVP에서 자동 처리되는 범위:
 - pending 큐 적재까지 (`build-approval` 실행 시)
+- 승인자 결정 기록 및 queue 이동 (`resolve-approval` 실행 시)
 
 현재 MVP에서 수동 운영인 범위:
-- pending 이후 승인자 결정 반영
-- `approved/`, `rejected/`, `exceptions/`로의 분류/이동
 - merge/release 실행
 
 재실행 규칙:
@@ -111,6 +112,7 @@ factory record-qa --root . --run-id RUN-LOCAL --status pass --summary "qa ok"
 factory record-docs-sync --root . --run-id RUN-LOCAL --status complete --summary "docs aligned"
 factory gate-check --root . --run-id RUN-LOCAL
 factory build-approval --root . --run-id RUN-LOCAL
+factory resolve-approval --root . --run-id RUN-LOCAL --decision approve --actor approver.local --note "all gates satisfied"
 ```
 
 ## 다음 단계 후보 (MVP 이후)

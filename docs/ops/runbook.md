@@ -15,7 +15,8 @@
 11. Docs Sync 완료
 12. `gate-check`로 gate 판정 확인
 13. `build-approval`로 Evidence Bundle + Approval Request 생성
-14. Merge
+14. `resolve-approval`로 승인자 결정 기록 및 queue 정리
+15. Merge
 
 ## goal intake 최소 계약
 
@@ -73,10 +74,11 @@ Docs Sync 단계로 되돌린다.
 - 같은 파일명이 이미 존재하고 내용이 다르면 `APR-<run-id>--r2.yaml`, `--r3` 순으로 append한다.
 
 ### pending 이후 승인자 운영 (현재 MVP)
-- 자동 승인 처리 CLI는 아직 없다.
 - 승인자는 `approval_queue/pending/*.yaml`와 `runs/latest/<run-id>/artifacts/{evidence-bundle,approval-request}.yaml`를 함께 검토한다.
-- 승인자 결정(`approve`, `reject`, `request_changes`, `approve_with_exception`)은 현재 MVP에서 수동으로 기록/운영한다.
-- 필요 시 운영자가 `approved/`, `rejected/`, `exceptions/` 디렉터리로 수동 분류한다.
+- 승인자 결정은 `factory resolve-approval --decision {approve|reject|exception}`으로 기록한다.
+- resolve 시 `runs/latest/<run-id>/artifacts/approval-decision.yaml`이 생성/갱신된다.
+- resolve 시 queue 파일은 `pending`에서 `approved|rejected|exceptions`로 이동한다.
+- 이미 같은 결정으로 처리된 run을 다시 resolve해도 idempotent하게 동작한다.
 
 ### gate/build 재실행 추적
 - `run.yaml`의 `run.operations`에 `gate_check`, `build_approval` 실행 횟수(`count`)와 마지막 실행 정보(`last_at`, `last_details`)를 남긴다.
