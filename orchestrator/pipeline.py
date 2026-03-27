@@ -44,6 +44,8 @@ PR_DOC_FILENAMES = (
     "decision.md",
 )
 
+GOAL_STATUS = "draft"
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -59,6 +61,13 @@ def _ensure_text_file(path: Path, lines: Iterable[str]) -> None:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
+def _normalize_multiline_text(value: str | None) -> list[str]:
+    text = (value or "").strip()
+    if not text:
+        return ["TBD"]
+    return text.splitlines()
 
 
 def _run_root(root_dir: Path, run_id: str) -> Path:
@@ -170,6 +179,62 @@ def _queue_path_for_approval(root_dir: Path, approval: dict[str, Any]) -> tuple[
         if read_yaml(candidate) == approval:
             return candidate, False
         retry += 1
+
+
+def create_goal(
+    *,
+    root_dir: Path,
+    goal_id: str,
+    title: str,
+    problem: str,
+    outcome: str,
+    constraints: str | None = None,
+) -> Path:
+    goal_path = root_dir / "goals" / f"{goal_id}.md"
+    if goal_path.exists():
+        raise FileExistsError(f"Goal artifact already exists for goal-id '{goal_id}': {goal_path.as_posix()}")
+
+    constraint_lines = _normalize_multiline_text(constraints)
+    lines = [
+        f"# {goal_id}: {title}",
+        "",
+        "## Goal ID",
+        goal_id,
+        "",
+        "## Title",
+        title,
+        "",
+        "## Status",
+        GOAL_STATUS,
+        "",
+        "## Problem",
+        *problem.splitlines(),
+        "",
+        "## Desired Outcome",
+        *outcome.splitlines(),
+        "",
+        "## Non-Goals",
+        "- TBD",
+        "",
+        "## Constraints",
+        *constraint_lines,
+        "",
+        "## Risks",
+        "- TBD",
+        "",
+        "## Open Questions",
+        "- TBD",
+        "",
+        "## Approval-Required Decisions",
+        "- TBD",
+        "",
+        "## Success Criteria",
+        "- TBD",
+        "",
+    ]
+    goal_path.parent.mkdir(parents=True, exist_ok=True)
+    goal_path.write_text("\n".join(lines), encoding="utf-8")
+    return goal_path
 
 
 def bootstrap_run(

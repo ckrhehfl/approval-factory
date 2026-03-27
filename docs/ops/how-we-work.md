@@ -11,36 +11,45 @@
 - file-based
 - approval-first
 - one-PR-at-a-time
+- Goal intake minimum
 
 비포함:
-- Goal intake 자동화
+- Goal intake 질문 자동화
+- Goal 해결 자동화
+- Goal to Work Item 자동 분해
+- LLM 연동
 - UI
 - central control plane
 - multi-project orchestration
 
-## 운영 흐름 (WI -> PR -> run -> approval)
+## 운영 흐름 (Goal -> WI -> PR -> run -> approval)
 
-1. Work Item 정의
+1. Goal intake
+- `factory create-goal`로 `goals/<goal-id>.md`를 생성한다.
+- Goal은 사람이 읽고 수정 가능한 Markdown artifact다.
+- 현재 단계는 intake 저장 계약만 제공하며, planner/resolver는 다음 PR 범위다.
+
+2. Work Item 정의
 - `docs/work-items/WI-###-*.md`에 문제/범위/성공기준을 기록한다.
 
-2. PR 단위 계획
+3. PR 단위 계획
 - `docs/prs/PR-###/plan.md` 중심으로 one-PR-at-a-time 실행 계획을 고정한다.
 
-3. Run 부트스트랩
+4. Run 부트스트랩
 - `factory bootstrap-run`으로 `runs/latest/<run-id>/` 및 기본 artifact를 만든다.
 
-4. 역할별 결과 기록
+5. 역할별 결과 기록
 - Implementer/Reviewer/QA/Docs Sync/Verification 결과를 해당 record 명령으로 artifact에 반영한다.
 
-5. 게이트 판정
+6. 게이트 판정
 - `factory gate-check`로 `gate-status.yaml`을 갱신한다.
  - 이 단계는 gate 판정 확인용이며, 최종 승인 요청 산출물 최신화 단계는 아니다.
 
-6. 승인 패키지 생성
+7. 승인 패키지 생성
 - `factory build-approval`로 `evidence-bundle.yaml`, `approval-request.yaml`를 최신 상태로 만든다.
 - 조건이 맞으면 `approval_queue/pending/`에 approval 요청 파일이 적재된다.
 
-7. 승인자 결정
+8. 승인자 결정
 - 승인자는 queue 파일과 evidence를 보고 `approve/reject/request_changes/approve_with_exception`을 결정한다.
  - 현재 MVP에서는 pending 이후 승인 처리와 queue 상태 이동이 수동 운영이다.
 
