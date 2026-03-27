@@ -5,7 +5,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 
-from orchestrator.pipeline import bootstrap_run
+from orchestrator.pipeline import (
+    bootstrap_run,
+    build_approval_request,
+    evaluate_gates,
+    record_docs_sync,
+    record_qa,
+    record_review,
+)
 
 
 def _default_run_id() -> str:
@@ -23,6 +30,32 @@ def build_parser() -> argparse.ArgumentParser:
     bootstrap_parser.add_argument("--work-item-title", default="bootstrap-run")
     bootstrap_parser.add_argument("--pr-id", default="PR-000")
 
+    record_review_parser = subparsers.add_parser("record-review", help="Record review result")
+    record_review_parser.add_argument("--root", default=".", help="Repository root path")
+    record_review_parser.add_argument("--run-id", required=True)
+    record_review_parser.add_argument("--status", choices=["pass", "fail"], required=True)
+    record_review_parser.add_argument("--summary", required=True)
+
+    record_qa_parser = subparsers.add_parser("record-qa", help="Record QA result")
+    record_qa_parser.add_argument("--root", default=".", help="Repository root path")
+    record_qa_parser.add_argument("--run-id", required=True)
+    record_qa_parser.add_argument("--status", choices=["pass", "fail"], required=True)
+    record_qa_parser.add_argument("--summary", required=True)
+
+    record_docs_sync_parser = subparsers.add_parser("record-docs-sync", help="Record docs sync result")
+    record_docs_sync_parser.add_argument("--root", default=".", help="Repository root path")
+    record_docs_sync_parser.add_argument("--run-id", required=True)
+    record_docs_sync_parser.add_argument("--status", choices=["complete", "required", "not-needed"], required=True)
+    record_docs_sync_parser.add_argument("--summary", required=True)
+
+    gate_check_parser = subparsers.add_parser("gate-check", help="Evaluate gate status")
+    gate_check_parser.add_argument("--root", default=".", help="Repository root path")
+    gate_check_parser.add_argument("--run-id", required=True)
+
+    build_approval_parser = subparsers.add_parser("build-approval", help="Build evidence and approval request")
+    build_approval_parser.add_argument("--root", default=".", help="Repository root path")
+    build_approval_parser.add_argument("--run-id", required=True)
+
     return parser
 
 
@@ -39,6 +72,48 @@ def main(argv: Sequence[str] | None = None) -> int:
             pr_id=args.pr_id,
         )
         print(run_root.as_posix())
+        return 0
+
+    if args.command == "record-review":
+        path = record_review(
+            root_dir=Path(args.root),
+            run_id=args.run_id,
+            status=args.status,
+            summary=args.summary,
+        )
+        print(path.as_posix())
+        return 0
+
+    if args.command == "record-qa":
+        path = record_qa(
+            root_dir=Path(args.root),
+            run_id=args.run_id,
+            status=args.status,
+            summary=args.summary,
+        )
+        print(path.as_posix())
+        return 0
+
+    if args.command == "record-docs-sync":
+        path = record_docs_sync(
+            root_dir=Path(args.root),
+            run_id=args.run_id,
+            status=args.status,
+            summary=args.summary,
+        )
+        print(path.as_posix())
+        return 0
+
+    if args.command == "gate-check":
+        path = evaluate_gates(root_dir=Path(args.root), run_id=args.run_id)
+        print(path.as_posix())
+        return 0
+
+    if args.command == "build-approval":
+        approval_path, queue_path = build_approval_request(root_dir=Path(args.root), run_id=args.run_id)
+        print(approval_path.as_posix())
+        if queue_path is not None:
+            print(queue_path.as_posix())
         return 0
 
     parser.error(f"Unsupported command: {args.command}")
