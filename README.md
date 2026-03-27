@@ -5,13 +5,16 @@
 ## 현재 MVP 범위
 
 포함:
+- repo-local, file-based Goal intake minimum (`goals/*.md`)
 - repo-local, file-based 운영 (`runs/latest`, `approval_queue/*`)
 - approval-first 원칙 기반의 게이트 판정
 - one-PR-at-a-time 운영 가정
 - PR 실행 산출물(artifact) 및 문서 흔적(`docs/prs`, `docs/work-items`) 생성/갱신
 
 비포함:
-- Goal intake 자동화
+- Goal intake 질문 자동 생성
+- Goal to Work Item 자동 분해
+- LLM 연동
 - UI
 - central control plane
 - multi-project orchestration
@@ -21,6 +24,7 @@
 엔트리포인트: `factory`
 
 - `bootstrap-run`
+- `create-goal`
 - `record-review`
 - `record-qa`
 - `record-docs-sync`
@@ -38,14 +42,16 @@ factory <command> --help
 
 ## 기본 실행 흐름
 
-1. `bootstrap-run`으로 canonical run/artifact 스켈레톤 생성
-2. `record-verification`으로 lint/tests/type-check/build 상태 기록
-3. `record-review` 기록
-4. `record-qa` 기록
-5. `record-docs-sync` 기록
-6. `gate-check`로 merge/exception gate 판정
-7. `build-approval`로 evidence/approval-request 생성 및 조건 충족 시 queue 적재
-8. `resolve-approval`로 승인자 결정을 기록하고 queue를 pending에서 최종 queue로 이동
+1. `create-goal`로 repo-local Goal artifact 생성
+2. 사람 승인 하에 Goal을 Work Item/PR 계획으로 연결
+3. `bootstrap-run`으로 canonical run/artifact 스켈레톤 생성
+4. `record-verification`으로 lint/tests/type-check/build 상태 기록
+5. `record-review` 기록
+6. `record-qa` 기록
+7. `record-docs-sync` 기록
+8. `gate-check`로 merge/exception gate 판정
+9. `build-approval`로 evidence/approval-request 생성 및 조건 충족 시 queue 적재
+10. `resolve-approval`로 승인자 결정을 기록하고 queue를 pending에서 최종 queue로 이동
 
 조건 요약:
 - review/qa 실패 시 `merge_approval=blocked`
@@ -87,6 +93,7 @@ factory <command> --help
 ## 주요 경로
 
 - 오케스트레이터: `orchestrator/`
+- Goal artifact: `goals/<goal-id>.md`
 - 게이트 설정: `config/gates.yaml`
 - 운영 문서: `docs/ops/`
 - PR 문서: `docs/prs/`
@@ -97,6 +104,7 @@ factory <command> --help
 
 ```bash
 pip install -e ".[dev]"
+factory create-goal --root . --goal-id GOAL-LOCAL --title "local intake" --problem "Need a formal goal artifact" --outcome "A readable goal file exists" --constraints "repo-local only"
 factory bootstrap-run --root . --run-id RUN-LOCAL --work-item-id WI-LOCAL --work-item-title "local bootstrap" --pr-id PR-LOCAL
 factory record-verification --root . --run-id RUN-LOCAL --lint pass --tests pass --type-check pass --build pass --summary "all checks green"
 factory record-review --root . --run-id RUN-LOCAL --status pass --summary "review ok"
@@ -109,6 +117,6 @@ factory resolve-approval --root . --run-id RUN-LOCAL --decision approve --actor 
 
 ## 다음 단계 후보 (MVP 이후)
 
-1. Goal intake
+1. Goal clarification loop
 2. clarification loop
 3. WI auto-generation

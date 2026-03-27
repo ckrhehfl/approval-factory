@@ -3,19 +3,40 @@
 ## 정상 운영 순서
 
 1. Work Item 생성
-2. Scope 승인
-3. 설계 초안 생성
-4. Architecture 승인 필요 여부 판정
-5. PR 분해
-6. PR별 구현
-7. Verification 기록(lint/tests/type_check/build)
-8. Review
-9. QA
-10. Docs Sync 완료
-11. `gate-check`로 gate 판정 확인
-12. `build-approval`로 Evidence Bundle + Approval Request 생성
-13. `resolve-approval`로 승인자 결정 기록 및 queue 정리
-14. Merge
+2. Goal intake 필요 시 `factory create-goal`로 `goals/<goal-id>.md` 생성
+3. Scope 승인
+4. 설계 초안 생성
+5. Architecture 승인 필요 여부 판정
+6. PR 분해
+7. PR별 구현
+8. Verification 기록(lint/tests/type_check/build)
+9. Review
+10. QA
+11. Docs Sync 완료
+12. `gate-check`로 gate 판정 확인
+13. `build-approval`로 Evidence Bundle + Approval Request 생성
+14. `resolve-approval`로 승인자 결정 기록 및 queue 정리
+15. Merge
+
+## goal intake 최소 계약
+
+- Goal artifact는 `goals/<goal-id>.md`에 저장한다.
+- 생성 명령은 `factory create-goal --root <repo> --goal-id <id> --title <title> --problem <text> --outcome <text> [--constraints <text>]` 이다.
+- 생성되는 문서는 사람 검토용 Markdown이며 다음 섹션을 항상 포함한다:
+  - Goal ID
+  - Title
+  - Status
+  - Problem
+  - Desired Outcome
+  - Non-Goals
+  - Constraints
+  - Risks
+  - Open Questions
+  - Approval-Required Decisions
+  - Success Criteria
+- 동일 `goal-id`가 이미 존재하면 명령은 실패한다.
+- 현재 PR 범위에서 goal artifact는 intake 저장 계약만 제공한다.
+- 질문 자동 생성, goal 해소, Work Item 자동 분해, LLM 연결은 아직 없다.
 
 ## gate-check와 build-approval의 역할 차이
 

@@ -5,12 +5,35 @@
 ## 0) 변수 설정
 
 ```bash
+GOAL_ID="GOAL-007-DEMO"
 RUN_ID="RUN-DEMO-001"
 WI_ID="WI-005"
 PR_ID="PR-005"
 ```
 
-## 1) bootstrap-run
+## 1) create-goal
+
+```bash
+factory create-goal \
+  --root . \
+  --goal-id "$GOAL_ID" \
+  --title "goal intake demo" \
+  --problem "A human needs a formal repo-local way to register a project goal." \
+  --outcome "A readable goal artifact exists under goals/." \
+  --constraints "repo-local\nfile-based"
+```
+
+확인:
+
+```bash
+sed -n '1,220p' "goals/$GOAL_ID.md"
+```
+
+주의:
+- 현재 Goal intake는 artifact 생성만 다룬다.
+- 자동 질문 생성, goal 해결, WI 자동 분해는 아직 없다.
+
+## 2) bootstrap-run
 
 ```bash
 factory bootstrap-run \
@@ -21,7 +44,7 @@ factory bootstrap-run \
   --pr-id "$PR_ID"
 ```
 
-## 2) record-review
+## 3) record-review
 
 ```bash
 factory record-review \
@@ -31,7 +54,7 @@ factory record-review \
   --summary "review passed for MVP demo"
 ```
 
-## 3) record-qa
+## 4) record-qa
 
 ```bash
 factory record-qa \
@@ -41,7 +64,7 @@ factory record-qa \
   --summary "qa passed for MVP demo"
 ```
 
-## 4) record-docs-sync
+## 5) record-docs-sync
 
 ```bash
 factory record-docs-sync \
@@ -51,7 +74,7 @@ factory record-docs-sync \
   --summary "docs are aligned"
 ```
 
-## 5) record-verification
+## 6) record-verification
 
 ```bash
 factory record-verification \
@@ -64,7 +87,7 @@ factory record-verification \
   --summary "all checks green"
 ```
 
-## 6) gate-check
+## 7) gate-check
 
 ```bash
 factory gate-check --root . --run-id "$RUN_ID"
@@ -80,7 +103,7 @@ sed -n '1,200p' "runs/latest/$RUN_ID/artifacts/gate-status.yaml"
 - `gate-check`는 gate 판정만 갱신한다.
 - 최종 승인 요청 판단은 다음 단계 `build-approval` 산출물 기준으로 한다.
 
-## 7) build-approval
+## 8) build-approval
 
 ```bash
 factory build-approval --root . --run-id "$RUN_ID"
@@ -93,7 +116,7 @@ sed -n '1,220p' "runs/latest/$RUN_ID/artifacts/approval-request.yaml"
 sed -n '1,220p' "runs/latest/$RUN_ID/artifacts/evidence-bundle.yaml"
 ```
 
-## 8) approval_queue 확인
+## 9) approval_queue 확인
 
 ```bash
 find approval_queue/pending -maxdepth 1 -type f -name "APR-$RUN_ID*.yaml" | sort

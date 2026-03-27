@@ -56,3 +56,89 @@ class BootstrapCliTest(unittest.TestCase):
             self.assertTrue((pr_docs / "docs-sync.md").exists())
             self.assertTrue((pr_docs / "evidence.md").exists())
             self.assertTrue((pr_docs / "decision.md").exists())
+
+
+class CreateGoalCliTest(unittest.TestCase):
+    def test_create_goal_creates_markdown_artifact(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            exit_code = main(
+                [
+                    "create-goal",
+                    "--root",
+                    str(root),
+                    "--goal-id",
+                    "GOAL-007",
+                    "--title",
+                    "Goal intake contract",
+                    "--problem",
+                    "People need a formal way to persist project goals.",
+                    "--outcome",
+                    "A readable goal artifact exists in the repo.",
+                    "--constraints",
+                    "repo-local\nfile-based",
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+
+            goal_path = root / "goals" / "GOAL-007.md"
+            self.assertTrue(goal_path.exists())
+
+            content = goal_path.read_text(encoding="utf-8")
+            self.assertIn("# GOAL-007: Goal intake contract", content)
+            self.assertIn("## Goal ID\nGOAL-007", content)
+            self.assertIn("## Status\ndraft", content)
+            self.assertIn("## Problem\nPeople need a formal way to persist project goals.", content)
+            self.assertIn("## Desired Outcome\nA readable goal artifact exists in the repo.", content)
+            self.assertIn("## Constraints\nrepo-local\nfile-based", content)
+            self.assertIn("## Non-Goals\n- TBD", content)
+            self.assertIn("## Risks\n- TBD", content)
+            self.assertIn("## Open Questions\n- TBD", content)
+            self.assertIn("## Approval-Required Decisions\n- TBD", content)
+            self.assertIn("## Success Criteria\n- TBD", content)
+
+    def test_create_goal_rejects_duplicate_goal_id(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            first_exit_code = main(
+                [
+                    "create-goal",
+                    "--root",
+                    str(root),
+                    "--goal-id",
+                    "GOAL-007",
+                    "--title",
+                    "Goal intake contract",
+                    "--problem",
+                    "Need a formal intake contract.",
+                    "--outcome",
+                    "Goal artifact exists.",
+                ]
+            )
+            self.assertEqual(first_exit_code, 0)
+
+            with self.assertRaises(SystemExit) as exc_info:
+                main(
+                    [
+                        "create-goal",
+                        "--root",
+                        str(root),
+                        "--goal-id",
+                        "GOAL-007",
+                        "--title",
+                        "Goal intake contract",
+                        "--problem",
+                        "Need a formal intake contract.",
+                        "--outcome",
+                        "Goal artifact exists.",
+                    ]
+                )
+
+            self.assertEqual(exc_info.exception.code, 2)

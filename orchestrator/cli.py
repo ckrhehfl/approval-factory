@@ -8,6 +8,7 @@ from typing import Sequence
 from orchestrator.pipeline import (
     bootstrap_run,
     build_approval_request,
+    create_goal,
     evaluate_gates,
     record_docs_sync,
     record_qa,
@@ -66,6 +67,14 @@ def build_parser() -> argparse.ArgumentParser:
     build_approval_parser = subparsers.add_parser("build-approval", help="Build evidence and approval request")
     build_approval_parser.add_argument("--root", default=".", help="Repository root path")
     build_approval_parser.add_argument("--run-id", required=True)
+
+    create_goal_parser = subparsers.add_parser("create-goal", help="Create a goal intake artifact")
+    create_goal_parser.add_argument("--root", default=".", help="Repository root path")
+    create_goal_parser.add_argument("--goal-id", required=True)
+    create_goal_parser.add_argument("--title", required=True)
+    create_goal_parser.add_argument("--problem", required=True)
+    create_goal_parser.add_argument("--outcome", required=True)
+    create_goal_parser.add_argument("--constraints")
 
     resolve_approval_parser = subparsers.add_parser("resolve-approval", help="Resolve pending approval request")
     resolve_approval_parser.add_argument("--root", default=".", help="Repository root path")
@@ -145,6 +154,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(approval_path.as_posix())
         if queue_path is not None:
             print(queue_path.as_posix())
+        return 0
+
+    if args.command == "create-goal":
+        try:
+            path = create_goal(
+                root_dir=Path(args.root),
+                goal_id=args.goal_id,
+                title=args.title,
+                problem=args.problem,
+                outcome=args.outcome,
+                constraints=args.constraints,
+            )
+        except FileExistsError as exc:
+            parser.error(str(exc))
+        print(path.as_posix())
         return 0
 
     if args.command == "resolve-approval":
