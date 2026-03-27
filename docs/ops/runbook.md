@@ -12,9 +12,15 @@
 8. Review
 9. QA
 10. Docs Sync 완료
-11. Evidence Bundle 생성
-12. Merge Approval 요청
+11. `gate-check`로 gate 판정 확인
+12. `build-approval`로 Evidence Bundle + Approval Request 생성
 13. Merge
+
+## gate-check와 build-approval의 역할 차이
+
+- `gate-check`는 `gate-status.yaml` 판정만 갱신한다.
+- `build-approval`는 evidence를 재생성하고 gate를 다시 계산한 뒤 `approval-request.yaml`를 만든다.
+- 최종 승인 요청 판단은 `build-approval` 이후 산출물을 기준으로 한다.
 
 ## 실패 시 복구
 
@@ -44,6 +50,12 @@ Docs Sync 단계로 되돌린다.
 - 기본 queue 파일명은 `approval_queue/pending/APR-<run-id>.yaml` 이다.
 - 동일 내용으로 `build-approval`를 재실행하면 queue 파일을 중복 생성하지 않는다.
 - 같은 파일명이 이미 존재하고 내용이 다르면 `APR-<run-id>--r2.yaml`, `--r3` 순으로 append한다.
+
+### pending 이후 승인자 운영 (현재 MVP)
+- 자동 승인 처리 CLI는 아직 없다.
+- 승인자는 `approval_queue/pending/*.yaml`와 `runs/latest/<run-id>/artifacts/{evidence-bundle,approval-request}.yaml`를 함께 검토한다.
+- 승인자 결정(`approve`, `reject`, `request_changes`, `approve_with_exception`)은 현재 MVP에서 수동으로 기록/운영한다.
+- 필요 시 운영자가 `approved/`, `rejected/`, `exceptions/` 디렉터리로 수동 분류한다.
 
 ### gate/build 재실행 추적
 - `run.yaml`의 `run.operations`에 `gate_check`, `build_approval` 실행 횟수(`count`)와 마지막 실행 정보(`last_at`, `last_details`)를 남긴다.

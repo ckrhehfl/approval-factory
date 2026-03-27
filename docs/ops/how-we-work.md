@@ -34,6 +34,7 @@
 
 5. 게이트 판정
 - `factory gate-check`로 `gate-status.yaml`을 갱신한다.
+ - 이 단계는 gate 판정 확인용이며, 최종 승인 요청 산출물 최신화 단계는 아니다.
 
 6. 승인 패키지 생성
 - `factory build-approval`로 `evidence-bundle.yaml`, `approval-request.yaml`를 최신 상태로 만든다.
@@ -41,6 +42,7 @@
 
 7. 승인자 결정
 - 승인자는 queue 파일과 evidence를 보고 `approve/reject/request_changes/approve_with_exception`을 결정한다.
+ - 현재 MVP에서는 pending 이후 승인 처리와 queue 상태 이동이 수동 운영이다.
 
 ## 역할 설명 (현재 MVP 기준)
 
@@ -64,4 +66,5 @@ Verification:
 
 - 명령 실행과 판정 업데이트는 CLI로 반자동 처리한다.
 - 최종 승인 결정은 반드시 인간 승인자가 수행한다.
+- `approved/rejected/exceptions` 반영은 현재 MVP에서 수동 운영이다.
 - 승인 없는 범위 확대, 구조 변경 확정, 테스트 실패 무시는 금지다.

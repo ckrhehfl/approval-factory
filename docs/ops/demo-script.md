@@ -76,6 +76,10 @@ factory gate-check --root . --run-id "$RUN_ID"
 sed -n '1,200p' "runs/latest/$RUN_ID/artifacts/gate-status.yaml"
 ```
 
+주의:
+- `gate-check`는 gate 판정만 갱신한다.
+- 최종 승인 요청 판단은 다음 단계 `build-approval` 산출물 기준으로 한다.
+
 ## 7) build-approval
 
 ```bash
@@ -99,3 +103,9 @@ find approval_queue/pending -maxdepth 1 -type f -name "APR-$RUN_ID*.yaml" | sort
 
 - docs-sync 상태가 `complete` 또는 `not-needed`
 - merge gate가 `ready` 또는 `exception_required`
+
+## 참고: pending 이후 운영 (현재 MVP)
+
+- 자동 승인 처리 명령은 없다.
+- 승인자는 `approval_queue/pending/APR-<run-id>.yaml`와 run artifact를 보고 수동으로 결정한다.
+- 결정 이후 `approved/`, `rejected/`, `exceptions/`로의 분류/이동도 수동 운영이다.

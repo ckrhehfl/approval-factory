@@ -51,6 +51,17 @@ factory <command> --help
 - 모든 prerequisite 통과 시 `merge_approval=ready`
 - queue 적재는 `docs_sync` 완료(`complete` 또는 `not-needed`)이고 merge gate가 `ready` 또는 `exception_required`일 때만 수행
 
+## gate-check vs build-approval
+
+- `gate-check`:
+  - `gate-status.yaml`의 gate 판정만 갱신한다.
+  - `evidence_bundle_complete` 판정은 기존 `evidence-bundle.yaml` 상태를 읽어 계산한다.
+  - 따라서 `gate-check`만 실행한 결과는 최종 승인 요청 산출물 최신 상태를 보장하지 않는다.
+- `build-approval`:
+  - 내부에서 evidence bundle 재생성 후 gate를 다시 계산한다.
+  - `evidence-bundle.yaml`과 `approval-request.yaml`을 최신 상태로 만든다.
+  - 조건 충족 시 `approval_queue/pending/APR-<run-id>.yaml`를 생성/갱신한다.
+
 ## approval queue 설명
 
 - 대기 큐: `approval_queue/pending/`
@@ -59,6 +70,14 @@ factory <command> --help
 - 예외 큐: `approval_queue/exceptions/`
 
 `build-approval`는 기본적으로 `approval_queue/pending/APR-<run-id>.yaml`를 사용한다.
+
+현재 MVP에서 자동 처리되는 범위:
+- pending 큐 적재까지 (`build-approval` 실행 시)
+
+현재 MVP에서 수동 운영인 범위:
+- pending 이후 승인자 결정 반영
+- `approved/`, `rejected/`, `exceptions/`로의 분류/이동
+- merge/release 실행
 
 재실행 규칙:
 - 같은 내용으로 재실행하면 queue 파일을 중복 생성하지 않는다(idempotent).
