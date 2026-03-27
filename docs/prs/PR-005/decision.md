@@ -26,3 +26,16 @@
 ## next required gate
 
 - approver decision
+
+## Final Approval (Approver)
+
+Decision: APPROVED
+
+Rationale:
+- MVP acceptance criteria satisfied
+- approval loop (record → gate → build-approval → queue) verified via demo
+- all PR artifacts present
+- tests passing
+
+Next:
+- PR-006: approval decision lifecycle hardening
