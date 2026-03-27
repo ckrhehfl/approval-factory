@@ -35,6 +35,7 @@
 - in_progress
 - review
 - qa
+- docs_sync
 - approval_pending
 - approved
 - merged
@@ -48,12 +49,37 @@
 4. Implementer가 코드/테스트 작성
 5. Reviewer가 리스크와 설계 정합성 검토
 6. QA가 기능/회귀 검증
-7. Orchestrator가 evidence bundle 생성
-8. Approver가 승인/반려
-9. Docs Sync가 문서 최종 정리
+7. Docs Sync가 문서 최종 정리
+8. Orchestrator가 evidence bundle 생성
+9. Approver가 승인/반려
 10. Merge
 
-## 4. 확장 경계
+## 4. canonical naming
+
+사람용 문서 경로:
+
+- `docs/work-items/WI-###-<slug>.md`
+- `docs/prs/PR-###/scope.md`
+- `docs/prs/PR-###/plan.md`
+- `docs/prs/PR-###/review.md`
+- `docs/prs/PR-###/qa.md`
+- `docs/prs/PR-###/docs-sync.md`
+- `docs/prs/PR-###/evidence.md`
+- `docs/prs/PR-###/decision.md`
+
+기계용 artifact 경로:
+
+- `runs/latest/<run_id>/run.yaml`
+- `runs/latest/<run_id>/artifacts/work-item.yaml`
+- `runs/latest/<run_id>/artifacts/pr-plan.yaml`
+- `runs/latest/<run_id>/artifacts/review-report.yaml`
+- `runs/latest/<run_id>/artifacts/qa-report.yaml`
+- `runs/latest/<run_id>/artifacts/docs-sync-report.yaml`
+- `runs/latest/<run_id>/artifacts/evidence-bundle.yaml`
+- `runs/latest/<run_id>/artifacts/approval-request.yaml`
+- `runs/latest/<run_id>/artifacts/gate-status.yaml`
+
+## 5. 확장 경계
 
 MVP에서 다음은 명확히 분리해야 한다.
 
@@ -65,7 +91,7 @@ MVP에서 다음은 명확히 분리해야 한다.
 
 이 경계가 유지되면 이후 중앙 control plane으로 승격 가능하다.
 
-## 5. 레포 우선 구조
+## 6. 레포 우선 구조
 
 현재는 repo-local 구조를 사용한다.
 이는 다음 이유에서다.

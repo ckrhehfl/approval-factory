@@ -10,9 +10,9 @@
 6. PR별 구현
 7. Review
 8. QA
-9. Evidence Bundle 생성
-10. Merge Approval 요청
-11. Docs Sync 완료
+9. Docs Sync 완료
+10. Evidence Bundle 생성
+11. Merge Approval 요청
 12. Merge
 
 ## 실패 시 복구

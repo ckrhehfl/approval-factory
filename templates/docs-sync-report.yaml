@@ -1,0 +1,6 @@
+docs_sync_report:
+  pr_id: PR-000
+  required: true
+  status: pending
+  changed_docs: []
+  notes: []
