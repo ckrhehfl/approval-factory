@@ -77,6 +77,18 @@ def _write_run(root_dir: Path, run_id: str, payload: dict[str, Any]) -> None:
     write_yaml(_run_root(root_dir, run_id) / "run.yaml", payload)
 
 
+def _record_run_operation(root_dir: Path, run_id: str, operation: str, details: dict[str, Any] | None = None) -> None:
+    run_payload = _load_run(root_dir, run_id)
+    run = run_payload["run"]
+    operations = run.setdefault("operations", {})
+    operation_state = operations.setdefault(operation, {"count": 0})
+    operation_state["count"] = int(operation_state.get("count", 0)) + 1
+    operation_state["last_at"] = _now_iso()
+    if details:
+        operation_state["last_details"] = details
+    _write_run(root_dir, run_id, run_payload)
+
+
 def _artifact_path(root_dir: Path, run_id: str, name: str) -> Path:
     return _artifacts_dir(root_dir, run_id) / name
 
@@ -87,6 +99,13 @@ def _read_artifact(root_dir: Path, run_id: str, name: str) -> dict[str, Any]:
 
 def _write_artifact(root_dir: Path, run_id: str, name: str, payload: dict[str, Any]) -> None:
     write_yaml(_artifact_path(root_dir, run_id, name), payload)
+
+
+def _ensure_artifact(root_dir: Path, run_id: str, name: str, payload: dict[str, Any]) -> None:
+    path = _artifact_path(root_dir, run_id, name)
+    if path.exists():
+        return
+    write_yaml(path, payload)
 
 
 def _update_pipeline_state(root_dir: Path, run_id: str, state: PipelineState) -> None:
@@ -132,6 +151,27 @@ def _verification_payload_or_pending(root_dir: Path, run_id: str) -> dict[str, A
     return _read_verification_report(root_dir, run_id)
 
 
+def _queue_path_for_approval(root_dir: Path, approval: dict[str, Any]) -> tuple[Path, bool]:
+    approval_request = approval["approval_request"]
+    queue_dir = root_dir / "approval_queue" / "pending"
+    queue_dir.mkdir(parents=True, exist_ok=True)
+
+    primary = queue_dir / f"{approval_request['id']}.yaml"
+    if not primary.exists():
+        return primary, True
+    if read_yaml(primary) == approval:
+        return primary, False
+
+    retry = 2
+    while True:
+        candidate = queue_dir / f"{approval_request['id']}--r{retry}.yaml"
+        if not candidate.exists():
+            return candidate, True
+        if read_yaml(candidate) == approval:
+            return candidate, False
+        retry += 1
+
+
 def bootstrap_run(
     *,
     root_dir: Path,
@@ -141,20 +181,22 @@ def bootstrap_run(
     work_item_title: str = "bootstrap-run",
 ) -> Path:
     run_root = root_dir / "runs" / "latest" / run_id
-    artifacts_dir = run_root / "artifacts"
-    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    _artifacts_dir(root_dir, run_id).mkdir(parents=True, exist_ok=True)
 
-    initial_state = PipelineState.draft
-    run_record = RunRecord.new(
-        run_id=run_id,
-        work_item_id=work_item_id,
-        pr_id=pr_id,
-        state=initial_state.value,
-    )
-    write_yaml(run_root / "run.yaml", run_record.as_payload())
+    run_file = run_root / "run.yaml"
+    if not run_file.exists():
+        run_record = RunRecord.new(
+            run_id=run_id,
+            work_item_id=work_item_id,
+            pr_id=pr_id,
+            state=PipelineState.draft.value,
+        )
+        write_yaml(run_file, run_record.as_payload())
 
-    write_yaml(
-        artifacts_dir / "work-item.yaml",
+    _ensure_artifact(
+        root_dir,
+        run_id,
+        "work-item.yaml",
         {
             "work_item": {
                 "id": work_item_id,
@@ -163,8 +205,10 @@ def bootstrap_run(
             }
         },
     )
-    write_yaml(
-        artifacts_dir / "pr-plan.yaml",
+    _ensure_artifact(
+        root_dir,
+        run_id,
+        "pr-plan.yaml",
         {
             "pr_plan": {
                 "pr_id": pr_id,
@@ -173,8 +217,10 @@ def bootstrap_run(
             }
         },
     )
-    write_yaml(
-        artifacts_dir / "verification-report.yaml",
+    _ensure_artifact(
+        root_dir,
+        run_id,
+        "verification-report.yaml",
         {
             "verification_report": {
                 "pr_id": pr_id,
@@ -186,8 +232,10 @@ def bootstrap_run(
             }
         },
     )
-    write_yaml(
-        artifacts_dir / "review-report.yaml",
+    _ensure_artifact(
+        root_dir,
+        run_id,
+        "review-report.yaml",
         {
             "review_report": {
                 "pr_id": pr_id,
@@ -197,8 +245,10 @@ def bootstrap_run(
             }
         },
     )
-    write_yaml(
-        artifacts_dir / "qa-report.yaml",
+    _ensure_artifact(
+        root_dir,
+        run_id,
+        "qa-report.yaml",
         {
             "qa_report": {
                 "pr_id": pr_id,
@@ -208,8 +258,10 @@ def bootstrap_run(
             }
         },
     )
-    write_yaml(
-        artifacts_dir / "docs-sync-report.yaml",
+    _ensure_artifact(
+        root_dir,
+        run_id,
+        "docs-sync-report.yaml",
         {
             "docs_sync_report": {
                 "pr_id": pr_id,
@@ -220,8 +272,10 @@ def bootstrap_run(
             }
         },
     )
-    write_yaml(
-        artifacts_dir / "evidence-bundle.yaml",
+    _ensure_artifact(
+        root_dir,
+        run_id,
+        "evidence-bundle.yaml",
         {
             "evidence_bundle": {
                 "id": f"EV-{run_id}",
@@ -246,8 +300,10 @@ def bootstrap_run(
             }
         },
     )
-    write_yaml(
-        artifacts_dir / "approval-request.yaml",
+    _ensure_artifact(
+        root_dir,
+        run_id,
+        "approval-request.yaml",
         {
             "approval_request": {
                 "id": f"APR-{run_id}",
@@ -284,12 +340,14 @@ def bootstrap_run(
             }
         },
     )
-    write_yaml(
-        artifacts_dir / "gate-status.yaml",
+    _ensure_artifact(
+        root_dir,
+        run_id,
+        "gate-status.yaml",
         {
             "gate_status": {
                 "pr_id": pr_id,
-                "current_state": initial_state.value,
+                "current_state": PipelineState.draft.value,
                 "states": [state.value for state in PipelineState],
                 "gates": {
                     "scope_approval": "pending",
@@ -512,6 +570,15 @@ def evaluate_gates(*, root_dir: Path, run_id: str, gates_config_path: Path | Non
     gate_status["gate_status"]["prerequisite_results"] = prerequisite_results
     _write_artifact(root_dir, run_id, "gate-status.yaml", gate_status)
 
+    _record_run_operation(
+        root_dir,
+        run_id,
+        "gate_check",
+        {
+            "merge_approval": merge_gate,
+            "exception_approval": exception_gate,
+        },
+    )
     _update_pipeline_state(root_dir, run_id, PipelineState.approval_pending)
     return _artifact_path(root_dir, run_id, "gate-status.yaml")
 
@@ -593,7 +660,19 @@ def build_approval_request(*, root_dir: Path, run_id: str) -> tuple[Path, Path |
     queue_path: Path | None = None
     docs_ready = _docs_sync_complete(docs_sync_status)
     if docs_ready and merge_gate in {"ready", "exception_required"}:
-        queue_path = root_dir / "approval_queue" / "pending" / f"APR-{run_id}.yaml"
-        write_yaml(queue_path, approval)
+        queue_path, should_write_queue = _queue_path_for_approval(root_dir, approval)
+        if should_write_queue:
+            write_yaml(queue_path, approval)
+
+    _record_run_operation(
+        root_dir,
+        run_id,
+        "build_approval",
+        {
+            "recommended_decision": recommended_decision,
+            "merge_approval": merge_gate,
+            "queued": queue_path.as_posix() if queue_path is not None else "",
+        },
+    )
 
     return approval_path, queue_path

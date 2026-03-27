@@ -180,6 +180,74 @@ class PipelineApprovalLoopTest(unittest.TestCase):
 
             self.assertFalse((root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").exists())
 
+    def test_duplicate_build_approval_is_idempotent(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-DUP-BUILD"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+
+            self._build_approval(root, run_id)
+            self._build_approval(root, run_id)
+
+            queue_files = sorted((root / "approval_queue" / "pending").glob(f"APR-{run_id}*.yaml"))
+            self.assertEqual(len(queue_files), 1)
+            run_payload = read_yaml(root / "runs" / "latest" / run_id / "run.yaml")
+            self.assertEqual(run_payload["run"]["operations"]["build_approval"]["count"], 2)
+
+    def test_duplicate_gate_check_keeps_single_canonical_artifact(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-DUP-GATE"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+
+            self.assertEqual(main(["gate-check", "--root", str(root), "--run-id", run_id]), 0)
+            self.assertEqual(main(["gate-check", "--root", str(root), "--run-id", run_id]), 0)
+
+            gate = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "gate-status.yaml")
+            self.assertEqual(gate["gate_status"]["gates"]["merge_approval"], "pending")
+            self.assertEqual(len(list((root / "runs" / "latest" / run_id / "artifacts").glob("gate-status*.yaml"))), 1)
+            run_payload = read_yaml(root / "runs" / "latest" / run_id / "run.yaml")
+            self.assertEqual(run_payload["run"]["operations"]["gate_check"]["count"], 2)
+
+    def test_queue_file_collision_creates_retry_suffix(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-COLLISION"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+
+            pending = root / "approval_queue" / "pending"
+            (pending / f"APR-{run_id}.yaml").write_text(
+                "approval_request:\n  id: APR-RUN-COLLISION\n  recommended_decision: reject\n",
+                encoding="utf-8",
+            )
+
+            self._build_approval(root, run_id)
+
+            self.assertTrue((pending / f"APR-{run_id}.yaml").exists())
+            self.assertTrue((pending / f"APR-{run_id}--r2.yaml").exists())
+
+    def test_bootstrap_rerun_does_not_reset_existing_artifacts(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-RERUN-SAFE"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id, lint="fail")
+
+            self._bootstrap(root, run_id)
+
+            verification = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "verification-report.yaml")
+            self.assertEqual(verification["verification_report"]["lint"], "fail")
+
 
 if __name__ == "__main__":
     unittest.main()
