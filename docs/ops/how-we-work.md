@@ -41,8 +41,9 @@
 - 조건이 맞으면 `approval_queue/pending/`에 approval 요청 파일이 적재된다.
 
 7. 승인자 결정
-- 승인자는 queue 파일과 evidence를 보고 `approve/reject/request_changes/approve_with_exception`을 결정한다.
- - 현재 MVP에서는 pending 이후 승인 처리와 queue 상태 이동이 수동 운영이다.
+- 승인자는 queue 파일과 evidence를 보고 `approve/reject/exception`을 결정한다.
+- `factory resolve-approval`로 승인 결정을 `approval-decision.yaml`에 기록한다.
+- resolve 시 queue 상태가 `pending`에서 `approved|rejected|exceptions`로 이동한다.
 
 ## 역할 설명 (현재 MVP 기준)
 
@@ -66,5 +67,5 @@ Verification:
 
 - 명령 실행과 판정 업데이트는 CLI로 반자동 처리한다.
 - 최종 승인 결정은 반드시 인간 승인자가 수행한다.
-- `approved/rejected/exceptions` 반영은 현재 MVP에서 수동 운영이다.
+- 승인자의 명시적 결정을 반영하는 기록/queue 이동은 `resolve-approval`로 수행한다.
 - 승인 없는 범위 확대, 구조 변경 확정, 테스트 실패 무시는 금지다.

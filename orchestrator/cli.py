@@ -13,6 +13,7 @@ from orchestrator.pipeline import (
     record_qa,
     record_review,
     record_verification,
+    resolve_approval,
 )
 
 
@@ -65,6 +66,13 @@ def build_parser() -> argparse.ArgumentParser:
     build_approval_parser = subparsers.add_parser("build-approval", help="Build evidence and approval request")
     build_approval_parser.add_argument("--root", default=".", help="Repository root path")
     build_approval_parser.add_argument("--run-id", required=True)
+
+    resolve_approval_parser = subparsers.add_parser("resolve-approval", help="Resolve pending approval request")
+    resolve_approval_parser.add_argument("--root", default=".", help="Repository root path")
+    resolve_approval_parser.add_argument("--run-id", required=True)
+    resolve_approval_parser.add_argument("--decision", choices=["approve", "reject", "exception"], required=True)
+    resolve_approval_parser.add_argument("--actor", required=True)
+    resolve_approval_parser.add_argument("--note", required=True)
 
     return parser
 
@@ -137,6 +145,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(approval_path.as_posix())
         if queue_path is not None:
             print(queue_path.as_posix())
+        return 0
+
+    if args.command == "resolve-approval":
+        decision_path, queue_path = resolve_approval(
+            root_dir=Path(args.root),
+            run_id=args.run_id,
+            decision=args.decision,
+            actor=args.actor,
+            note=args.note,
+        )
+        print(decision_path.as_posix())
+        print(queue_path.as_posix())
         return 0
 
     parser.error(f"Unsupported command: {args.command}")
