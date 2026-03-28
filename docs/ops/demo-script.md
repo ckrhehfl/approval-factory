@@ -132,6 +132,7 @@ sed -n '1,220p' "runs/latest/$RUN_ID/artifacts/pr-plan.yaml"
 
 주의:
 - `start-execution`은 `prs/active/`의 단일 active PR plan을 읽어 run을 시작하는 공식 entrypoint다.
+- active PR plan의 `Work Item ID`가 `docs/work-items/` 아래 실제 artifact와 연결되지 않으면 시작 전에 실패한다.
 - active PR를 명시적으로 바꾼 뒤 실행해야 하면 `activate-pr`를 먼저 사용한다.
 - review/qa/docs-sync/verification 자동 실행은 하지 않는다.
 - `bootstrap-run`은 내부 기반 명령으로 유지되지만, active PR plan에서 실행을 시작할 때는 `start-execution`을 사용한다.
@@ -208,6 +209,10 @@ sed -n '1,220p' "runs/latest/$RUN_ID/artifacts/approval-request.yaml"
 sed -n '1,220p' "runs/latest/$RUN_ID/artifacts/evidence-bundle.yaml"
 ```
 
+주의:
+- `build-approval`는 `record-review`, `record-qa`, `record-docs-sync`, `record-verification`이 모두 실제로 기록된 뒤에만 동작한다.
+- placeholder artifact만 있는 상태에서 실행하면 누락된 record 명령을 알려주며 실패한다.
+
 ## 12) approval_queue 확인
 
 ```bash
@@ -225,6 +230,10 @@ factory resolve-approval \
   --note "all merge prerequisites satisfied"
 ```
 
+주의:
+- `resolve-approval`는 `build-approval`로 채워진 `approval-request.yaml`와 `approval_queue/pending/APR-$RUN_ID.yaml`가 둘 다 있어야 한다.
+- pending queue item이 없으면 승인 결정은 기록되지 않는다.
+
 확인:
 
 ```bash
@@ -237,6 +246,13 @@ find approval_queue/pending -maxdepth 1 -type f -name "APR-$RUN_ID*.yaml" | sort
 
 - docs-sync 상태가 `complete` 또는 `not-needed`
 - merge gate가 `ready` 또는 `exception_required`
+
+## 참고: run state
+
+- `draft`: bootstrap만 된 상태
+- `in_progress`: execution 진행 중
+- `approval_pending`: 승인 패키지 생성 후 승인 대기
+- `approved`: 승인 완료
 
 ## 참고: pending 이후 운영 (현재 MVP)
 

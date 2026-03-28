@@ -12,14 +12,9 @@ from orchestrator.yaml_io import read_yaml, write_yaml
 
 class PipelineState(StrEnum):
     draft = "draft"
-    planned = "planned"
     in_progress = "in_progress"
-    review = "review"
-    qa = "qa"
-    docs_sync = "docs_sync"
     approval_pending = "approval_pending"
     approved = "approved"
-    merged = "merged"
     rejected = "rejected"
 
 
@@ -212,6 +207,76 @@ def _find_active_pr_plan(root_dir: Path) -> Path:
             f"found {len(plans)}: {plan_list}"
         )
     return plans[0]
+
+
+def _find_work_item_artifact(root_dir: Path, work_item_id: str) -> Path:
+    work_items_dir = root_dir / "docs" / "work-items"
+    exact_path = work_items_dir / f"{work_item_id}.md"
+    if exact_path.exists():
+        return exact_path
+
+    matches = sorted(work_items_dir.glob(f"{work_item_id}-*.md"))
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        raise ValueError(
+            "start-execution requires the active PR work_item_id to link to a work item artifact under "
+            f"docs/work-items/ (missing: {work_item_id})"
+        )
+
+    match_list = ", ".join(path.as_posix() for path in matches)
+    raise ValueError(
+        "start-execution requires the active PR work_item_id to link to exactly one work item artifact under "
+        f"docs/work-items/; found {len(matches)} matches for {work_item_id}: {match_list}"
+    )
+
+
+def _require_recorded_artifact(root_dir: Path, run_id: str, name: str, key: str, command: str) -> dict[str, Any]:
+    path = _artifact_path(root_dir, run_id, name)
+    if not path.exists():
+        raise ValueError(f"cannot build approval request without {name}")
+
+    payload = read_yaml(path)[key]
+    if not payload.get("recorded_at"):
+        raise ValueError(f"cannot build approval request before {command} records {name}")
+    return payload
+
+
+def _require_build_approval_prerequisites(root_dir: Path, run_id: str) -> dict[str, dict[str, Any]]:
+    verification = _require_recorded_artifact(
+        root_dir,
+        run_id,
+        "verification-report.yaml",
+        "verification_report",
+        "record-verification",
+    )
+    review = _require_recorded_artifact(
+        root_dir,
+        run_id,
+        "review-report.yaml",
+        "review_report",
+        "record-review",
+    )
+    qa = _require_recorded_artifact(
+        root_dir,
+        run_id,
+        "qa-report.yaml",
+        "qa_report",
+        "record-qa",
+    )
+    docs_sync = _require_recorded_artifact(
+        root_dir,
+        run_id,
+        "docs-sync-report.yaml",
+        "docs_sync_report",
+        "record-docs-sync",
+    )
+    return {
+        "verification": verification,
+        "review": review,
+        "qa": qa,
+        "docs_sync": docs_sync,
+    }
 
 
 def _read_markdown_section(path: Path, heading: str) -> str:
@@ -581,7 +646,7 @@ def bootstrap_run(
                 "title": work_item_title,
                 "source_pr_plan_path": pr_plan_path or "",
                 "scope": "",
-                "status": PipelineState.planned.value,
+                "status": PipelineState.draft.value,
             }
         },
     )
@@ -746,6 +811,7 @@ def bootstrap_run(
 def start_execution(*, root_dir: Path, run_id: str) -> Path:
     pr_plan_path = _find_active_pr_plan(root_dir)
     pr_plan = _read_active_pr_plan(pr_plan_path)
+    work_item_path = _find_work_item_artifact(root_dir, pr_plan["work_item_id"])
     run_root = bootstrap_run(
         root_dir=root_dir,
         run_id=run_id,
@@ -760,6 +826,8 @@ def start_execution(*, root_dir: Path, run_id: str) -> Path:
     run_payload["run"]["pr_plan_path"] = pr_plan["pr_plan_path"]
     run_payload["run"]["pr_title"] = pr_plan["title"]
     run_payload["run"]["source_command"] = "start-execution"
+    run_payload["run"]["work_item_path"] = work_item_path.as_posix()
+    run_payload["run"]["state"] = PipelineState.in_progress.value
     run_payload["run"]["updated_at"] = _now_iso()
     _write_run(root_dir, run_id, run_payload)
 
@@ -767,7 +835,13 @@ def start_execution(*, root_dir: Path, run_id: str) -> Path:
     pr_plan_artifact["pr_plan"]["work_item_id"] = pr_plan["work_item_id"]
     pr_plan_artifact["pr_plan"]["title"] = pr_plan["title"]
     pr_plan_artifact["pr_plan"]["source_pr_plan_path"] = pr_plan["pr_plan_path"]
+    pr_plan_artifact["pr_plan"]["status"] = PipelineState.in_progress.value
     _write_artifact(root_dir, run_id, "pr-plan.yaml", pr_plan_artifact)
+
+    work_item_artifact = _read_artifact(root_dir, run_id, "work-item.yaml")
+    work_item_artifact["work_item"]["status"] = PipelineState.in_progress.value
+    work_item_artifact["work_item"]["source_work_item_path"] = work_item_path.as_posix()
+    _write_artifact(root_dir, run_id, "work-item.yaml", work_item_artifact)
     return run_root
 
 
@@ -781,7 +855,7 @@ def record_review(*, root_dir: Path, run_id: str, status: str, summary: str) -> 
     report["review_report"]["recorded_at"] = _now_iso()
     _write_artifact(root_dir, run_id, "review-report.yaml", report)
 
-    _update_pipeline_state(root_dir, run_id, PipelineState.review)
+    _update_pipeline_state(root_dir, run_id, PipelineState.in_progress)
     return _artifact_path(root_dir, run_id, "review-report.yaml")
 
 
@@ -819,7 +893,7 @@ def record_qa(*, root_dir: Path, run_id: str, status: str, summary: str) -> Path
     report["qa_report"]["recorded_at"] = _now_iso()
     _write_artifact(root_dir, run_id, "qa-report.yaml", report)
 
-    _update_pipeline_state(root_dir, run_id, PipelineState.qa)
+    _update_pipeline_state(root_dir, run_id, PipelineState.in_progress)
     return _artifact_path(root_dir, run_id, "qa-report.yaml")
 
 
@@ -835,7 +909,7 @@ def record_docs_sync(*, root_dir: Path, run_id: str, status: str, summary: str) 
     _write_artifact(root_dir, run_id, "docs-sync-report.yaml", report)
 
     _set_docs_sync_verdict(root_dir, run_id, status, summary)
-    _update_pipeline_state(root_dir, run_id, PipelineState.docs_sync)
+    _update_pipeline_state(root_dir, run_id, PipelineState.in_progress)
     return _artifact_path(root_dir, run_id, "docs-sync-report.yaml")
 
 
@@ -982,9 +1056,7 @@ def evaluate_gates(*, root_dir: Path, run_id: str, gates_config_path: Path | Non
 def build_approval_request(*, root_dir: Path, run_id: str) -> tuple[Path, Path | None]:
     run_payload = _load_run(root_dir, run_id)
     run = run_payload["run"]
-    verification_path = _artifact_path(root_dir, run_id, "verification-report.yaml")
-    if not verification_path.exists():
-        raise ValueError("cannot build approval request without verification report")
+    _require_build_approval_prerequisites(root_dir, run_id)
 
     evidence_path = build_evidence_bundle(root_dir=root_dir, run_id=run_id)
     gate_path = evaluate_gates(root_dir=root_dir, run_id=run_id)
@@ -1071,10 +1143,22 @@ def build_approval_request(*, root_dir: Path, run_id: str) -> tuple[Path, Path |
         },
     )
 
+    _update_pipeline_state(root_dir, run_id, PipelineState.approval_pending)
+
     return approval_path, queue_path
 
 
 def resolve_approval(*, root_dir: Path, run_id: str, decision: str, actor: str, note: str) -> tuple[Path, Path]:
+    approval_path = _artifact_path(root_dir, run_id, "approval-request.yaml")
+    if not approval_path.exists():
+        raise ValueError(f"cannot resolve approval without approval request artifact: {approval_path.as_posix()}")
+
+    approval_request = read_yaml(approval_path).get("approval_request", {})
+    if not approval_request.get("evidence_bundle"):
+        raise ValueError(
+            "cannot resolve approval before build-approval creates a populated approval request artifact"
+        )
+
     source_relative = _queue_item_relative_path("pending", run_id)
     source_path = root_dir / source_relative
 
@@ -1099,9 +1183,7 @@ def resolve_approval(*, root_dir: Path, run_id: str, decision: str, actor: str, 
             source_path.replace(target_path)
     else:
         if not target_path.exists():
-            raise ValueError(
-                f"pending queue item not found: {source_relative}; expected resolved item: {target_relative}"
-            )
+            raise ValueError(f"cannot resolve approval without pending queue item: {source_relative}")
 
     decision_payload = {
         "approval_decision": {

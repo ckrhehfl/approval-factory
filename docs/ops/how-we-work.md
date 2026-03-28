@@ -58,9 +58,11 @@
 5. Run 부트스트랩
 - `factory start-execution`으로 `prs/active/`의 단일 active PR plan을 읽어 `runs/latest/<run-id>/` 및 기본 artifact를 만든다.
 - active PR가 사용자의 의도와 다르면 먼저 `activate-pr`로 전환한 뒤 실행한다.
+- active PR plan의 `Work Item ID`가 실제 `docs/work-items/` artifact와 연결되지 않으면 시작하지 않는다.
 - 이 명령은 내부적으로 기존 `bootstrap-run` 흐름을 재사용한다.
-- 생성된 run에는 최소 `run_id`, `pr_id`, `work_item_id`, `pr_plan_path`가 남아 active PR plan과 연결된다.
-- active PR plan이 없거나 여러 개면 안전하게 실패한다.
+- 생성된 run에는 최소 `run_id`, `pr_id`, `work_item_id`, `pr_plan_path`, `work_item_path`가 남아 active PR plan과 연결된다.
+- run state는 `in_progress`로 갱신된다.
+- active PR plan이 없거나 여러 개이거나, work item 연결이 안 되면 안전하게 실패한다.
 
 6. 역할별 결과 기록
 - Implementer/Reviewer/QA/Docs Sync/Verification 결과를 해당 record 명령으로 artifact에 반영한다.
@@ -71,11 +73,14 @@
 
 8. 승인 패키지 생성
 - `factory build-approval`로 `evidence-bundle.yaml`, `approval-request.yaml`를 최신 상태로 만든다.
+- 이 단계는 `record-review`, `record-qa`, `record-docs-sync`, `record-verification`이 모두 실제로 기록된 뒤에만 허용된다.
 - 조건이 맞으면 `approval_queue/pending/`에 approval 요청 파일이 적재된다.
+- approval package가 생성되면 run state는 `approval_pending`이 된다.
 
 9. 승인자 결정
 - 승인자는 queue 파일과 evidence를 보고 `approve/reject/exception`을 결정한다.
 - `factory resolve-approval`로 승인 결정을 `approval-decision.yaml`에 기록한다.
+- 이 단계는 populated `approval-request.yaml`와 pending queue item이 모두 있을 때만 허용된다.
 - resolve 시 queue 상태가 `pending`에서 `approved|rejected|exceptions`로 이동한다.
 
 ## 역할 설명 (현재 MVP 기준)
@@ -102,4 +107,12 @@ Verification:
 - 최종 승인 결정은 반드시 인간 승인자가 수행한다.
 - 승인자의 명시적 결정을 반영하는 기록/queue 이동은 `resolve-approval`로 수행한다.
 - `start-execution`은 최소 orchestration entrypoint일 뿐이며 이후 단계 자동 호출은 하지 않는다.
+- 시스템은 잘못된 순서를 줄이기 위한 최소 guardrail만 제공하며, planner automation이나 역할 자동 실행은 계속 제공하지 않는다.
 - 승인 없는 범위 확대, 구조 변경 확정, 테스트 실패 무시는 금지다.
+
+## run state 최소 해석
+
+- `draft`: run bootstrap만 생성된 상태
+- `in_progress`: execution 진행 중이며 role artifact를 기록하는 상태
+- `approval_pending`: approval package가 준비되어 승인 대기 중인 상태
+- `approved`: approve 기록이 끝난 상태

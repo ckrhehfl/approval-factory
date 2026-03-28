@@ -481,6 +481,8 @@ class StartExecutionCliTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "prs" / "active").mkdir(parents=True, exist_ok=True)
+            (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+            (root / "docs" / "work-items" / "WI-011.md").write_text("# WI-011\n", encoding="utf-8")
             (root / "prs" / "active" / "PR-011.md").write_text(
                 "\n".join(
                     [
@@ -539,16 +541,26 @@ class StartExecutionCliTest(unittest.TestCase):
             self.assertEqual(run_payload["run"]["run_id"], "RUN-011")
             self.assertEqual(run_payload["run"]["pr_id"], "PR-011")
             self.assertEqual(run_payload["run"]["work_item_id"], "WI-011")
+            self.assertEqual(run_payload["run"]["work_item_path"], (root / "docs" / "work-items" / "WI-011.md").as_posix())
             self.assertEqual(run_payload["run"]["pr_plan_path"], (root / "prs" / "active" / "PR-011.md").as_posix())
             self.assertEqual(run_payload["run"]["source_command"], "start-execution")
+            self.assertEqual(run_payload["run"]["state"], "in_progress")
 
             pr_plan_payload = read_yaml(run_root / "artifacts" / "pr-plan.yaml")
             self.assertEqual(pr_plan_payload["pr_plan"]["pr_id"], "PR-011")
             self.assertEqual(pr_plan_payload["pr_plan"]["work_item_id"], "WI-011")
             self.assertEqual(pr_plan_payload["pr_plan"]["title"], "approval-driven execution flow")
+            self.assertEqual(pr_plan_payload["pr_plan"]["status"], "in_progress")
             self.assertEqual(
                 pr_plan_payload["pr_plan"]["source_pr_plan_path"],
                 (root / "prs" / "active" / "PR-011.md").as_posix(),
+            )
+
+            work_item_payload = read_yaml(run_root / "artifacts" / "work-item.yaml")
+            self.assertEqual(work_item_payload["work_item"]["status"], "in_progress")
+            self.assertEqual(
+                work_item_payload["work_item"]["source_work_item_path"],
+                (root / "docs" / "work-items" / "WI-011.md").as_posix(),
             )
 
     def test_start_execution_fails_without_active_pr_plan(self) -> None:
@@ -588,6 +600,31 @@ class StartExecutionCliTest(unittest.TestCase):
                         str(root),
                         "--run-id",
                         "RUN-011",
+                    ]
+                )
+
+            self.assertEqual(exc_info.exception.code, 2)
+
+    def test_start_execution_fails_when_work_item_artifact_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            active_dir = root / "prs" / "active"
+            active_dir.mkdir(parents=True, exist_ok=True)
+            (active_dir / "PR-012.md").write_text(
+                "# PR-012\n\n## PR ID\nPR-012\n\n## Work Item ID\nWI-012\n\n## Title\nmissing work item\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(SystemExit) as exc_info:
+                main(
+                    [
+                        "start-execution",
+                        "--root",
+                        str(root),
+                        "--run-id",
+                        "RUN-012",
                     ]
                 )
 
@@ -728,6 +765,10 @@ class ActivatePrCliTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             active_dir = root / "prs" / "active"
+            work_items_dir = root / "docs" / "work-items"
+            work_items_dir.mkdir(parents=True, exist_ok=True)
+            (work_items_dir / "WI-010.md").write_text("# WI-010\n", encoding="utf-8")
+            (work_items_dir / "WI-011.md").write_text("# WI-011\n", encoding="utf-8")
             first_exit_code = main(
                 [
                     "create-pr-plan",
