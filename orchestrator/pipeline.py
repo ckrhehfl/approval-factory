@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from enum import StrEnum
 from pathlib import Path
+import re
 from typing import Any, Iterable
 
 from orchestrator.models import RunRecord
@@ -191,6 +192,49 @@ def _queue_path_for_approval(root_dir: Path, approval: dict[str, Any]) -> tuple[
         retry += 1
 
 
+def _pr_active_dir(root_dir: Path) -> Path:
+    return root_dir / "prs" / "active"
+
+
+def _pr_archive_dir(root_dir: Path) -> Path:
+    return root_dir / "prs" / "archive"
+
+
+def _find_active_pr_plan(root_dir: Path) -> Path:
+    active_dir = _pr_active_dir(root_dir)
+    plans = sorted(active_dir.glob("*.md"))
+    if not plans:
+        raise ValueError("start-execution requires exactly one active PR plan under prs/active/, found none")
+    if len(plans) > 1:
+        plan_list = ", ".join(path.as_posix() for path in plans)
+        raise ValueError(
+            "start-execution requires exactly one active PR plan under prs/active/, "
+            f"found {len(plans)}: {plan_list}"
+        )
+    return plans[0]
+
+
+def _read_markdown_section(path: Path, heading: str) -> str:
+    content = path.read_text(encoding="utf-8")
+    pattern = rf"^## {re.escape(heading)}\n(.*?)(?=^## |\Z)"
+    match = re.search(pattern, content, re.MULTILINE | re.DOTALL)
+    if not match:
+        raise ValueError(f"Required section '## {heading}' not found in active PR plan: {path.as_posix()}")
+    return match.group(1).strip()
+
+
+def _read_active_pr_plan(path: Path) -> dict[str, str]:
+    pr_id = _read_markdown_section(path, "PR ID")
+    work_item_id = _read_markdown_section(path, "Work Item ID")
+    title = _read_markdown_section(path, "Title")
+    return {
+        "pr_id": pr_id,
+        "work_item_id": work_item_id,
+        "title": title,
+        "pr_plan_path": path.as_posix(),
+    }
+
+
 def create_goal(
     *,
     root_dir: Path,
@@ -377,14 +421,21 @@ def create_pr_plan(
     title: str,
     summary: str,
 ) -> Path:
-    active_dir = root_dir / "prs" / "active"
-    pr_plan_path = active_dir / f"{pr_id}.md"
-    if pr_plan_path.exists():
-        raise FileExistsError(f"PR plan artifact already exists for pr-id '{pr_id}': {pr_plan_path.as_posix()}")
+    active_dir = _pr_active_dir(root_dir)
+    archive_dir = _pr_archive_dir(root_dir)
+    active_pr_plan_path = active_dir / f"{pr_id}.md"
+    if active_pr_plan_path.exists():
+        raise FileExistsError(
+            f"PR plan artifact already exists for pr-id '{pr_id}': {active_pr_plan_path.as_posix()}"
+        )
+    archive_pr_plan_path = archive_dir / f"{pr_id}.md"
+    if archive_pr_plan_path.exists():
+        raise FileExistsError(
+            f"PR plan artifact already exists for pr-id '{pr_id}': {archive_pr_plan_path.as_posix()}"
+        )
 
     existing_active_plans = sorted(active_dir.glob("*.md"))
-    if existing_active_plans:
-        raise FileExistsError(f"Active PR plan already exists: {existing_active_plans[0].as_posix()}")
+    pr_plan_path = active_pr_plan_path if not existing_active_plans else archive_pr_plan_path
 
     lines = [
         f"# {pr_id}: {title}",
@@ -425,6 +476,39 @@ def create_pr_plan(
     return pr_plan_path
 
 
+def activate_pr(*, root_dir: Path, pr_id: str) -> Path:
+    active_dir = _pr_active_dir(root_dir)
+    archive_dir = _pr_archive_dir(root_dir)
+    active_dir.mkdir(parents=True, exist_ok=True)
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    target_active_path = active_dir / f"{pr_id}.md"
+    target_archive_path = archive_dir / f"{pr_id}.md"
+    target_exists_in_active = target_active_path.exists()
+    target_exists_in_archive = target_archive_path.exists()
+
+    if target_exists_in_active and target_exists_in_archive:
+        raise ValueError(
+            "activate-pr found duplicate PR plan artifacts for "
+            f"'{pr_id}' in both active and archive: {target_active_path.as_posix()}, "
+            f"{target_archive_path.as_posix()}"
+        )
+    if not target_exists_in_active and not target_exists_in_archive:
+        raise FileNotFoundError(
+            f"activate-pr requires an existing PR plan artifact for pr-id '{pr_id}' under prs/active/ or prs/archive/"
+        )
+
+    for active_plan in sorted(active_dir.glob("*.md")):
+        if active_plan.name == f"{pr_id}.md":
+            continue
+        active_plan.replace(archive_dir / active_plan.name)
+
+    if target_exists_in_archive:
+        target_archive_path.replace(target_active_path)
+
+    return target_active_path
+
+
 def _queue_item_name(run_id: str) -> str:
     return f"APR-{run_id}.yaml"
 
@@ -455,6 +539,8 @@ def bootstrap_run(
     work_item_id: str,
     pr_id: str,
     work_item_title: str = "bootstrap-run",
+    pr_plan_path: str | None = None,
+    source_command: str | None = None,
 ) -> Path:
     run_root = root_dir / "runs" / "latest" / run_id
     _artifacts_dir(root_dir, run_id).mkdir(parents=True, exist_ok=True)
@@ -466,6 +552,9 @@ def bootstrap_run(
             work_item_id=work_item_id,
             pr_id=pr_id,
             state=PipelineState.draft.value,
+            pr_plan_path=pr_plan_path,
+            pr_title=work_item_title,
+            source_command=source_command,
         )
         write_yaml(run_file, run_record.as_payload())
 
@@ -488,6 +577,9 @@ def bootstrap_run(
         {
             "pr_plan": {
                 "pr_id": pr_id,
+                "work_item_id": work_item_id,
+                "title": work_item_title,
+                "source_pr_plan_path": pr_plan_path or "",
                 "scope": "",
                 "status": PipelineState.planned.value,
             }
@@ -648,6 +740,34 @@ def bootstrap_run(
     work_item_doc = root_dir / "docs" / "work-items" / f"{work_item_id}-{slug}.md"
     _ensure_text_file(work_item_doc, [f"# {work_item_id}: {work_item_title}", "", "## Status", "Draft"])
 
+    return run_root
+
+
+def start_execution(*, root_dir: Path, run_id: str) -> Path:
+    pr_plan_path = _find_active_pr_plan(root_dir)
+    pr_plan = _read_active_pr_plan(pr_plan_path)
+    run_root = bootstrap_run(
+        root_dir=root_dir,
+        run_id=run_id,
+        work_item_id=pr_plan["work_item_id"],
+        pr_id=pr_plan["pr_id"],
+        work_item_title=pr_plan["title"],
+        pr_plan_path=pr_plan["pr_plan_path"],
+        source_command="start-execution",
+    )
+
+    run_payload = _load_run(root_dir, run_id)
+    run_payload["run"]["pr_plan_path"] = pr_plan["pr_plan_path"]
+    run_payload["run"]["pr_title"] = pr_plan["title"]
+    run_payload["run"]["source_command"] = "start-execution"
+    run_payload["run"]["updated_at"] = _now_iso()
+    _write_run(root_dir, run_id, run_payload)
+
+    pr_plan_artifact = _read_artifact(root_dir, run_id, "pr-plan.yaml")
+    pr_plan_artifact["pr_plan"]["work_item_id"] = pr_plan["work_item_id"]
+    pr_plan_artifact["pr_plan"]["title"] = pr_plan["title"]
+    pr_plan_artifact["pr_plan"]["source_pr_plan_path"] = pr_plan["pr_plan_path"]
+    _write_artifact(root_dir, run_id, "pr-plan.yaml", pr_plan_artifact)
     return run_root
 
 

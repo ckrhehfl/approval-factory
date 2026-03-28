@@ -6,19 +6,22 @@
 2. Goal intake 필요 시 `factory create-goal`로 `goals/<goal-id>.md` 생성
 3. Goal 기준 clarification 필요 시 `factory create-clarification`로 `clarifications/<goal-id>/<clarification-id>.md` 생성
 4. `factory create-work-item`로 `docs/work-items/<work-item-id>.md` 생성
-5. `factory create-pr-plan`로 `prs/active/<pr-id>.md` 생성
-6. Scope 승인
-7. 설계 초안 생성
-8. Architecture 승인 필요 여부 판정
-9. PR별 구현
-10. Verification 기록(lint/tests/type_check/build)
-11. Review
-12. QA
-13. Docs Sync 완료
-14. `gate-check`로 gate 판정 확인
-15. `build-approval`로 Evidence Bundle + Approval Request 생성
-16. `resolve-approval`로 승인자 결정 기록 및 queue 정리
-17. Merge
+5. `factory create-pr-plan`로 PR plan 후보 생성
+6. active PR가 없으면 `prs/active/<pr-id>.md`, 이미 있으면 `prs/archive/<pr-id>.md`에 저장
+7. 필요 시 `factory activate-pr`로 기존 active PR을 `prs/archive/`로 옮기고 의도한 PR을 active로 전환
+8. `factory start-execution`로 active PR plan에서 `runs/latest/<run-id>/` 시작
+9. Scope 승인
+10. 설계 초안 생성
+11. Architecture 승인 필요 여부 판정
+12. PR별 구현
+13. Verification 기록(lint/tests/type_check/build)
+14. Review
+15. QA
+16. Docs Sync 완료
+17. `gate-check`로 gate 판정 확인
+18. `build-approval`로 Evidence Bundle + Approval Request 생성
+19. `resolve-approval`로 승인자 결정 기록 및 queue 정리
+20. Merge
 
 ## goal intake 최소 계약
 
@@ -87,6 +90,7 @@
 ## active pr plan 최소 계약
 
 - active PR plan artifact는 `prs/active/<pr-id>.md`에 저장한다.
+- archived PR plan artifact는 `prs/archive/<pr-id>.md`에 저장한다.
 - 생성 명령은 `factory create-pr-plan --root <repo> --pr-id <id> --work-item-id <work-item-id> --title <title> --summary <text>` 이다.
 - active PR plan은 one-PR-at-a-time 원칙을 명시하는 최소 수동 계층이다.
 - 생성되는 문서는 사람 검토용 Markdown이며 다음 섹션을 항상 포함한다:
@@ -102,9 +106,23 @@
   - Open Questions
 - 기본 `Status`는 `planned`다.
 - `prs/active/`에는 항상 0 또는 1개의 PR plan만 존재해야 한다.
-- 동일 `pr-id`가 이미 존재하면 명령은 실패한다.
-- 다른 active PR plan이 이미 존재해도 명령은 실패한다.
-- 이번 PR 범위에서 archive 이동, close/merge lifecycle, multi-PR 관리, planner automation, LLM 연결은 구현하지 않는다.
+- 동일 `pr-id`가 `prs/active/` 또는 `prs/archive/`에 이미 존재하면 명령은 실패한다.
+- active PR plan이 없으면 `create-pr-plan`은 새 plan을 active에 만든다.
+- 다른 active PR plan이 이미 존재하면 `create-pr-plan`은 새 plan 후보를 archive에 만든다.
+- active PR 전환은 `factory activate-pr --root <repo> --pr-id <id>`로 수행한다.
+- `activate-pr`는 기존 active PR을 `prs/archive/`로 이동시키고, 지정한 PR plan을 active로 이동시켜 `prs/active/`에 정확히 하나의 PR만 남긴다.
+- 이번 PR 범위에서 close/merge lifecycle 전체, history 관리, multi-PR 관리, planner automation, LLM 연결은 구현하지 않는다.
+
+## start-execution 최소 계약
+
+- run 시작 명령은 `factory start-execution --root <repo> --run-id <run-id>` 이다.
+- `prs/active/` 아래 active PR plan이 정확히 하나 있어야 한다.
+- 사용자가 active PR를 바꾸려면 먼저 `activate-pr`로 `prs/active/`를 명시적으로 전환해야 한다.
+- 명령은 active PR plan에서 `PR ID`, `Work Item ID`, `Title` 섹션을 읽는다.
+- 내부적으로 기존 `bootstrap-run` 흐름을 재사용해 `runs/latest/<run-id>/`와 기본 artifact를 생성한다.
+- 생성된 run에는 최소 `run_id`, `pr_id`, `work_item_id`, `pr_plan_path`가 식별 가능하게 남아야 한다.
+- active PR plan이 0개이거나 2개 이상이면 명령은 안전하게 실패한다.
+- 이번 PR 범위에서 `start-execution`은 run bootstrap entrypoint만 제공하며 review/qa/docs-sync/verification 자동 실행은 하지 않는다.
 
 ## gate-check와 build-approval의 역할 차이
 
@@ -135,6 +153,7 @@ Docs Sync 단계로 되돌린다.
 ### canonical artifact 규칙
 - `runs/latest/<run-id>/artifacts/*.yaml`는 canonical 파일이며 재실행 시 **overwrite** 된다.
 - `bootstrap-run`을 동일 `run-id`로 다시 실행하면 기존 artifact를 초기화하지 않고 **누락 파일만 생성**한다.
+- `start-execution`은 active PR plan을 읽은 뒤 `bootstrap-run` 기반으로 동일 규칙을 따른다.
 
 ### approval queue 규칙
 - 기본 queue 파일명은 `approval_queue/pending/APR-<run-id>.yaml` 이다.
@@ -156,5 +175,7 @@ Docs Sync 단계로 되돌린다.
 
 - 한 번에 하나의 PR만 승인하지 말고 Work Item 전체 맥락도 본다.
 - `prs/active/`에 active PR이 하나를 초과하지 않는지 먼저 확인한다.
+- active PR를 바꿔야 하면 수동 파일 편집 대신 `activate-pr`를 사용한다.
+- `start-execution` 전에도 `prs/active/` 단일성 유지와 plan 섹션 계약을 확인한다.
 - evidence 없는 속도는 금지한다.
 - 설계와 구현이 엇갈리면 구현보다 문서와 ADR을 먼저 본다.

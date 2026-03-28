@@ -98,20 +98,45 @@ sed -n '1,220p' "prs/active/$PR_ID.md"
 
 주의:
 - `prs/active/`는 항상 0 또는 1개의 PR plan만 가진다.
+- active PR가 없으면 `create-pr-plan`은 active에 만들고, 이미 있으면 archive 후보를 만든다.
 - archive 이동, PR close/merge lifecycle, multi-PR 관리, planner automation은 아직 없다.
 
-## 5) bootstrap-run
+## 5) activate-pr
+
+active PR를 archive에서 다시 선택해야 할 때는 먼저 아래처럼 전환한다.
 
 ```bash
-factory bootstrap-run \
+factory activate-pr \
   --root . \
-  --run-id "$RUN_ID" \
-  --work-item-id "$WI_ID" \
-  --work-item-title "mvp finish docs and ops" \
   --pr-id "$PR_ID"
 ```
 
-## 6) record-review
+주의:
+- `activate-pr`는 PR-011 execution flow 보강용 최소 전환 단계다.
+- 기존 active PR이 있으면 `prs/archive/`로 이동하고, 지정한 PR plan이 active가 된다.
+
+## 6) start-execution
+
+```bash
+factory start-execution \
+  --root . \
+  --run-id "$RUN_ID"
+```
+
+확인:
+
+```bash
+sed -n '1,220p' "runs/latest/$RUN_ID/run.yaml"
+sed -n '1,220p' "runs/latest/$RUN_ID/artifacts/pr-plan.yaml"
+```
+
+주의:
+- `start-execution`은 `prs/active/`의 단일 active PR plan을 읽어 run을 시작하는 공식 entrypoint다.
+- active PR를 명시적으로 바꾼 뒤 실행해야 하면 `activate-pr`를 먼저 사용한다.
+- review/qa/docs-sync/verification 자동 실행은 하지 않는다.
+- `bootstrap-run`은 내부 기반 명령으로 유지되지만, active PR plan에서 실행을 시작할 때는 `start-execution`을 사용한다.
+
+## 7) record-review
 
 ```bash
 factory record-review \
@@ -121,7 +146,7 @@ factory record-review \
   --summary "review passed for MVP demo"
 ```
 
-## 7) record-qa
+## 8) record-qa
 
 ```bash
 factory record-qa \
@@ -131,7 +156,7 @@ factory record-qa \
   --summary "qa passed for MVP demo"
 ```
 
-## 8) record-docs-sync
+## 9) record-docs-sync
 
 ```bash
 factory record-docs-sync \
@@ -141,7 +166,7 @@ factory record-docs-sync \
   --summary "docs are aligned"
 ```
 
-## 9) record-verification
+## 10) record-verification
 
 ```bash
 factory record-verification \
@@ -154,7 +179,7 @@ factory record-verification \
   --summary "all checks green"
 ```
 
-## 10) gate-check
+## 11) gate-check
 
 ```bash
 factory gate-check --root . --run-id "$RUN_ID"

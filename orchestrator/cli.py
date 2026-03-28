@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Sequence
 
 from orchestrator.pipeline import (
+    activate_pr,
     bootstrap_run,
     build_approval_request,
     create_clarification,
@@ -18,6 +19,7 @@ from orchestrator.pipeline import (
     record_review,
     record_verification,
     resolve_approval,
+    start_execution,
 )
 
 
@@ -105,6 +107,17 @@ def build_parser() -> argparse.ArgumentParser:
     create_pr_plan_parser.add_argument("--work-item-id", required=True)
     create_pr_plan_parser.add_argument("--title", required=True)
     create_pr_plan_parser.add_argument("--summary", required=True)
+
+    activate_pr_parser = subparsers.add_parser("activate-pr", help="Switch the single active PR plan")
+    activate_pr_parser.add_argument("--root", default=".", help="Repository root path")
+    activate_pr_parser.add_argument("--pr-id", required=True)
+
+    start_execution_parser = subparsers.add_parser(
+        "start-execution",
+        help="Start a run from the single active PR plan",
+    )
+    start_execution_parser.add_argument("--root", default=".", help="Repository root path")
+    start_execution_parser.add_argument("--run-id", default=_default_run_id())
 
     resolve_approval_parser = subparsers.add_parser("resolve-approval", help="Resolve pending approval request")
     resolve_approval_parser.add_argument("--root", default=".", help="Repository root path")
@@ -244,6 +257,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         except FileExistsError as exc:
             parser.error(str(exc))
         print(path.as_posix())
+        return 0
+
+    if args.command == "activate-pr":
+        try:
+            path = activate_pr(root_dir=Path(args.root), pr_id=args.pr_id)
+        except (FileNotFoundError, ValueError) as exc:
+            parser.error(str(exc))
+        print(path.as_posix())
+        return 0
+
+    if args.command == "start-execution":
+        try:
+            run_root = start_execution(root_dir=Path(args.root), run_id=args.run_id)
+        except ValueError as exc:
+            parser.error(str(exc))
+        print(run_root.as_posix())
         return 0
 
     if args.command == "resolve-approval":
