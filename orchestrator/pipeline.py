@@ -45,6 +45,14 @@ PR_DOC_FILENAMES = (
 )
 
 GOAL_STATUS = "draft"
+CLARIFICATION_STATUS = "open"
+VALID_CLARIFICATION_CATEGORIES = {
+    "scope",
+    "design",
+    "dependency",
+    "constraint",
+    "approval-required",
+}
 
 
 def _now_iso() -> str:
@@ -235,6 +243,70 @@ def create_goal(
     goal_path.parent.mkdir(parents=True, exist_ok=True)
     goal_path.write_text("\n".join(lines), encoding="utf-8")
     return goal_path
+
+
+def create_clarification(
+    *,
+    root_dir: Path,
+    goal_id: str,
+    clarification_id: str,
+    title: str,
+    category: str,
+    question: str,
+    escalation: bool = False,
+) -> Path:
+    normalized_category = category.strip()
+    if normalized_category not in VALID_CLARIFICATION_CATEGORIES:
+        allowed = ", ".join(sorted(VALID_CLARIFICATION_CATEGORIES))
+        raise ValueError(
+            f"clarification category must be one of {allowed} (got: {normalized_category or category})"
+        )
+
+    clarification_path = root_dir / "clarifications" / goal_id / f"{clarification_id}.md"
+    if clarification_path.exists():
+        raise FileExistsError(
+            "Clarification artifact already exists "
+            f"for goal-id '{goal_id}' and clarification-id '{clarification_id}': "
+            f"{clarification_path.as_posix()}"
+        )
+
+    lines = [
+        f"# {clarification_id}: {title}",
+        "",
+        "## Clarification ID",
+        clarification_id,
+        "",
+        "## Goal ID",
+        goal_id,
+        "",
+        "## Title",
+        title,
+        "",
+        "## Status",
+        CLARIFICATION_STATUS,
+        "",
+        "## Category",
+        normalized_category,
+        "",
+        "## Question",
+        *question.splitlines(),
+        "",
+        "## Suggested Resolution",
+        "- TBD",
+        "",
+        "## Escalation Required",
+        "yes" if escalation else "no",
+        "",
+        "## Resolution Notes",
+        "- TBD",
+        "",
+        "## Next Action",
+        "- TBD",
+        "",
+    ]
+    clarification_path.parent.mkdir(parents=True, exist_ok=True)
+    clarification_path.write_text("\n".join(lines), encoding="utf-8")
+    return clarification_path
 
 
 def _queue_item_name(run_id: str) -> str:

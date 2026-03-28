@@ -142,3 +142,121 @@ class CreateGoalCliTest(unittest.TestCase):
                 )
 
             self.assertEqual(exc_info.exception.code, 2)
+
+
+class CreateClarificationCliTest(unittest.TestCase):
+    def test_create_clarification_creates_markdown_artifact(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            exit_code = main(
+                [
+                    "create-clarification",
+                    "--root",
+                    str(root),
+                    "--goal-id",
+                    "GOAL-008",
+                    "--clarification-id",
+                    "CLAR-001",
+                    "--title",
+                    "Need scope boundary",
+                    "--category",
+                    "scope",
+                    "--question",
+                    "What is explicitly out of scope for this goal?",
+                    "--escalation",
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+
+            clarification_path = root / "clarifications" / "GOAL-008" / "CLAR-001.md"
+            self.assertTrue(clarification_path.exists())
+
+            content = clarification_path.read_text(encoding="utf-8")
+            self.assertIn("# CLAR-001: Need scope boundary", content)
+            self.assertIn("## Clarification ID\nCLAR-001", content)
+            self.assertIn("## Goal ID\nGOAL-008", content)
+            self.assertIn("## Title\nNeed scope boundary", content)
+            self.assertIn("## Status\nopen", content)
+            self.assertIn("## Category\nscope", content)
+            self.assertIn("## Question\nWhat is explicitly out of scope for this goal?", content)
+            self.assertIn("## Suggested Resolution\n- TBD", content)
+            self.assertIn("## Escalation Required\nyes", content)
+            self.assertIn("## Resolution Notes\n- TBD", content)
+            self.assertIn("## Next Action\n- TBD", content)
+
+    def test_create_clarification_rejects_duplicate_clarification_id(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            first_exit_code = main(
+                [
+                    "create-clarification",
+                    "--root",
+                    str(root),
+                    "--goal-id",
+                    "GOAL-008",
+                    "--clarification-id",
+                    "CLAR-001",
+                    "--title",
+                    "Need scope boundary",
+                    "--category",
+                    "scope",
+                    "--question",
+                    "What is explicitly out of scope for this goal?",
+                ]
+            )
+            self.assertEqual(first_exit_code, 0)
+
+            with self.assertRaises(SystemExit) as exc_info:
+                main(
+                    [
+                        "create-clarification",
+                        "--root",
+                        str(root),
+                        "--goal-id",
+                        "GOAL-008",
+                        "--clarification-id",
+                        "CLAR-001",
+                        "--title",
+                        "Need scope boundary",
+                        "--category",
+                        "scope",
+                        "--question",
+                        "What is explicitly out of scope for this goal?",
+                    ]
+                )
+
+            self.assertEqual(exc_info.exception.code, 2)
+
+    def test_create_clarification_rejects_invalid_category(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            with self.assertRaises(SystemExit) as exc_info:
+                main(
+                    [
+                        "create-clarification",
+                        "--root",
+                        str(root),
+                        "--goal-id",
+                        "GOAL-008",
+                        "--clarification-id",
+                        "CLAR-001",
+                        "--title",
+                        "Need scope boundary",
+                        "--category",
+                        "unknown",
+                        "--question",
+                        "What is explicitly out of scope for this goal?",
+                    ]
+                )
+
+            self.assertEqual(exc_info.exception.code, 2)

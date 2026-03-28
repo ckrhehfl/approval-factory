@@ -6,6 +6,7 @@
 
 ```bash
 GOAL_ID="GOAL-007-DEMO"
+CLAR_ID="CLAR-001"
 RUN_ID="RUN-DEMO-001"
 WI_ID="WI-005"
 PR_ID="PR-005"
@@ -33,7 +34,30 @@ sed -n '1,220p' "goals/$GOAL_ID.md"
 - 현재 Goal intake는 artifact 생성만 다룬다.
 - 자동 질문 생성, goal 해결, WI 자동 분해는 아직 없다.
 
-## 2) bootstrap-run
+## 2) create-clarification
+
+```bash
+factory create-clarification \
+  --root . \
+  --goal-id "$GOAL_ID" \
+  --clarification-id "$CLAR_ID" \
+  --title "scope boundary for demo" \
+  --category scope \
+  --question "What is explicitly out of scope before planning starts?" \
+  --escalation
+```
+
+확인:
+
+```bash
+sed -n '1,220p' "clarifications/$GOAL_ID/$CLAR_ID.md"
+```
+
+주의:
+- clarification queue는 Goal intake 다음의 최소 질문 관리 계층이다.
+- 자동 질문 생성, 자동 해결, resolver/planner 구현은 아직 없다.
+
+## 3) bootstrap-run
 
 ```bash
 factory bootstrap-run \
@@ -44,7 +68,7 @@ factory bootstrap-run \
   --pr-id "$PR_ID"
 ```
 
-## 3) record-review
+## 4) record-review
 
 ```bash
 factory record-review \
@@ -54,7 +78,7 @@ factory record-review \
   --summary "review passed for MVP demo"
 ```
 
-## 4) record-qa
+## 5) record-qa
 
 ```bash
 factory record-qa \
@@ -64,7 +88,7 @@ factory record-qa \
   --summary "qa passed for MVP demo"
 ```
 
-## 5) record-docs-sync
+## 6) record-docs-sync
 
 ```bash
 factory record-docs-sync \
@@ -74,7 +98,7 @@ factory record-docs-sync \
   --summary "docs are aligned"
 ```
 
-## 6) record-verification
+## 7) record-verification
 
 ```bash
 factory record-verification \
@@ -87,7 +111,7 @@ factory record-verification \
   --summary "all checks green"
 ```
 
-## 7) gate-check
+## 8) gate-check
 
 ```bash
 factory gate-check --root . --run-id "$RUN_ID"
@@ -103,7 +127,7 @@ sed -n '1,200p' "runs/latest/$RUN_ID/artifacts/gate-status.yaml"
 - `gate-check`는 gate 판정만 갱신한다.
 - 최종 승인 요청 판단은 다음 단계 `build-approval` 산출물 기준으로 한다.
 
-## 8) build-approval
+## 9) build-approval
 
 ```bash
 factory build-approval --root . --run-id "$RUN_ID"
@@ -116,13 +140,13 @@ sed -n '1,220p' "runs/latest/$RUN_ID/artifacts/approval-request.yaml"
 sed -n '1,220p' "runs/latest/$RUN_ID/artifacts/evidence-bundle.yaml"
 ```
 
-## 9) approval_queue 확인
+## 10) approval_queue 확인
 
 ```bash
 find approval_queue/pending -maxdepth 1 -type f -name "APR-$RUN_ID*.yaml" | sort
 ```
 
-## 9) resolve-approval
+## 11) resolve-approval
 
 ```bash
 factory resolve-approval \
