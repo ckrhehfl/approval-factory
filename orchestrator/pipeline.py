@@ -47,6 +47,7 @@ PR_DOC_FILENAMES = (
 GOAL_STATUS = "draft"
 CLARIFICATION_STATUS = "open"
 WORK_ITEM_STATUS = "draft"
+PR_PLAN_STATUS = "planned"
 VALID_CLARIFICATION_CATEGORIES = {
     "scope",
     "design",
@@ -366,6 +367,62 @@ def create_work_item(
     work_item_path.parent.mkdir(parents=True, exist_ok=True)
     work_item_path.write_text("\n".join(lines), encoding="utf-8")
     return work_item_path
+
+
+def create_pr_plan(
+    *,
+    root_dir: Path,
+    pr_id: str,
+    work_item_id: str,
+    title: str,
+    summary: str,
+) -> Path:
+    active_dir = root_dir / "prs" / "active"
+    pr_plan_path = active_dir / f"{pr_id}.md"
+    if pr_plan_path.exists():
+        raise FileExistsError(f"PR plan artifact already exists for pr-id '{pr_id}': {pr_plan_path.as_posix()}")
+
+    existing_active_plans = sorted(active_dir.glob("*.md"))
+    if existing_active_plans:
+        raise FileExistsError(f"Active PR plan already exists: {existing_active_plans[0].as_posix()}")
+
+    lines = [
+        f"# {pr_id}: {title}",
+        "",
+        "## PR ID",
+        pr_id,
+        "",
+        "## Work Item ID",
+        work_item_id,
+        "",
+        "## Title",
+        title,
+        "",
+        "## Status",
+        PR_PLAN_STATUS,
+        "",
+        "## Summary",
+        *summary.splitlines(),
+        "",
+        "## Scope",
+        "- TBD",
+        "",
+        "## Out of Scope",
+        "- TBD",
+        "",
+        "## Implementation Notes",
+        "- TBD",
+        "",
+        "## Risks",
+        "- TBD",
+        "",
+        "## Open Questions",
+        "- TBD",
+        "",
+    ]
+    pr_plan_path.parent.mkdir(parents=True, exist_ok=True)
+    pr_plan_path.write_text("\n".join(lines), encoding="utf-8")
+    return pr_plan_path
 
 
 def _queue_item_name(run_id: str) -> str:

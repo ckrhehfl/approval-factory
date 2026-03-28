@@ -6,10 +6,10 @@
 2. Goal intake 필요 시 `factory create-goal`로 `goals/<goal-id>.md` 생성
 3. Goal 기준 clarification 필요 시 `factory create-clarification`로 `clarifications/<goal-id>/<clarification-id>.md` 생성
 4. `factory create-work-item`로 `docs/work-items/<work-item-id>.md` 생성
-5. Scope 승인
-6. 설계 초안 생성
-7. Architecture 승인 필요 여부 판정
-8. PR 분해
+5. `factory create-pr-plan`로 `prs/active/<pr-id>.md` 생성
+6. Scope 승인
+7. 설계 초안 생성
+8. Architecture 승인 필요 여부 판정
 9. PR별 구현
 10. Verification 기록(lint/tests/type_check/build)
 11. Review
@@ -84,6 +84,28 @@
 - 이번 PR 범위에서 Work Item은 artifact 생성과 수동 관리까지만 제공한다.
 - Goal to Work Item 자동 분해, clarification 강한 연결, planner 자동화, LLM 연결은 아직 없다.
 
+## active pr plan 최소 계약
+
+- active PR plan artifact는 `prs/active/<pr-id>.md`에 저장한다.
+- 생성 명령은 `factory create-pr-plan --root <repo> --pr-id <id> --work-item-id <work-item-id> --title <title> --summary <text>` 이다.
+- active PR plan은 one-PR-at-a-time 원칙을 명시하는 최소 수동 계층이다.
+- 생성되는 문서는 사람 검토용 Markdown이며 다음 섹션을 항상 포함한다:
+  - PR ID
+  - Work Item ID
+  - Title
+  - Status
+  - Summary
+  - Scope
+  - Out of Scope
+  - Implementation Notes
+  - Risks
+  - Open Questions
+- 기본 `Status`는 `planned`다.
+- `prs/active/`에는 항상 0 또는 1개의 PR plan만 존재해야 한다.
+- 동일 `pr-id`가 이미 존재하면 명령은 실패한다.
+- 다른 active PR plan이 이미 존재해도 명령은 실패한다.
+- 이번 PR 범위에서 archive 이동, close/merge lifecycle, multi-PR 관리, planner automation, LLM 연결은 구현하지 않는다.
+
 ## gate-check와 build-approval의 역할 차이
 
 - `gate-check`는 `gate-status.yaml` 판정만 갱신한다.
@@ -133,5 +155,6 @@ Docs Sync 단계로 되돌린다.
 ## 운영자 원칙
 
 - 한 번에 하나의 PR만 승인하지 말고 Work Item 전체 맥락도 본다.
+- `prs/active/`에 active PR이 하나를 초과하지 않는지 먼저 확인한다.
 - evidence 없는 속도는 금지한다.
 - 설계와 구현이 엇갈리면 구현보다 문서와 ADR을 먼저 본다.
