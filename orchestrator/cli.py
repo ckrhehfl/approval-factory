@@ -10,6 +10,7 @@ from orchestrator.pipeline import (
     build_approval_request,
     create_clarification,
     create_goal,
+    create_work_item,
     evaluate_gates,
     record_docs_sync,
     record_qa,
@@ -88,6 +89,14 @@ def build_parser() -> argparse.ArgumentParser:
     create_clarification_parser.add_argument("--category", required=True)
     create_clarification_parser.add_argument("--question", required=True)
     create_clarification_parser.add_argument("--escalation", action="store_true")
+
+    create_work_item_parser = subparsers.add_parser("create-work-item", help="Create a work item artifact")
+    create_work_item_parser.add_argument("--root", default=".", help="Repository root path")
+    create_work_item_parser.add_argument("--work-item-id", required=True)
+    create_work_item_parser.add_argument("--title", required=True)
+    create_work_item_parser.add_argument("--goal-id", required=True)
+    create_work_item_parser.add_argument("--description", required=True)
+    create_work_item_parser.add_argument("--acceptance-criteria")
 
     resolve_approval_parser = subparsers.add_parser("resolve-approval", help="Resolve pending approval request")
     resolve_approval_parser.add_argument("--root", default=".", help="Repository root path")
@@ -196,6 +205,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                 escalation=args.escalation,
             )
         except (FileExistsError, ValueError) as exc:
+            parser.error(str(exc))
+        print(path.as_posix())
+        return 0
+
+    if args.command == "create-work-item":
+        try:
+            path = create_work_item(
+                root_dir=Path(args.root),
+                work_item_id=args.work_item_id,
+                title=args.title,
+                goal_id=args.goal_id,
+                description=args.description,
+                acceptance_criteria=args.acceptance_criteria,
+            )
+        except FileExistsError as exc:
             parser.error(str(exc))
         print(path.as_posix())
         return 0

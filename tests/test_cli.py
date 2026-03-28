@@ -260,3 +260,120 @@ class CreateClarificationCliTest(unittest.TestCase):
                 )
 
             self.assertEqual(exc_info.exception.code, 2)
+
+
+class CreateWorkItemCliTest(unittest.TestCase):
+    def test_create_work_item_creates_markdown_artifact(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            exit_code = main(
+                [
+                    "create-work-item",
+                    "--root",
+                    str(root),
+                    "--work-item-id",
+                    "WI-009",
+                    "--title",
+                    "Goal to work item decomposition",
+                    "--goal-id",
+                    "GOAL-009",
+                    "--description",
+                    "Create a repo-local work item artifact contract.",
+                    "--acceptance-criteria",
+                    "Artifact exists under docs/work-items.\nDuplicate IDs fail safely.",
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+
+            work_item_path = root / "docs" / "work-items" / "WI-009.md"
+            self.assertTrue(work_item_path.exists())
+
+            content = work_item_path.read_text(encoding="utf-8")
+            self.assertIn("# WI-009: Goal to work item decomposition", content)
+            self.assertIn("## Work Item ID\nWI-009", content)
+            self.assertIn("## Goal ID\nGOAL-009", content)
+            self.assertIn("## Title\nGoal to work item decomposition", content)
+            self.assertIn("## Status\ndraft", content)
+            self.assertIn("## Description\nCreate a repo-local work item artifact contract.", content)
+            self.assertIn("## Scope\n- TBD", content)
+            self.assertIn("## Out of Scope\n- TBD", content)
+            self.assertIn(
+                "## Acceptance Criteria\nArtifact exists under docs/work-items.\nDuplicate IDs fail safely.",
+                content,
+            )
+            self.assertIn("## Dependencies\n- TBD", content)
+            self.assertIn("## Risks\n- TBD", content)
+            self.assertIn("## Notes\n- TBD", content)
+
+    def test_create_work_item_defaults_acceptance_criteria_to_tbd(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            exit_code = main(
+                [
+                    "create-work-item",
+                    "--root",
+                    str(root),
+                    "--work-item-id",
+                    "WI-009",
+                    "--title",
+                    "Goal to work item decomposition",
+                    "--goal-id",
+                    "GOAL-009",
+                    "--description",
+                    "Create a repo-local work item artifact contract.",
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+
+            content = (root / "docs" / "work-items" / "WI-009.md").read_text(encoding="utf-8")
+            self.assertIn("## Acceptance Criteria\nTBD", content)
+
+    def test_create_work_item_rejects_duplicate_work_item_id(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            first_exit_code = main(
+                [
+                    "create-work-item",
+                    "--root",
+                    str(root),
+                    "--work-item-id",
+                    "WI-009",
+                    "--title",
+                    "Goal to work item decomposition",
+                    "--goal-id",
+                    "GOAL-009",
+                    "--description",
+                    "Create a repo-local work item artifact contract.",
+                ]
+            )
+            self.assertEqual(first_exit_code, 0)
+
+            with self.assertRaises(SystemExit) as exc_info:
+                main(
+                    [
+                        "create-work-item",
+                        "--root",
+                        str(root),
+                        "--work-item-id",
+                        "WI-009",
+                        "--title",
+                        "Goal to work item decomposition",
+                        "--goal-id",
+                        "GOAL-009",
+                        "--description",
+                        "Create a repo-local work item artifact contract.",
+                    ]
+                )
+
+            self.assertEqual(exc_info.exception.code, 2)

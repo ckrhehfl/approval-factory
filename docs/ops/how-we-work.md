@@ -13,6 +13,7 @@
 - one-PR-at-a-time
 - Goal intake minimum
 - clarification queue minimum
+- Work Item artifact minimum
 
 비포함:
 - Goal intake 질문 자동화
@@ -38,7 +39,10 @@
 - 현재 단계는 질문 artifact 생성과 수동 관리까지만 제공하며, auto-generation/resolution은 다음 PR 범위다.
 
 3. Work Item 정의
-- `docs/work-items/WI-###-*.md`에 문제/범위/성공기준을 기록한다.
+- `factory create-work-item`로 `docs/work-items/<work-item-id>.md`를 생성한다.
+- Work Item은 Goal/clarification을 PR 실행 단위로 연결하는 수동 Markdown artifact다.
+- 기본 섹션은 Work Item ID, Goal ID, Title, Status, Description, Scope, Out of Scope, Acceptance Criteria, Dependencies, Risks, Notes다.
+- 현재 단계는 artifact 생성과 수동 관리까지만 제공하며 auto decomposition과 clarification 강제 연결은 다음 PR 범위다.
 
 4. PR 단위 계획
 - `docs/prs/PR-###/plan.md` 중심으로 one-PR-at-a-time 실행 계획을 고정한다.

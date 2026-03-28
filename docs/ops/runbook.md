@@ -5,19 +5,20 @@
 1. Work Item 생성
 2. Goal intake 필요 시 `factory create-goal`로 `goals/<goal-id>.md` 생성
 3. Goal 기준 clarification 필요 시 `factory create-clarification`로 `clarifications/<goal-id>/<clarification-id>.md` 생성
-4. Scope 승인
-5. 설계 초안 생성
-6. Architecture 승인 필요 여부 판정
-7. PR 분해
-8. PR별 구현
-9. Verification 기록(lint/tests/type_check/build)
-10. Review
-11. QA
-12. Docs Sync 완료
-13. `gate-check`로 gate 판정 확인
-14. `build-approval`로 Evidence Bundle + Approval Request 생성
-15. `resolve-approval`로 승인자 결정 기록 및 queue 정리
-16. Merge
+4. `factory create-work-item`로 `docs/work-items/<work-item-id>.md` 생성
+5. Scope 승인
+6. 설계 초안 생성
+7. Architecture 승인 필요 여부 판정
+8. PR 분해
+9. PR별 구현
+10. Verification 기록(lint/tests/type_check/build)
+11. Review
+12. QA
+13. Docs Sync 완료
+14. `gate-check`로 gate 판정 확인
+15. `build-approval`로 Evidence Bundle + Approval Request 생성
+16. `resolve-approval`로 승인자 결정 기록 및 queue 정리
+17. Merge
 
 ## goal intake 최소 계약
 
@@ -59,6 +60,29 @@
 - 동일 `goal-id` 아래 동일 `clarification-id`가 이미 존재하면 명령은 실패한다.
 - 이번 PR 범위에서 clarification queue는 artifact 생성과 수동 관리까지만 제공한다.
 - 질문 자동 생성, 질문 자동 해결, goal-to-WI 자동 분해, resolver/planner 구현, LLM 연결은 아직 없다.
+
+## work item 최소 계약
+
+- Work Item artifact는 `docs/work-items/<work-item-id>.md`에 저장한다.
+- 생성 명령은 `factory create-work-item --root <repo> --work-item-id <id> --title <title> --goal-id <goal-id> --description <text> [--acceptance-criteria <text>]` 이다.
+- Work Item은 Goal/clarification을 실제 PR 실행 단위로 연결하는 최소 수동 계층이다.
+- 생성되는 문서는 사람 검토용 Markdown이며 다음 섹션을 항상 포함한다:
+  - Work Item ID
+  - Goal ID
+  - Title
+  - Status
+  - Description
+  - Scope
+  - Out of Scope
+  - Acceptance Criteria
+  - Dependencies
+  - Risks
+  - Notes
+- 기본 `Status`는 `draft`다.
+- `--acceptance-criteria`를 생략하면 `Acceptance Criteria`는 `TBD`로 채운다.
+- 동일 `work-item-id`가 이미 존재하면 명령은 실패한다.
+- 이번 PR 범위에서 Work Item은 artifact 생성과 수동 관리까지만 제공한다.
+- Goal to Work Item 자동 분해, clarification 강한 연결, planner 자동화, LLM 연결은 아직 없다.
 
 ## gate-check와 build-approval의 역할 차이
 
