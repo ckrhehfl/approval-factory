@@ -46,14 +46,21 @@
 - 현재 단계는 artifact 생성과 수동 관리까지만 제공하며 auto decomposition과 clarification 강제 연결은 다음 PR 범위다.
 
 4. Active PR 계획
-- `factory create-pr-plan`로 `prs/active/<pr-id>.md`를 생성한다.
+- `factory create-pr-plan`로 PR plan 후보를 생성한다.
 - active PR plan은 Work Item을 현재 실행 중인 단 하나의 PR로 연결하는 수동 Markdown artifact다.
 - 기본 섹션은 PR ID, Work Item ID, Title, Status, Summary, Scope, Out of Scope, Implementation Notes, Risks, Open Questions다.
 - `prs/active/`는 항상 0 또는 1개의 PR만 가져야 한다.
-- archive 이동, lifecycle 관리, multi-PR 관리, planner automation은 다음 PR 범위다.
+- active PR가 없으면 `create-pr-plan`은 `prs/active/<pr-id>.md`를 만든다.
+- active PR가 이미 있으면 `create-pr-plan`은 `prs/archive/<pr-id>.md`에 후보를 만든다.
+- active PR를 명시적으로 바꿔야 할 때는 `factory activate-pr`로 기존 active를 `prs/archive/`로 옮기고 대상 PR을 active로 전환한다.
+- 이번 범위는 PR-011 execution flow 보강용 최소 전환만 포함하며, lifecycle 전체나 multi-PR orchestration은 포함하지 않는다.
 
 5. Run 부트스트랩
-- `factory bootstrap-run`으로 `runs/latest/<run-id>/` 및 기본 artifact를 만든다.
+- `factory start-execution`으로 `prs/active/`의 단일 active PR plan을 읽어 `runs/latest/<run-id>/` 및 기본 artifact를 만든다.
+- active PR가 사용자의 의도와 다르면 먼저 `activate-pr`로 전환한 뒤 실행한다.
+- 이 명령은 내부적으로 기존 `bootstrap-run` 흐름을 재사용한다.
+- 생성된 run에는 최소 `run_id`, `pr_id`, `work_item_id`, `pr_plan_path`가 남아 active PR plan과 연결된다.
+- active PR plan이 없거나 여러 개면 안전하게 실패한다.
 
 6. 역할별 결과 기록
 - Implementer/Reviewer/QA/Docs Sync/Verification 결과를 해당 record 명령으로 artifact에 반영한다.
@@ -94,4 +101,5 @@ Verification:
 - 명령 실행과 판정 업데이트는 CLI로 반자동 처리한다.
 - 최종 승인 결정은 반드시 인간 승인자가 수행한다.
 - 승인자의 명시적 결정을 반영하는 기록/queue 이동은 `resolve-approval`로 수행한다.
+- `start-execution`은 최소 orchestration entrypoint일 뿐이며 이후 단계 자동 호출은 하지 않는다.
 - 승인 없는 범위 확대, 구조 변경 확정, 테스트 실패 무시는 금지다.

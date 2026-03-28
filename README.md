@@ -29,10 +29,12 @@
 엔트리포인트: `factory`
 
 - `bootstrap-run`
+- `start-execution`
 - `create-goal`
 - `create-clarification`
 - `create-work-item`
 - `create-pr-plan`
+- `activate-pr`
 - `record-review`
 - `record-qa`
 - `record-docs-sync`
@@ -53,15 +55,16 @@ factory <command> --help
 1. `create-goal`로 repo-local Goal artifact 생성
 2. `create-clarification`로 Goal 기준 clarification queue artifact 생성
 3. `create-work-item`으로 Goal을 실행 가능한 Work Item Markdown artifact로 연결
-4. `create-pr-plan`으로 Work Item 기준 단 하나의 active PR plan을 `prs/active/`에 생성
-5. `bootstrap-run`으로 canonical run/artifact 스켈레톤 생성
-6. `record-verification`으로 lint/tests/type-check/build 상태 기록
-7. `record-review` 기록
-8. `record-qa` 기록
-9. `record-docs-sync` 기록
-10. `gate-check`로 merge/exception gate 판정
-11. `build-approval`로 evidence/approval-request 생성 및 조건 충족 시 queue 적재
-12. `resolve-approval`로 승인자 결정을 기록하고 queue를 pending에서 최종 queue로 이동
+4. `create-pr-plan`으로 Work Item 기준 PR plan 후보를 생성한다. active PR이 없으면 `prs/active/`에, 이미 있으면 `prs/archive/`에 만든다.
+5. 필요 시 `activate-pr`로 기존 active PR을 `prs/archive/`로 이동하고 의도한 PR plan 후보를 active로 전환
+6. `start-execution`으로 `prs/active/`의 단일 active PR plan에서 run을 시작
+7. `record-verification`으로 lint/tests/type-check/build 상태 기록
+8. `record-review` 기록
+9. `record-qa` 기록
+10. `record-docs-sync` 기록
+11. `gate-check`로 merge/exception gate 판정
+12. `build-approval`로 evidence/approval-request 생성 및 조건 충족 시 queue 적재
+13. `resolve-approval`로 승인자 결정을 기록하고 queue를 pending에서 최종 queue로 이동
 
 조건 요약:
 - review/qa 실패 시 `merge_approval=blocked`
@@ -107,11 +110,31 @@ factory <command> --help
 - Clarification artifact: `clarifications/<goal-id>/<clarification-id>.md`
 - Work Item artifact: `docs/work-items/<work-item-id>.md`
 - Active PR plan artifact: `prs/active/<pr-id>.md`
+- Archived PR plan artifact: `prs/archive/<pr-id>.md`
 - 게이트 설정: `config/gates.yaml`
 - 운영 문서: `docs/ops/`
 - PR 문서: `docs/prs/`
 - Work Item 문서: `docs/work-items/`
 - 실행 결과: `runs/latest/<run-id>/`
+
+`activate-pr` 최소 계약:
+- 입력: `--root`, `--pr-id`
+- 전제: 지정한 `pr-id`의 PR plan artifact가 `prs/active/` 또는 `prs/archive/`에 존재해야 한다.
+- 동작: 기존 active PR이 있으면 `prs/archive/`로 이동시키고, 지정한 PR plan을 `prs/active/`로 이동시킨다.
+- 결과: `prs/active/` 아래에는 정확히 1개의 active PR만 남아야 한다.
+- 범위: PR-011 execution flow 보강용 최소 전환만 제공하며, merge/close/history lifecycle 전체는 구현하지 않는다.
+
+`create-pr-plan` 최소 계약:
+- active PR이 없으면 `prs/active/<pr-id>.md`를 생성한다.
+- active PR이 이미 있으면 새 PR plan 후보를 `prs/archive/<pr-id>.md`에 생성한다.
+- duplicate `pr-id`는 `prs/active/`와 `prs/archive/`를 함께 검사해 막는다.
+
+`start-execution` 최소 계약:
+- 입력: `--root`, `--run-id`
+- 전제: `prs/active/` 아래 active PR plan이 정확히 하나여야 한다.
+- 동작: active PR plan에서 `pr_id`, `work_item_id`, `title`을 읽고 기존 `bootstrap-run` 흐름 위에 run을 시작한다.
+- 기록: `runs/latest/<run-id>/run.yaml`과 `artifacts/pr-plan.yaml`에 최소 `run_id`, `pr_id`, `work_item_id`, `pr_plan_path`가 식별 가능하게 남는다.
+- 실패: active PR plan이 0개이거나 2개 이상이면 안전하게 실패한다.
 
 ## 빠른 시작
 
@@ -121,7 +144,8 @@ factory create-goal --root . --goal-id GOAL-LOCAL --title "local intake" --probl
 factory create-clarification --root . --goal-id GOAL-LOCAL --clarification-id CLAR-001 --title "scope boundary" --category scope --question "What must stay out of scope for this goal?"
 factory create-work-item --root . --work-item-id WI-LOCAL --title "local work item" --goal-id GOAL-LOCAL --description "Create a minimal work item artifact" --acceptance-criteria $'- docs/work-items/WI-LOCAL.md exists\n- Duplicate IDs fail safely'
 factory create-pr-plan --root . --pr-id PR-LOCAL --work-item-id WI-LOCAL --title "local PR plan" --summary "Track the single active PR plan as a repo-local Markdown artifact"
-factory bootstrap-run --root . --run-id RUN-LOCAL --work-item-id WI-LOCAL --work-item-title "local bootstrap" --pr-id PR-LOCAL
+factory activate-pr --root . --pr-id PR-LOCAL
+factory start-execution --root . --run-id RUN-LOCAL
 factory record-verification --root . --run-id RUN-LOCAL --lint pass --tests pass --type-check pass --build pass --summary "all checks green"
 factory record-review --root . --run-id RUN-LOCAL --status pass --summary "review ok"
 factory record-qa --root . --run-id RUN-LOCAL --status pass --summary "qa ok"
@@ -137,3 +161,5 @@ factory resolve-approval --root . --run-id RUN-LOCAL --decision approve --actor 
 2. clarification resolution loop
 3. Goal to Work Item linkage hardening
 4. WI auto-generation
+
+`bootstrap-run`은 제거되지 않았다. 현재는 `activate-pr`로 active PR를 명시적으로 전환한 뒤 `start-execution`이 그 active PR plan을 읽어 실행을 시작하는 공식 entrypoint이고, `bootstrap-run`은 그 아래의 run bootstrap 기반 명령으로 유지된다.
