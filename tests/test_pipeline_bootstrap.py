@@ -8,10 +8,10 @@ from orchestrator.yaml_io import read_yaml
 
 
 class PipelineBootstrapTest(unittest.TestCase):
-    def test_pipeline_state_includes_docs_sync(self) -> None:
-        self.assertEqual(PipelineState.docs_sync.value, "docs_sync")
+    def test_pipeline_state_includes_approval_pending(self) -> None:
+        self.assertEqual(PipelineState.approval_pending.value, "approval_pending")
 
-    def test_gate_status_contains_docs_sync_state(self) -> None:
+    def test_gate_status_contains_refined_states(self) -> None:
         from pathlib import Path
 
         with TemporaryDirectory() as tmp:
@@ -25,5 +25,8 @@ class PipelineBootstrapTest(unittest.TestCase):
             )
 
             payload = read_yaml(run_root / "artifacts" / "gate-status.yaml")
-            self.assertIn("docs_sync", payload["gate_status"]["states"])
+            self.assertEqual(
+                payload["gate_status"]["states"],
+                ["draft", "in_progress", "approval_pending", "approved", "rejected"],
+            )
             self.assertEqual(payload["gate_status"]["gates"]["merge_approval"], "pending")

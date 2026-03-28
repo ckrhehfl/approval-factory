@@ -12,6 +12,7 @@
 - repo-local, file-based 운영 (`runs/latest`, `approval_queue/*`)
 - approval-first 원칙 기반의 게이트 판정
 - one-PR-at-a-time 운영 가정
+- 잘못된 실행 순서를 막는 최소 guardrail과 run state 갱신
 - PR 실행 산출물(artifact) 및 문서 흔적(`docs/prs`, `docs/work-items`) 생성/갱신
 
 비포함:
@@ -71,6 +72,8 @@ factory <command> --help
 - verification 실패가 있으면 `merge_approval=exception_required`
 - 모든 prerequisite 통과 시 `merge_approval=ready`
 - queue 적재는 `docs_sync` 완료(`complete` 또는 `not-needed`)이고 merge gate가 `ready` 또는 `exception_required`일 때만 수행
+- `build-approval`는 placeholder artifact만으로는 진행되지 않으며 `record-review`, `record-qa`, `record-docs-sync`, `record-verification`이 실제로 기록된 뒤에만 진행된다.
+- `resolve-approval`는 `build-approval` 이후 생성된 approval request와 pending queue item이 모두 있어야만 진행된다.
 
 ## gate-check vs build-approval
 
@@ -132,9 +135,26 @@ factory <command> --help
 `start-execution` 최소 계약:
 - 입력: `--root`, `--run-id`
 - 전제: `prs/active/` 아래 active PR plan이 정확히 하나여야 한다.
+- 전제: active PR plan의 `Work Item ID`가 `docs/work-items/` 아래 실제 work item artifact와 정확히 연결되어야 한다.
 - 동작: active PR plan에서 `pr_id`, `work_item_id`, `title`을 읽고 기존 `bootstrap-run` 흐름 위에 run을 시작한다.
-- 기록: `runs/latest/<run-id>/run.yaml`과 `artifacts/pr-plan.yaml`에 최소 `run_id`, `pr_id`, `work_item_id`, `pr_plan_path`가 식별 가능하게 남는다.
-- 실패: active PR plan이 0개이거나 2개 이상이면 안전하게 실패한다.
+- 기록: `runs/latest/<run-id>/run.yaml`과 `artifacts/{pr-plan,work-item}.yaml`에 최소 `run_id`, `pr_id`, `work_item_id`, `pr_plan_path`, `work_item_path`가 식별 가능하게 남고 `run.yaml.state=in_progress`로 갱신된다.
+- 실패: active PR plan이 0개이거나 2개 이상이거나, work item 연결이 불가하면 안전하게 실패한다.
+
+`build-approval` 최소 계약:
+- 전제: `verification-report.yaml`, `review-report.yaml`, `qa-report.yaml`, `docs-sync-report.yaml`가 모두 존재하고 실제 record 명령으로 기록돼 있어야 한다.
+- 실패: prerequisite artifact가 없거나 아직 placeholder 상태면 누락된 record 명령을 명확히 보여주며 실패한다.
+- 상태: 승인 패키지를 만들면 `run.yaml.state=approval_pending`으로 갱신된다.
+
+`resolve-approval` 최소 계약:
+- 전제: `approval-request.yaml`가 실제 `build-approval` 결과로 채워져 있어야 하고 `approval_queue/pending/APR-<run-id>.yaml`가 존재해야 한다.
+- 실패: approval request artifact 또는 pending queue item이 없으면 누락 원인을 명확히 표시하고 실패한다.
+- 상태: `approve`면 `approved`, `reject`면 `rejected`, `exception`은 `approval_pending` 상태를 유지한다.
+
+`run.yaml.state` 최소 의미:
+- `draft`: bootstrap만 된 상태
+- `in_progress`: execution이 시작됐고 verification/review/qa/docs-sync 기록 중인 상태
+- `approval_pending`: approval package가 만들어져 승인자 결정을 기다리는 상태
+- `approved`: 승인자가 approve를 기록한 상태
 
 ## 빠른 시작
 
@@ -146,10 +166,10 @@ factory create-work-item --root . --work-item-id WI-LOCAL --title "local work it
 factory create-pr-plan --root . --pr-id PR-LOCAL --work-item-id WI-LOCAL --title "local PR plan" --summary "Track the single active PR plan as a repo-local Markdown artifact"
 factory activate-pr --root . --pr-id PR-LOCAL
 factory start-execution --root . --run-id RUN-LOCAL
-factory record-verification --root . --run-id RUN-LOCAL --lint pass --tests pass --type-check pass --build pass --summary "all checks green"
 factory record-review --root . --run-id RUN-LOCAL --status pass --summary "review ok"
 factory record-qa --root . --run-id RUN-LOCAL --status pass --summary "qa ok"
 factory record-docs-sync --root . --run-id RUN-LOCAL --status complete --summary "docs aligned"
+factory record-verification --root . --run-id RUN-LOCAL --lint pass --tests pass --type-check pass --build pass --summary "all checks green"
 factory gate-check --root . --run-id RUN-LOCAL
 factory build-approval --root . --run-id RUN-LOCAL
 factory resolve-approval --root . --run-id RUN-LOCAL --decision approve --actor approver.local --note "all gates satisfied"

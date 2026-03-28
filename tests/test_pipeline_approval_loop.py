@@ -200,6 +200,38 @@ class PipelineApprovalLoopTest(unittest.TestCase):
 
             self.assertFalse((root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").exists())
 
+    def test_build_approval_fails_when_review_was_not_recorded(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-REVIEW-MISSING"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id)
+            self.assertEqual(main(["record-qa", "--root", str(root), "--run-id", run_id, "--status", "pass", "--summary", "qa ok"]), 0)
+            self.assertEqual(
+                main(["record-docs-sync", "--root", str(root), "--run-id", run_id, "--status", "complete", "--summary", "docs synced"]),
+                0,
+            )
+
+            with self.assertRaisesRegex(ValueError, "record-review"):
+                main(["build-approval", "--root", str(root), "--run-id", run_id])
+
+    def test_build_approval_fails_when_docs_sync_was_not_recorded(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-DOCS-MISSING"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id)
+            self.assertEqual(
+                main(["record-review", "--root", str(root), "--run-id", run_id, "--status", "pass", "--summary", "review ok"]),
+                0,
+            )
+            self.assertEqual(main(["record-qa", "--root", str(root), "--run-id", run_id, "--status", "pass", "--summary", "qa ok"]), 0)
+
+            with self.assertRaisesRegex(ValueError, "record-docs-sync"):
+                main(["build-approval", "--root", str(root), "--run-id", run_id])
+
     def test_duplicate_build_approval_is_idempotent(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -342,6 +374,60 @@ class PipelineApprovalLoopTest(unittest.TestCase):
             run_payload = read_yaml(root / "runs" / "latest" / run_id / "run.yaml")
             self.assertEqual(run_payload["run"]["operations"]["resolve_approval"]["count"], 2)
 
+    def test_resolve_approval_fails_without_pending_queue_item(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-NO-PENDING"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+            main(["build-approval", "--root", str(root), "--run-id", run_id])
+            (root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").unlink()
+
+            with self.assertRaisesRegex(ValueError, "pending queue item"):
+                main(
+                    [
+                        "resolve-approval",
+                        "--root",
+                        str(root),
+                        "--run-id",
+                        run_id,
+                        "--decision",
+                        "approve",
+                        "--actor",
+                        "approver.local",
+                        "--note",
+                        "approve without queue item",
+                    ]
+                )
+
+    def test_resolve_approval_fails_without_built_approval_request(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-NO-APPROVAL-REQUEST"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            approval_path = root / "runs" / "latest" / run_id / "artifacts" / "approval-request.yaml"
+            approval_path.unlink()
+
+            with self.assertRaisesRegex(ValueError, "approval request artifact"):
+                main(
+                    [
+                        "resolve-approval",
+                        "--root",
+                        str(root),
+                        "--run-id",
+                        run_id,
+                        "--decision",
+                        "approve",
+                        "--actor",
+                        "approver.local",
+                        "--note",
+                        "approve without approval request",
+                    ]
+                )
+
     def test_resolve_approval_fails_when_already_resolved_to_other_queue(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -369,6 +455,32 @@ class PipelineApprovalLoopTest(unittest.TestCase):
                         "reject after approval",
                     ]
                 )
+
+    def test_state_transitions_follow_execution_flow(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-STATE"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+
+            run_payload = read_yaml(root / "runs" / "latest" / run_id / "run.yaml")
+            self.assertEqual(run_payload["run"]["state"], "draft")
+
+            self._record_verification(root, run_id)
+            run_payload = read_yaml(root / "runs" / "latest" / run_id / "run.yaml")
+            self.assertEqual(run_payload["run"]["state"], "in_progress")
+
+            self._record_non_verification_ready(root, run_id)
+            run_payload = read_yaml(root / "runs" / "latest" / run_id / "run.yaml")
+            self.assertEqual(run_payload["run"]["state"], "in_progress")
+
+            self._build_approval(root, run_id)
+            run_payload = read_yaml(root / "runs" / "latest" / run_id / "run.yaml")
+            self.assertEqual(run_payload["run"]["state"], "approval_pending")
+
+            self._resolve_approval(root, run_id, "approve")
+            run_payload = read_yaml(root / "runs" / "latest" / run_id / "run.yaml")
+            self.assertEqual(run_payload["run"]["state"], "approved")
 
 
 if __name__ == "__main__":
