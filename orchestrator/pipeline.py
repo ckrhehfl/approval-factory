@@ -46,6 +46,7 @@ PR_DOC_FILENAMES = (
 
 GOAL_STATUS = "draft"
 CLARIFICATION_STATUS = "open"
+WORK_ITEM_STATUS = "draft"
 VALID_CLARIFICATION_CATEGORIES = {
     "scope",
     "design",
@@ -307,6 +308,64 @@ def create_clarification(
     clarification_path.parent.mkdir(parents=True, exist_ok=True)
     clarification_path.write_text("\n".join(lines), encoding="utf-8")
     return clarification_path
+
+
+def create_work_item(
+    *,
+    root_dir: Path,
+    work_item_id: str,
+    title: str,
+    goal_id: str,
+    description: str,
+    acceptance_criteria: str | None = None,
+) -> Path:
+    work_item_path = root_dir / "docs" / "work-items" / f"{work_item_id}.md"
+    if work_item_path.exists():
+        raise FileExistsError(
+            f"Work item artifact already exists for work-item-id '{work_item_id}': {work_item_path.as_posix()}"
+        )
+
+    acceptance_criteria_lines = _normalize_multiline_text(acceptance_criteria)
+    lines = [
+        f"# {work_item_id}: {title}",
+        "",
+        "## Work Item ID",
+        work_item_id,
+        "",
+        "## Goal ID",
+        goal_id,
+        "",
+        "## Title",
+        title,
+        "",
+        "## Status",
+        WORK_ITEM_STATUS,
+        "",
+        "## Description",
+        *description.splitlines(),
+        "",
+        "## Scope",
+        "- TBD",
+        "",
+        "## Out of Scope",
+        "- TBD",
+        "",
+        "## Acceptance Criteria",
+        *acceptance_criteria_lines,
+        "",
+        "## Dependencies",
+        "- TBD",
+        "",
+        "## Risks",
+        "- TBD",
+        "",
+        "## Notes",
+        "- TBD",
+        "",
+    ]
+    work_item_path.parent.mkdir(parents=True, exist_ok=True)
+    work_item_path.write_text("\n".join(lines), encoding="utf-8")
+    return work_item_path
 
 
 def _queue_item_name(run_id: str) -> str:

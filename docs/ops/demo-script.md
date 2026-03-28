@@ -7,8 +7,8 @@
 ```bash
 GOAL_ID="GOAL-007-DEMO"
 CLAR_ID="CLAR-001"
+WI_ID="WI-009-DEMO"
 RUN_ID="RUN-DEMO-001"
-WI_ID="WI-005"
 PR_ID="PR-005"
 ```
 
@@ -57,7 +57,29 @@ sed -n '1,220p' "clarifications/$GOAL_ID/$CLAR_ID.md"
 - clarification queue는 Goal intake 다음의 최소 질문 관리 계층이다.
 - 자동 질문 생성, 자동 해결, resolver/planner 구현은 아직 없다.
 
-## 3) bootstrap-run
+## 3) create-work-item
+
+```bash
+factory create-work-item \
+  --root . \
+  --work-item-id "$WI_ID" \
+  --title "goal to work item demo" \
+  --goal-id "$GOAL_ID" \
+  --description "Create the minimum repo-local Work Item contract that links Goal intake to a PR-sized execution unit." \
+  --acceptance-criteria $'- docs/work-items/'"$WI_ID"'.md exists\n- Duplicate work-item IDs fail safely\n- No auto decomposition is performed'
+```
+
+확인:
+
+```bash
+sed -n '1,220p' "docs/work-items/$WI_ID.md"
+```
+
+주의:
+- Work Item은 Goal/clarification을 실제 PR 실행 단위로 연결하는 수동 Markdown artifact다.
+- 자동 decomposition, clarification 강한 연결, planner 자동화는 아직 없다.
+
+## 4) bootstrap-run
 
 ```bash
 factory bootstrap-run \
@@ -68,7 +90,7 @@ factory bootstrap-run \
   --pr-id "$PR_ID"
 ```
 
-## 4) record-review
+## 5) record-review
 
 ```bash
 factory record-review \
@@ -78,7 +100,7 @@ factory record-review \
   --summary "review passed for MVP demo"
 ```
 
-## 5) record-qa
+## 6) record-qa
 
 ```bash
 factory record-qa \
@@ -88,7 +110,7 @@ factory record-qa \
   --summary "qa passed for MVP demo"
 ```
 
-## 6) record-docs-sync
+## 7) record-docs-sync
 
 ```bash
 factory record-docs-sync \
@@ -98,7 +120,7 @@ factory record-docs-sync \
   --summary "docs are aligned"
 ```
 
-## 7) record-verification
+## 8) record-verification
 
 ```bash
 factory record-verification \
@@ -111,7 +133,7 @@ factory record-verification \
   --summary "all checks green"
 ```
 
-## 8) gate-check
+## 9) gate-check
 
 ```bash
 factory gate-check --root . --run-id "$RUN_ID"
@@ -127,7 +149,7 @@ sed -n '1,200p' "runs/latest/$RUN_ID/artifacts/gate-status.yaml"
 - `gate-check`는 gate 판정만 갱신한다.
 - 최종 승인 요청 판단은 다음 단계 `build-approval` 산출물 기준으로 한다.
 
-## 9) build-approval
+## 10) build-approval
 
 ```bash
 factory build-approval --root . --run-id "$RUN_ID"
@@ -140,13 +162,13 @@ sed -n '1,220p' "runs/latest/$RUN_ID/artifacts/approval-request.yaml"
 sed -n '1,220p' "runs/latest/$RUN_ID/artifacts/evidence-bundle.yaml"
 ```
 
-## 10) approval_queue 확인
+## 11) approval_queue 확인
 
 ```bash
 find approval_queue/pending -maxdepth 1 -type f -name "APR-$RUN_ID*.yaml" | sort
 ```
 
-## 11) resolve-approval
+## 12) resolve-approval
 
 ```bash
 factory resolve-approval \
