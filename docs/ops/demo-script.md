@@ -7,7 +7,7 @@
 ```bash
 GOAL_ID="GOAL-007-DEMO"
 CLAR_ID="CLAR-001"
-WI_ID="WI-009-DEMO"
+WI_ID="WI-010-DEMO"
 RUN_ID="RUN-DEMO-001"
 PR_ID="PR-005"
 ```
@@ -79,7 +79,28 @@ sed -n '1,220p' "docs/work-items/$WI_ID.md"
 - Work Item은 Goal/clarification을 실제 PR 실행 단위로 연결하는 수동 Markdown artifact다.
 - 자동 decomposition, clarification 강한 연결, planner 자동화는 아직 없다.
 
-## 4) bootstrap-run
+## 4) create-pr-plan
+
+```bash
+factory create-pr-plan \
+  --root . \
+  --pr-id "$PR_ID" \
+  --work-item-id "$WI_ID" \
+  --title "single active PR demo" \
+  --summary "Create the minimum repo-local active PR plan artifact for the current Work Item."
+```
+
+확인:
+
+```bash
+sed -n '1,220p' "prs/active/$PR_ID.md"
+```
+
+주의:
+- `prs/active/`는 항상 0 또는 1개의 PR plan만 가진다.
+- archive 이동, PR close/merge lifecycle, multi-PR 관리, planner automation은 아직 없다.
+
+## 5) bootstrap-run
 
 ```bash
 factory bootstrap-run \
@@ -90,7 +111,7 @@ factory bootstrap-run \
   --pr-id "$PR_ID"
 ```
 
-## 5) record-review
+## 6) record-review
 
 ```bash
 factory record-review \
@@ -100,7 +121,7 @@ factory record-review \
   --summary "review passed for MVP demo"
 ```
 
-## 6) record-qa
+## 7) record-qa
 
 ```bash
 factory record-qa \
@@ -110,7 +131,7 @@ factory record-qa \
   --summary "qa passed for MVP demo"
 ```
 
-## 7) record-docs-sync
+## 8) record-docs-sync
 
 ```bash
 factory record-docs-sync \
@@ -120,7 +141,7 @@ factory record-docs-sync \
   --summary "docs are aligned"
 ```
 
-## 8) record-verification
+## 9) record-verification
 
 ```bash
 factory record-verification \
@@ -133,7 +154,7 @@ factory record-verification \
   --summary "all checks green"
 ```
 
-## 9) gate-check
+## 10) gate-check
 
 ```bash
 factory gate-check --root . --run-id "$RUN_ID"
@@ -149,7 +170,7 @@ sed -n '1,200p' "runs/latest/$RUN_ID/artifacts/gate-status.yaml"
 - `gate-check`는 gate 판정만 갱신한다.
 - 최종 승인 요청 판단은 다음 단계 `build-approval` 산출물 기준으로 한다.
 
-## 10) build-approval
+## 11) build-approval
 
 ```bash
 factory build-approval --root . --run-id "$RUN_ID"
@@ -162,13 +183,13 @@ sed -n '1,220p' "runs/latest/$RUN_ID/artifacts/approval-request.yaml"
 sed -n '1,220p' "runs/latest/$RUN_ID/artifacts/evidence-bundle.yaml"
 ```
 
-## 11) approval_queue 확인
+## 12) approval_queue 확인
 
 ```bash
 find approval_queue/pending -maxdepth 1 -type f -name "APR-$RUN_ID*.yaml" | sort
 ```
 
-## 12) resolve-approval
+## 13) resolve-approval
 
 ```bash
 factory resolve-approval \

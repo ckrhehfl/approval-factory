@@ -14,6 +14,7 @@
 - Goal intake minimum
 - clarification queue minimum
 - Work Item artifact minimum
+- active PR plan minimum
 
 비포함:
 - Goal intake 질문 자동화
@@ -26,7 +27,7 @@
 - central control plane
 - multi-project orchestration
 
-## 운영 흐름 (Goal -> clarification -> WI -> PR -> run -> approval)
+## 운영 흐름 (Goal -> clarification -> WI -> active PR -> run -> approval)
 
 1. Goal intake
 - `factory create-goal`로 `goals/<goal-id>.md`를 생성한다.
@@ -44,8 +45,12 @@
 - 기본 섹션은 Work Item ID, Goal ID, Title, Status, Description, Scope, Out of Scope, Acceptance Criteria, Dependencies, Risks, Notes다.
 - 현재 단계는 artifact 생성과 수동 관리까지만 제공하며 auto decomposition과 clarification 강제 연결은 다음 PR 범위다.
 
-4. PR 단위 계획
-- `docs/prs/PR-###/plan.md` 중심으로 one-PR-at-a-time 실행 계획을 고정한다.
+4. Active PR 계획
+- `factory create-pr-plan`로 `prs/active/<pr-id>.md`를 생성한다.
+- active PR plan은 Work Item을 현재 실행 중인 단 하나의 PR로 연결하는 수동 Markdown artifact다.
+- 기본 섹션은 PR ID, Work Item ID, Title, Status, Summary, Scope, Out of Scope, Implementation Notes, Risks, Open Questions다.
+- `prs/active/`는 항상 0 또는 1개의 PR만 가져야 한다.
+- archive 이동, lifecycle 관리, multi-PR 관리, planner automation은 다음 PR 범위다.
 
 5. Run 부트스트랩
 - `factory bootstrap-run`으로 `runs/latest/<run-id>/` 및 기본 artifact를 만든다.

@@ -8,6 +8,7 @@
 - repo-local, file-based Goal intake minimum (`goals/*.md`)
 - repo-local, file-based clarification queue minimum (`clarifications/*/*.md`)
 - repo-local, file-based Work Item minimum (`docs/work-items/*.md`)
+- repo-local, file-based single active PR plan minimum (`prs/active/*.md`)
 - repo-local, file-based 운영 (`runs/latest`, `approval_queue/*`)
 - approval-first 원칙 기반의 게이트 판정
 - one-PR-at-a-time 운영 가정
@@ -31,6 +32,7 @@
 - `create-goal`
 - `create-clarification`
 - `create-work-item`
+- `create-pr-plan`
 - `record-review`
 - `record-qa`
 - `record-docs-sync`
@@ -51,7 +53,7 @@ factory <command> --help
 1. `create-goal`로 repo-local Goal artifact 생성
 2. `create-clarification`로 Goal 기준 clarification queue artifact 생성
 3. `create-work-item`으로 Goal을 실행 가능한 Work Item Markdown artifact로 연결
-4. 사람 승인 하에 Work Item을 PR 계획으로 분해
+4. `create-pr-plan`으로 Work Item 기준 단 하나의 active PR plan을 `prs/active/`에 생성
 5. `bootstrap-run`으로 canonical run/artifact 스켈레톤 생성
 6. `record-verification`으로 lint/tests/type-check/build 상태 기록
 7. `record-review` 기록
@@ -104,6 +106,7 @@ factory <command> --help
 - Goal artifact: `goals/<goal-id>.md`
 - Clarification artifact: `clarifications/<goal-id>/<clarification-id>.md`
 - Work Item artifact: `docs/work-items/<work-item-id>.md`
+- Active PR plan artifact: `prs/active/<pr-id>.md`
 - 게이트 설정: `config/gates.yaml`
 - 운영 문서: `docs/ops/`
 - PR 문서: `docs/prs/`
@@ -117,6 +120,7 @@ pip install -e ".[dev]"
 factory create-goal --root . --goal-id GOAL-LOCAL --title "local intake" --problem "Need a formal goal artifact" --outcome "A readable goal file exists" --constraints "repo-local only"
 factory create-clarification --root . --goal-id GOAL-LOCAL --clarification-id CLAR-001 --title "scope boundary" --category scope --question "What must stay out of scope for this goal?"
 factory create-work-item --root . --work-item-id WI-LOCAL --title "local work item" --goal-id GOAL-LOCAL --description "Create a minimal work item artifact" --acceptance-criteria $'- docs/work-items/WI-LOCAL.md exists\n- Duplicate IDs fail safely'
+factory create-pr-plan --root . --pr-id PR-LOCAL --work-item-id WI-LOCAL --title "local PR plan" --summary "Track the single active PR plan as a repo-local Markdown artifact"
 factory bootstrap-run --root . --run-id RUN-LOCAL --work-item-id WI-LOCAL --work-item-title "local bootstrap" --pr-id PR-LOCAL
 factory record-verification --root . --run-id RUN-LOCAL --lint pass --tests pass --type-check pass --build pass --summary "all checks green"
 factory record-review --root . --run-id RUN-LOCAL --status pass --summary "review ok"
