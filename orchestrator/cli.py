@@ -8,6 +8,7 @@ from typing import Sequence
 from orchestrator.pipeline import (
     bootstrap_run,
     build_approval_request,
+    create_clarification,
     create_goal,
     evaluate_gates,
     record_docs_sync,
@@ -75,6 +76,18 @@ def build_parser() -> argparse.ArgumentParser:
     create_goal_parser.add_argument("--problem", required=True)
     create_goal_parser.add_argument("--outcome", required=True)
     create_goal_parser.add_argument("--constraints")
+
+    create_clarification_parser = subparsers.add_parser(
+        "create-clarification",
+        help="Create a clarification artifact for a goal",
+    )
+    create_clarification_parser.add_argument("--root", default=".", help="Repository root path")
+    create_clarification_parser.add_argument("--goal-id", required=True)
+    create_clarification_parser.add_argument("--clarification-id", required=True)
+    create_clarification_parser.add_argument("--title", required=True)
+    create_clarification_parser.add_argument("--category", required=True)
+    create_clarification_parser.add_argument("--question", required=True)
+    create_clarification_parser.add_argument("--escalation", action="store_true")
 
     resolve_approval_parser = subparsers.add_parser("resolve-approval", help="Resolve pending approval request")
     resolve_approval_parser.add_argument("--root", default=".", help="Repository root path")
@@ -167,6 +180,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                 constraints=args.constraints,
             )
         except FileExistsError as exc:
+            parser.error(str(exc))
+        print(path.as_posix())
+        return 0
+
+    if args.command == "create-clarification":
+        try:
+            path = create_clarification(
+                root_dir=Path(args.root),
+                goal_id=args.goal_id,
+                clarification_id=args.clarification_id,
+                title=args.title,
+                category=args.category,
+                question=args.question,
+                escalation=args.escalation,
+            )
+        except (FileExistsError, ValueError) as exc:
             parser.error(str(exc))
         print(path.as_posix())
         return 0

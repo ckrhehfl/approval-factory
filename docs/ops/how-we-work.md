@@ -12,9 +12,12 @@
 - approval-first
 - one-PR-at-a-time
 - Goal intake minimum
+- clarification queue minimum
 
 비포함:
 - Goal intake 질문 자동화
+- clarification 질문 자동화
+- clarification 해결 자동화
 - Goal 해결 자동화
 - Goal to Work Item 자동 분해
 - LLM 연동
@@ -22,34 +25,39 @@
 - central control plane
 - multi-project orchestration
 
-## 운영 흐름 (Goal -> WI -> PR -> run -> approval)
+## 운영 흐름 (Goal -> clarification -> WI -> PR -> run -> approval)
 
 1. Goal intake
 - `factory create-goal`로 `goals/<goal-id>.md`를 생성한다.
 - Goal은 사람이 읽고 수정 가능한 Markdown artifact다.
 - 현재 단계는 intake 저장 계약만 제공하며, planner/resolver는 다음 PR 범위다.
 
-2. Work Item 정의
+2. Clarification queue
+- `factory create-clarification`로 `clarifications/<goal-id>/<clarification-id>.md`를 생성한다.
+- clarification은 Goal intake 다음 단계의 최소 질문 관리 계층이다.
+- 현재 단계는 질문 artifact 생성과 수동 관리까지만 제공하며, auto-generation/resolution은 다음 PR 범위다.
+
+3. Work Item 정의
 - `docs/work-items/WI-###-*.md`에 문제/범위/성공기준을 기록한다.
 
-3. PR 단위 계획
+4. PR 단위 계획
 - `docs/prs/PR-###/plan.md` 중심으로 one-PR-at-a-time 실행 계획을 고정한다.
 
-4. Run 부트스트랩
+5. Run 부트스트랩
 - `factory bootstrap-run`으로 `runs/latest/<run-id>/` 및 기본 artifact를 만든다.
 
-5. 역할별 결과 기록
+6. 역할별 결과 기록
 - Implementer/Reviewer/QA/Docs Sync/Verification 결과를 해당 record 명령으로 artifact에 반영한다.
 
-6. 게이트 판정
+7. 게이트 판정
 - `factory gate-check`로 `gate-status.yaml`을 갱신한다.
  - 이 단계는 gate 판정 확인용이며, 최종 승인 요청 산출물 최신화 단계는 아니다.
 
-7. 승인 패키지 생성
+8. 승인 패키지 생성
 - `factory build-approval`로 `evidence-bundle.yaml`, `approval-request.yaml`를 최신 상태로 만든다.
 - 조건이 맞으면 `approval_queue/pending/`에 approval 요청 파일이 적재된다.
 
-8. 승인자 결정
+9. 승인자 결정
 - 승인자는 queue 파일과 evidence를 보고 `approve/reject/exception`을 결정한다.
 - `factory resolve-approval`로 승인 결정을 `approval-decision.yaml`에 기록한다.
 - resolve 시 queue 상태가 `pending`에서 `approved|rejected|exceptions`로 이동한다.

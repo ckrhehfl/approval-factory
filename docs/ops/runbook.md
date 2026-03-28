@@ -4,19 +4,20 @@
 
 1. Work Item 생성
 2. Goal intake 필요 시 `factory create-goal`로 `goals/<goal-id>.md` 생성
-3. Scope 승인
-4. 설계 초안 생성
-5. Architecture 승인 필요 여부 판정
-6. PR 분해
-7. PR별 구현
-8. Verification 기록(lint/tests/type_check/build)
-9. Review
-10. QA
-11. Docs Sync 완료
-12. `gate-check`로 gate 판정 확인
-13. `build-approval`로 Evidence Bundle + Approval Request 생성
-14. `resolve-approval`로 승인자 결정 기록 및 queue 정리
-15. Merge
+3. Goal 기준 clarification 필요 시 `factory create-clarification`로 `clarifications/<goal-id>/<clarification-id>.md` 생성
+4. Scope 승인
+5. 설계 초안 생성
+6. Architecture 승인 필요 여부 판정
+7. PR 분해
+8. PR별 구현
+9. Verification 기록(lint/tests/type_check/build)
+10. Review
+11. QA
+12. Docs Sync 완료
+13. `gate-check`로 gate 판정 확인
+14. `build-approval`로 Evidence Bundle + Approval Request 생성
+15. `resolve-approval`로 승인자 결정 기록 및 queue 정리
+16. Merge
 
 ## goal intake 최소 계약
 
@@ -37,6 +38,27 @@
 - 동일 `goal-id`가 이미 존재하면 명령은 실패한다.
 - 현재 PR 범위에서 goal artifact는 intake 저장 계약만 제공한다.
 - 질문 자동 생성, goal 해소, Work Item 자동 분해, LLM 연결은 아직 없다.
+
+## clarification queue 최소 계약
+
+- clarification artifact는 `clarifications/<goal-id>/<clarification-id>.md`에 저장한다.
+- 생성 명령은 `factory create-clarification --root <repo> --goal-id <goal-id> --clarification-id <id> --title <title> --category <scope|design|dependency|constraint|approval-required> --question <text> [--escalation]` 이다.
+- clarification은 Goal intake 다음 단계의 최소 질문 관리 계층이다.
+- 생성되는 문서는 사람 검토용 Markdown이며 다음 섹션을 항상 포함한다:
+  - Clarification ID
+  - Goal ID
+  - Title
+  - Status
+  - Category
+  - Question
+  - Suggested Resolution
+  - Escalation Required
+  - Resolution Notes
+  - Next Action
+- 기본 `Status`는 `open`이다.
+- 동일 `goal-id` 아래 동일 `clarification-id`가 이미 존재하면 명령은 실패한다.
+- 이번 PR 범위에서 clarification queue는 artifact 생성과 수동 관리까지만 제공한다.
+- 질문 자동 생성, 질문 자동 해결, goal-to-WI 자동 분해, resolver/planner 구현, LLM 연결은 아직 없다.
 
 ## gate-check와 build-approval의 역할 차이
 
