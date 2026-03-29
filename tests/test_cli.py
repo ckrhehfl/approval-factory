@@ -571,18 +571,24 @@ class StartExecutionCliTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
 
-            with self.assertRaises(SystemExit) as exc_info:
-                main(
-                    [
-                        "start-execution",
-                        "--root",
-                        str(root),
-                        "--run-id",
-                        "RUN-011",
-                    ]
-                )
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "start-execution",
+                            "--root",
+                            str(root),
+                            "--run-id",
+                            "RUN-011",
+                        ]
+                    )
 
             self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("there is no active PR plan", error_output)
+            self.assertIn("factory create-pr-plan --root . --pr-id PR-XXX", error_output)
+            self.assertIn("factory activate-pr --root . --pr-id PR-XXX", error_output)
 
 
 class StatusCliTest(unittest.TestCase):
@@ -669,15 +675,18 @@ class StatusCliTest(unittest.TestCase):
                         "Active PR:",
                         "- pr_id: PR-013",
                         "- work_item_id: WI-013",
+                        f"- path: {(root / 'prs' / 'active' / 'PR-013.md').as_posix()}",
                         "",
                         "Latest Run:",
                         "- run_id: RUN-013",
                         "- state: approval_pending",
+                        f"- path: {(root / 'runs' / 'latest' / 'RUN-013').as_posix()}",
                         "",
                         "Approval:",
                         "- status: pending",
+                        f"- path: {(root / 'approval_queue' / 'pending' / 'APR-RUN-013.yaml').as_posix()}",
                         "",
-                        "Open Clarifications:",
+                        "Open Clarifications (1):",
                         "- clarification_id: CLAR-001",
                     ]
                 )
@@ -974,6 +983,7 @@ class CleanupRehearsalCliTest(unittest.TestCase):
                         "Latest Run:",
                         "- run_id: RUN-100",
                         "- state: in_progress",
+                        f"- path: {(root / 'runs' / 'latest' / 'RUN-100').as_posix()}",
                         "",
                         "Approval:",
                         "- status: none",
@@ -1006,6 +1016,7 @@ class CleanupRehearsalCliTest(unittest.TestCase):
                         "Latest Run:",
                         "- run_id: RUN-100",
                         "- state: in_progress",
+                        f"- path: {(root / 'runs' / 'latest' / 'RUN-100').as_posix()}",
                         "",
                         "Approval:",
                         "- status: none",
@@ -1051,18 +1062,24 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             (active_dir / "PR-011.md").write_text("# PR-011\n\n## PR ID\nPR-011\n\n## Work Item ID\nWI-011\n\n## Title\none\n", encoding="utf-8")
             (active_dir / "PR-012.md").write_text("# PR-012\n\n## PR ID\nPR-012\n\n## Work Item ID\nWI-012\n\n## Title\ntwo\n", encoding="utf-8")
 
-            with self.assertRaises(SystemExit) as exc_info:
-                main(
-                    [
-                        "start-execution",
-                        "--root",
-                        str(root),
-                        "--run-id",
-                        "RUN-011",
-                    ]
-                )
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "start-execution",
+                            "--root",
+                            str(root),
+                            "--run-id",
+                            "RUN-011",
+                        ]
+                    )
 
             self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("must contain exactly one active PR plan", error_output)
+            self.assertIn("Current active candidates:", error_output)
+            self.assertIn("factory start-execution --root . --run-id RUN-011", error_output)
 
     def test_start_execution_fails_when_work_item_artifact_is_missing(self) -> None:
         from pathlib import Path
@@ -1076,18 +1093,24 @@ class CleanupRehearsalCliTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with self.assertRaises(SystemExit) as exc_info:
-                main(
-                    [
-                        "start-execution",
-                        "--root",
-                        str(root),
-                        "--run-id",
-                        "RUN-012",
-                    ]
-                )
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "start-execution",
+                            "--root",
+                            str(root),
+                            "--run-id",
+                            "RUN-012",
+                        ]
+                    )
 
             self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("does not resolve to a work item artifact", error_output)
+            self.assertIn("docs/work-items/WI-012.md", error_output)
+            self.assertIn("factory start-execution --root . --run-id RUN-012", error_output)
 
     def test_create_pr_plan_rejects_duplicate_pr_id(self) -> None:
         from pathlib import Path
@@ -1095,25 +1118,9 @@ class CleanupRehearsalCliTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
 
-            first_exit_code = main(
-                [
-                    "create-pr-plan",
-                    "--root",
-                    str(root),
-                    "--pr-id",
-                    "PR-010",
-                    "--work-item-id",
-                    "WI-010",
-                    "--title",
-                    "Single active PR planning",
-                    "--summary",
-                    "Create the single active PR plan artifact.",
-                ]
-            )
-            self.assertEqual(first_exit_code, 0)
-
-            with self.assertRaises(SystemExit) as exc_info:
-                main(
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                first_exit_code = main(
                     [
                         "create-pr-plan",
                         "--root",
@@ -1125,11 +1132,34 @@ class CleanupRehearsalCliTest(unittest.TestCase):
                         "--title",
                         "Single active PR planning",
                         "--summary",
-                        "Duplicate create should fail safely.",
+                        "Create the single active PR plan artifact.",
                     ]
                 )
+            self.assertEqual(first_exit_code, 0)
+            self.assertIn("- location: active", stdout.getvalue())
+            self.assertIn((root / "prs" / "active" / "PR-010.md").as_posix(), stdout.getvalue())
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "create-pr-plan",
+                            "--root",
+                            str(root),
+                            "--pr-id",
+                            "PR-010",
+                            "--work-item-id",
+                            "WI-010",
+                            "--title",
+                            "Single active PR planning",
+                            "--summary",
+                            "Duplicate create should fail safely.",
+                        ]
+                    )
 
             self.assertEqual(exc_info.exception.code, 2)
+            self.assertIn((root / "prs" / "active" / "PR-010.md").as_posix(), stderr.getvalue())
 
 
 class ActivatePrCliTest(unittest.TestCase):
@@ -1145,19 +1175,24 @@ class ActivatePrCliTest(unittest.TestCase):
             (active_dir / "PR-010.md").write_text("# PR-010\n", encoding="utf-8")
             (archive_dir / "PR-011.md").write_text("# PR-011\n", encoding="utf-8")
 
-            exit_code = main(
-                [
-                    "activate-pr",
-                    "--root",
-                    str(root),
-                    "--pr-id",
-                    "PR-011",
-                ]
-            )
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "activate-pr",
+                        "--root",
+                        str(root),
+                        "--pr-id",
+                        "PR-011",
+                    ]
+                )
 
             self.assertEqual(exit_code, 0)
             self.assertFalse((active_dir / "PR-010.md").exists())
             self.assertTrue((archive_dir / "PR-010.md").exists())
+            self.assertIn("- active_pr_id: PR-011", stdout.getvalue())
+            self.assertIn(f"- active_path: {(active_dir / 'PR-011.md').as_posix()}", stdout.getvalue())
+            self.assertIn(f"- archived_previous_active: {(archive_dir / 'PR-010.md').as_posix()}", stdout.getvalue())
 
     def test_activate_pr_promotes_archive_candidate_to_active(self) -> None:
         from pathlib import Path
@@ -1167,49 +1202,58 @@ class ActivatePrCliTest(unittest.TestCase):
             active_dir = root / "prs" / "active"
             archive_dir = root / "prs" / "archive"
 
-            active_create_exit_code = main(
-                [
-                    "create-pr-plan",
-                    "--root",
-                    str(root),
-                    "--pr-id",
-                    "PR-010",
-                    "--work-item-id",
-                    "WI-010",
-                    "--title",
-                    "Current active PR",
-                    "--summary",
-                    "This starts as the active PR plan.",
-                ]
-            )
+            active_stdout = StringIO()
+            with redirect_stdout(active_stdout):
+                active_create_exit_code = main(
+                    [
+                        "create-pr-plan",
+                        "--root",
+                        str(root),
+                        "--pr-id",
+                        "PR-010",
+                        "--work-item-id",
+                        "WI-010",
+                        "--title",
+                        "Current active PR",
+                        "--summary",
+                        "This starts as the active PR plan.",
+                    ]
+                )
             self.assertEqual(active_create_exit_code, 0)
 
-            archive_create_exit_code = main(
-                [
-                    "create-pr-plan",
-                    "--root",
-                    str(root),
-                    "--pr-id",
-                    "PR-011",
-                    "--work-item-id",
-                    "WI-011",
-                    "--title",
-                    "Candidate PR",
-                    "--summary",
-                    "This should be created as an archive candidate.",
-                ]
-            )
+            archive_stdout = StringIO()
+            with redirect_stdout(archive_stdout):
+                archive_create_exit_code = main(
+                    [
+                        "create-pr-plan",
+                        "--root",
+                        str(root),
+                        "--pr-id",
+                        "PR-011",
+                        "--work-item-id",
+                        "WI-011",
+                        "--title",
+                        "Candidate PR",
+                        "--summary",
+                        "This should be created as an archive candidate.",
+                    ]
+                )
             self.assertEqual(archive_create_exit_code, 0)
+            self.assertIn("- location: archive", archive_stdout.getvalue())
+            self.assertIn("active PR already exists", archive_stdout.getvalue())
+            self.assertIn("factory activate-pr --root . --pr-id PR-011", archive_stdout.getvalue())
 
-            exit_code = main(
-                [
-                    "activate-pr",
-                    "--root",
-                    str(root),
-                    "--pr-id",
-                    "PR-011",
-                ]
-            )
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "activate-pr",
+                        "--root",
+                        str(root),
+                        "--pr-id",
+                        "PR-011",
+                    ]
+                )
 
             self.assertEqual(exit_code, 0)
             active_plans = sorted(path.name for path in active_dir.glob("*.md"))
@@ -1217,6 +1261,33 @@ class ActivatePrCliTest(unittest.TestCase):
             self.assertTrue((active_dir / "PR-011.md").exists())
             self.assertFalse((archive_dir / "PR-011.md").exists())
             self.assertTrue((archive_dir / "PR-010.md").exists())
+            self.assertIn(f"- active_path: {(active_dir / 'PR-011.md').as_posix()}", stdout.getvalue())
+            self.assertIn(f"- archived_previous_active: {(archive_dir / 'PR-010.md').as_posix()}", stdout.getvalue())
+
+    def test_activate_pr_missing_target_reports_active_and_archive_paths(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            stderr = StringIO()
+
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "activate-pr",
+                            "--root",
+                            str(root),
+                            "--pr-id",
+                            "PR-404",
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("none was found under", error_output)
+            self.assertIn((root / "prs" / "active" / "PR-404.md").as_posix(), error_output)
+            self.assertIn((root / "prs" / "archive" / "PR-404.md").as_posix(), error_output)
 
     def test_start_execution_uses_newly_activated_pr(self) -> None:
         from pathlib import Path

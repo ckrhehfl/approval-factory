@@ -52,6 +52,7 @@
 - `prs/active/`는 항상 0 또는 1개의 PR만 가져야 한다.
 - active PR가 없으면 `create-pr-plan`은 `prs/active/<pr-id>.md`를 만든다.
 - active PR가 이미 있으면 `create-pr-plan`은 `prs/archive/<pr-id>.md`에 후보를 만든다.
+- CLI는 plan이 active에 생겼는지 archive에 생겼는지와 다음 action을 함께 보여주므로, archive 생성은 guardrail이지 버그가 아니다.
 - active PR를 명시적으로 바꿔야 할 때는 `factory activate-pr`로 기존 active를 `prs/archive/`로 옮기고 대상 PR을 active로 전환한다.
 - 이번 범위는 PR-011 execution flow 보강용 최소 전환만 포함하며, lifecycle 전체나 multi-PR orchestration은 포함하지 않는다.
 
@@ -59,6 +60,7 @@
 - `factory start-execution`으로 `prs/active/`의 단일 active PR plan을 읽어 `runs/latest/<run-id>/` 및 기본 artifact를 만든다.
 - active PR가 사용자의 의도와 다르면 먼저 `activate-pr`로 전환한 뒤 실행한다.
 - active PR plan의 `Work Item ID`가 실제 `docs/work-items/` artifact와 연결되지 않으면 시작하지 않는다.
+- guardrail 실패 시 CLI는 현재 repo 상태에서 먼저 해야 할 조치와 예시 명령을 짧게 보여준다.
 - 이 명령은 내부적으로 기존 `bootstrap-run` 흐름을 재사용한다.
 - 생성된 run에는 최소 `run_id`, `pr_id`, `work_item_id`, `pr_plan_path`, `work_item_path`가 남아 active PR plan과 연결된다.
 - run state는 `in_progress`로 갱신된다.

@@ -277,9 +277,11 @@ def _latest_run_summary(root_dir: Path) -> dict[str, str] | None:
         return None
 
     _, _, latest = max(candidates, key=lambda item: (item[0], item[1]))
+    run_id = str(latest.get("run_id", ""))
     return {
-        "run_id": str(latest.get("run_id", "")),
+        "run_id": run_id,
         "state": str(latest.get("state", "unknown")),
+        "path": (_run_root(root_dir, run_id) if run_id else latest_dir).as_posix(),
     }
 
 
@@ -301,12 +303,13 @@ def _read_active_pr_summary(root_dir: Path) -> dict[str, str] | None:
     return {
         "pr_id": sections.get("PR ID", plans[0].stem),
         "work_item_id": sections.get("Work Item ID", "unknown"),
+        "path": plans[0].as_posix(),
     }
 
 
-def _read_approval_status(root_dir: Path, run_id: str | None) -> str:
+def _read_approval_summary(root_dir: Path, run_id: str | None) -> dict[str, str]:
     if not run_id:
-        return "none"
+        return {"status": "none"}
 
     approval_id = f"APR-{run_id}.yaml"
     approved_path = root_dir / "approval_queue" / "approved" / approval_id
@@ -314,14 +317,14 @@ def _read_approval_status(root_dir: Path, run_id: str | None) -> str:
     decision_path = _artifact_path(root_dir, run_id, "approval-decision.yaml")
 
     if approved_path.exists():
-        return "approved"
+        return {"status": "approved", "path": approved_path.as_posix()}
     if pending_path.exists():
-        return "pending"
+        return {"status": "pending", "path": pending_path.as_posix()}
     if decision_path.exists():
         decision = read_yaml(decision_path).get("approval_decision", {}).get("decision")
         if decision == "approve":
-            return "approved"
-    return "none"
+            return {"status": "approved", "path": decision_path.as_posix()}
+    return {"status": "none"}
 
 
 def _read_open_clarifications(root_dir: Path) -> list[str]:
@@ -383,9 +386,7 @@ def get_factory_status(root_dir: Path) -> dict[str, Any]:
     return {
         "active_pr": active_pr,
         "latest_run": latest_run,
-        "approval": {
-            "status": _read_approval_status(root_dir, latest_run["run_id"] if latest_run else None),
-        },
+        "approval": _read_approval_summary(root_dir, latest_run["run_id"] if latest_run else None),
         "open_clarifications": _read_open_clarifications(root_dir),
     }
 
@@ -747,7 +748,9 @@ def activate_pr(*, root_dir: Path, pr_id: str) -> Path:
         )
     if not target_exists_in_active and not target_exists_in_archive:
         raise FileNotFoundError(
-            f"activate-pr requires an existing PR plan artifact for pr-id '{pr_id}' under prs/active/ or prs/archive/"
+            "activate-pr requires an existing PR plan artifact for "
+            f"pr-id '{pr_id}', but none was found under {target_active_path.as_posix()} "
+            f"or {target_archive_path.as_posix()}"
         )
 
     for active_plan in sorted(active_dir.glob("*.md")):

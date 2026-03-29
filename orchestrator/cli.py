@@ -37,6 +37,8 @@ def _render_status(status: dict[str, object]) -> str:
     if isinstance(active_pr, dict):
         lines.append(f"- pr_id: {active_pr['pr_id']}")
         lines.append(f"- work_item_id: {active_pr['work_item_id']}")
+        if active_pr.get("path"):
+            lines.append(f"- path: {active_pr['path']}")
     else:
         lines.append("- none")
 
@@ -46,6 +48,8 @@ def _render_status(status: dict[str, object]) -> str:
     if isinstance(latest_run, dict):
         lines.append(f"- run_id: {latest_run['run_id']}")
         lines.append(f"- state: {latest_run['state']}")
+        if latest_run.get("path"):
+            lines.append(f"- path: {latest_run['path']}")
     else:
         lines.append("- none")
 
@@ -53,15 +57,87 @@ def _render_status(status: dict[str, object]) -> str:
     lines.append("Approval:")
     approval = status["approval"]
     lines.append(f"- status: {approval['status']}")
+    if isinstance(approval, dict) and approval.get("path"):
+        lines.append(f"- path: {approval['path']}")
 
     open_clarifications = status["open_clarifications"]
     if isinstance(open_clarifications, list) and open_clarifications:
         lines.append("")
-        lines.append("Open Clarifications:")
+        lines.append(f"Open Clarifications ({len(open_clarifications)}):")
         for clarification_id in open_clarifications:
             lines.append(f"- clarification_id: {clarification_id}")
 
     return "\n".join(lines)
+
+
+def _render_create_pr_plan_summary(path: Path, had_active_pr: bool, pr_id: str) -> str:
+    lines = ["PR Plan Created:"]
+    lines.append(f"- pr_id: {pr_id}")
+    lines.append(f"- location: {'archive' if had_active_pr else 'active'}")
+    lines.append(f"- path: {path.as_posix()}")
+    if had_active_pr:
+        lines.append("- reason: active PR already exists, so the new plan was created in archive")
+        lines.append(f"- next: factory activate-pr --root . --pr-id {pr_id}")
+    else:
+        lines.append("- reason: no active PR existed, so the new plan became active")
+    return "\n".join(lines)
+
+
+def _render_activate_pr_summary(pr_id: str, active_path: Path, archived_paths: list[Path]) -> str:
+    lines = ["Active PR Updated:"]
+    lines.append(f"- active_pr_id: {pr_id}")
+    lines.append(f"- active_path: {active_path.as_posix()}")
+    if archived_paths:
+        for archived_path in archived_paths:
+            lines.append(f"- archived_previous_active: {archived_path.as_posix()}")
+    else:
+        lines.append("- archived_previous_active: none")
+    return "\n".join(lines)
+
+
+def _render_start_execution_error(root_dir: Path, run_id: str) -> str:
+    active_dir = root_dir / "prs" / "active"
+    active_plans = sorted(active_dir.glob("*.md"))
+    if not active_plans:
+        return "\n".join(
+            [
+                "start-execution could not start because there is no active PR plan under prs/active/.",
+                "Next action: create a PR plan, or activate the intended archived PR before starting execution.",
+                f"Examples: factory create-pr-plan --root . --pr-id PR-XXX --work-item-id WI-XXX --title \"...\" --summary \"...\"; factory activate-pr --root . --pr-id PR-XXX; factory start-execution --root . --run-id {run_id}",
+            ]
+        )
+    if len(active_plans) > 1:
+        plan_list = ", ".join(path.as_posix() for path in active_plans)
+        return "\n".join(
+            [
+                f"start-execution could not start because prs/active/ must contain exactly one active PR plan, but found {len(active_plans)}.",
+                f"Current active candidates: {plan_list}",
+                f"Next action: leave one active PR plan, usually by moving the intended PR through `factory activate-pr --root . --pr-id <id>`, then rerun `factory start-execution --root . --run-id {run_id}`.",
+            ]
+        )
+
+    pr_plan_path = active_plans[0]
+    work_item_id = "unknown"
+    current_heading = None
+    for raw_line in pr_plan_path.read_text(encoding="utf-8").splitlines():
+        if raw_line.startswith("## "):
+            current_heading = raw_line[3:].strip()
+            continue
+        if current_heading == "Work Item ID" and raw_line.strip():
+            work_item_id = raw_line.strip()
+            break
+    work_item_dir = root_dir / "docs" / "work-items"
+    expected_exact = work_item_dir / f"{work_item_id}.md"
+    matches = sorted(work_item_dir.glob(f"{work_item_id}-*.md"))
+    if not expected_exact.exists() and not matches:
+        return "\n".join(
+            [
+                f"start-execution found active PR {pr_plan_path.as_posix()}, but its Work Item ID '{work_item_id}' does not resolve to a work item artifact under docs/work-items/.",
+                "Next action: create or restore the matching work item artifact before starting execution.",
+                f"Examples: docs/work-items/{work_item_id}.md or docs/work-items/{work_item_id}-<slug>.md; then rerun `factory start-execution --root . --run-id {run_id}`.",
+            ]
+        )
+    return "start-execution could not start because the active PR linkage is invalid."
 
 
 def _render_cleanup_summary(result: dict[str, object]) -> str:
@@ -354,9 +430,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.command == "create-pr-plan":
+        root_dir = Path(args.root)
+        had_active_pr = any((root_dir / "prs" / "active").glob("*.md"))
         try:
             path = create_pr_plan(
-                root_dir=Path(args.root),
+                root_dir=root_dir,
                 pr_id=args.pr_id,
                 work_item_id=args.work_item_id,
                 title=args.title,
@@ -364,22 +442,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         except FileExistsError as exc:
             parser.error(str(exc))
-        print(path.as_posix())
+        print(_render_create_pr_plan_summary(path, had_active_pr, args.pr_id))
         return 0
 
     if args.command == "activate-pr":
+        root_dir = Path(args.root)
+        active_dir = root_dir / "prs" / "active"
+        archive_dir = root_dir / "prs" / "archive"
+        prior_active_paths = sorted(path for path in active_dir.glob("*.md") if path.name != f"{args.pr_id}.md")
         try:
-            path = activate_pr(root_dir=Path(args.root), pr_id=args.pr_id)
+            path = activate_pr(root_dir=root_dir, pr_id=args.pr_id)
         except (FileNotFoundError, ValueError) as exc:
             parser.error(str(exc))
-        print(path.as_posix())
+        archived_paths = [archive_dir / path.name for path in prior_active_paths if (archive_dir / path.name).exists()]
+        print(_render_activate_pr_summary(args.pr_id, path, archived_paths))
         return 0
 
     if args.command == "start-execution":
+        root_dir = Path(args.root)
         try:
-            run_root = start_execution(root_dir=Path(args.root), run_id=args.run_id)
+            run_root = start_execution(root_dir=root_dir, run_id=args.run_id)
         except ValueError as exc:
-            parser.error(str(exc))
+            parser.error(_render_start_execution_error(root_dir, args.run_id))
         print(run_root.as_posix())
         return 0
 

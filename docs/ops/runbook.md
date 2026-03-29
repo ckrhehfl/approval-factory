@@ -115,8 +115,11 @@ run convenience:
 - 동일 `pr-id`가 `prs/active/` 또는 `prs/archive/`에 이미 존재하면 명령은 실패한다.
 - active PR plan이 없으면 `create-pr-plan`은 새 plan을 active에 만든다.
 - 다른 active PR plan이 이미 존재하면 `create-pr-plan`은 새 plan 후보를 archive에 만든다.
+- CLI 출력은 생성 위치가 active인지 archive인지와 artifact path를 함께 보여준다.
+- archive 생성이면 이유가 "이미 active PR 존재"로 명시되고, 다음에 실행할 `factory activate-pr --root . --pr-id <id>` 예시가 같이 나온다.
 - active PR 전환은 `factory activate-pr --root <repo> --pr-id <id>`로 수행한다.
 - `activate-pr`는 기존 active PR을 `prs/archive/`로 이동시키고, 지정한 PR plan을 active로 이동시켜 `prs/active/`에 정확히 하나의 PR만 남긴다.
+- `activate-pr` 성공 출력은 archive로 이동된 이전 active와 새 active path를 함께 요약한다.
 - 이번 PR 범위에서 close/merge lifecycle 전체, history 관리, multi-PR 관리, planner automation, LLM 연결은 구현하지 않는다.
 
 ## start-execution 최소 계약
@@ -130,6 +133,7 @@ run convenience:
 - 생성된 run에는 최소 `run_id`, `pr_id`, `work_item_id`, `pr_plan_path`, `work_item_path`가 식별 가능하게 남아야 한다.
 - run 시작 시 `run.yaml.state`는 `in_progress`로 갱신된다.
 - active PR plan이 0개이거나 2개 이상이거나, work item 연결이 불가하면 명령은 안전하게 실패한다.
+- guardrail 실패 시 CLI는 왜 실패했는지와 다음에 확인할 repo-local 상태, 다음 명령 예시를 함께 출력해야 한다.
 - 이번 PR 범위에서 `start-execution`은 run bootstrap entrypoint만 제공하며 review/qa/docs-sync/verification 자동 실행은 하지 않는다.
 
 ## gate-check와 build-approval의 역할 차이
@@ -174,9 +178,15 @@ factory resolve-approval --root . --latest --decision approve --actor approver.l
 - active PR 정보는 `prs/active/*.md`에서 읽는다.
 - latest run 정보는 `runs/latest/*/run.yaml` 중 가장 최근 갱신된 run에서 읽는다.
 - approval 상태는 latest run 기준으로 `approval_queue/approved/`, `approval_queue/pending/`, `approval-decision.yaml`를 읽어 `approved`, `pending`, `none` 중 하나로 보여준다.
-- open clarification은 `clarifications/*/*.md` 중 `Status=open` 인 항목의 `Clarification ID`를 나열한다.
+- status는 가능하면 active PR path, latest run path, approval queue/artifact path도 함께 보여준다.
+- open clarification은 `clarifications/*/*.md` 중 `Status=open` 인 항목의 `Clarification ID`를 count와 함께 읽기 쉽게 보여준다.
 - active PR, latest run, approval이 없으면 각 섹션에서 `none`으로 보여준다.
 - 출력 형식은 단순 텍스트이며 JSON 출력은 제공하지 않는다.
+
+operator 해석 팁:
+- `factory status`에서 active PR path와 latest run path를 같이 보면 "내가 어떤 PR/run을 보고 있는지"를 즉시 확인할 수 있다.
+- approval이 `pending` 또는 `approved`면 표시된 path를 기준으로 queue/artifact를 바로 열어 본다.
+- `start-execution` guardrail 메시지는 bug report가 아니라 현재 active PR 흐름을 먼저 정리하라는 운영 안내로 해석한다.
 
 ## cleanup-rehearsal 최소 계약
 
