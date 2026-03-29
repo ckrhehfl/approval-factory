@@ -31,6 +31,7 @@
 
 - `bootstrap-run`
 - `status`
+- `cleanup-rehearsal`
 - `start-execution`
 - `create-goal`
 - `create-clarification`
@@ -123,6 +124,44 @@ factory <command> --help
 
 ```bash
 factory status --root .
+```
+
+## rehearsal cleanup
+
+- `factory cleanup-rehearsal`는 repo-local 운영 baseline 정리를 위한 최소 cleanup 명령이다.
+- 기본 동작은 dry-run이며 파일 시스템을 변경하지 않고 제거 대상 경로만 요약 출력한다.
+- 실제 삭제는 `--apply`가 있을 때만 수행한다.
+- 기본 대상은 공식 rehearsal prefix인 `RH` artifact만이다.
+- `--include-demo`를 주면 legacy scratch/demo 흔적인 `DEMO` artifact도 함께 정리한다.
+- partial cleanup만 허용하며 전체 reset은 제공하지 않는다.
+- `docs/prs/` 아래 이력 문서는 cleanup 대상이 아니다.
+- `README.md`, `docs/contracts/*`, `docs/adr/*`, 코드, 테스트는 cleanup 대상이 아니다.
+- non-rehearsal 실제 이력은 기본적으로 보존한다.
+
+기본 rehearsal 대상:
+- `runs/latest/RUN-RH-*`
+- `approval_queue/{pending,approved,rejected,exceptions}/APR-RUN-RH-*`
+- `goals/GOAL-RH-*`
+- `clarifications/GOAL-RH-*`
+- `docs/work-items/WI-RH-*`
+- `prs/active/PR-RH-*`
+- `prs/archive/PR-RH-*`
+
+`--include-demo` 추가 대상:
+- `runs/latest/RUN-DEMO-*`
+- `approval_queue/{pending,approved,rejected,exceptions}/APR-RUN-DEMO-*`
+- `goals/*DEMO*`
+- `clarifications/*DEMO*`
+- `docs/work-items/*DEMO*`
+- `prs/active/*DEMO*`
+- `prs/archive/*DEMO*`
+
+예시:
+
+```bash
+factory cleanup-rehearsal --root .
+factory cleanup-rehearsal --root . --apply
+factory cleanup-rehearsal --root . --apply --include-demo
 ```
 
 ## 주요 경로

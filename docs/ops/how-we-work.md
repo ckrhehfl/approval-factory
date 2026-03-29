@@ -64,6 +64,13 @@
 - run state는 `in_progress`로 갱신된다.
 - active PR plan이 없거나 여러 개이거나, work item 연결이 안 되면 안전하게 실패한다.
 
+운영 baseline 정리:
+- 기능 확장 전에 repo-local baseline normalization이 필요하면 `factory cleanup-rehearsal`를 먼저 사용한다.
+- 기본값은 dry-run이며 공식 rehearsal prefix `RH` artifact만 보여준다.
+- legacy scratch artifact까지 정리해야 할 때만 `--include-demo`를 사용한다.
+- 이 명령은 전체 reset이 아니라 partial cleanup만 허용하며, `docs/prs/` 이력 문서는 유지한다.
+- 실제 운영 이력과 non-rehearsal artifact는 기본적으로 보존한다.
+
 6. 역할별 결과 기록
 - Implementer/Reviewer/QA/Docs Sync/Verification 결과를 해당 record 명령으로 artifact에 반영한다.
 
@@ -107,6 +114,7 @@ Verification:
 - 최종 승인 결정은 반드시 인간 승인자가 수행한다.
 - 승인자의 명시적 결정을 반영하는 기록/queue 이동은 `resolve-approval`로 수행한다.
 - `start-execution`은 최소 orchestration entrypoint일 뿐이며 이후 단계 자동 호출은 하지 않는다.
+- rehearsal/demo 흔적 정리는 `cleanup-rehearsal`로 제한적으로만 수행하며 docs/contracts/history 전체 초기화는 허용하지 않는다.
 - 시스템은 잘못된 순서를 줄이기 위한 최소 guardrail만 제공하며, planner automation이나 역할 자동 실행은 계속 제공하지 않는다.
 - 승인 없는 범위 확대, 구조 변경 확정, 테스트 실패 무시는 금지다.
 

@@ -153,6 +153,51 @@
 - active PR, latest run, approval이 없으면 각 섹션에서 `none`으로 보여준다.
 - 출력 형식은 단순 텍스트이며 JSON 출력은 제공하지 않는다.
 
+## cleanup-rehearsal 최소 계약
+
+- 운영 baseline 정리 명령은 `factory cleanup-rehearsal --root <repo> [--apply] [--include-demo]` 이다.
+- 기본 동작은 dry-run이며, 제거 대상 경로를 요약 출력하지만 파일 시스템은 변경하지 않는다.
+- 실제 삭제는 `--apply`가 있을 때만 수행한다.
+- 기본 cleanup 범위는 공식 rehearsal prefix인 `RH` artifact만이다.
+- `--include-demo`를 추가하면 legacy scratch/demo 흔적인 `DEMO` artifact도 함께 cleanup 한다.
+- cleanup은 partial normalization만 허용한다. docs/contracts/history 전체 reset은 제공하지 않는다.
+- `docs/prs/` 아래 이력 문서는 cleanup 대상이 아니다.
+- `README.md`, `docs/contracts/*`, `docs/adr/*`, 코드, 테스트는 cleanup 대상이 아니다.
+- apply 시 matched target만 제거하고, 비대상 파일은 그대로 유지한다.
+- rehearsal/demo active PR 또는 open clarification만 남아 있던 fixture에서도 cleanup 후 `factory status`에 stale 항목이 남지 않아야 한다.
+
+기본 rehearsal 대상:
+- `runs/latest/RUN-RH-*`
+- `approval_queue/pending/APR-RUN-RH-*.yaml`
+- `approval_queue/approved/APR-RUN-RH-*.yaml`
+- `approval_queue/rejected/APR-RUN-RH-*.yaml`
+- `approval_queue/exceptions/APR-RUN-RH-*.yaml`
+- `goals/GOAL-RH-*.md`
+- `clarifications/GOAL-RH-*`
+- `docs/work-items/WI-RH-*.md`
+- `prs/active/PR-RH-*.md`
+- `prs/archive/PR-RH-*.md`
+
+`--include-demo` 추가 대상:
+- `runs/latest/RUN-DEMO-*`
+- `approval_queue/pending/APR-RUN-DEMO-*.yaml`
+- `approval_queue/approved/APR-RUN-DEMO-*.yaml`
+- `approval_queue/rejected/APR-RUN-DEMO-*.yaml`
+- `approval_queue/exceptions/APR-RUN-DEMO-*.yaml`
+- `goals/*DEMO*.md`
+- `clarifications/*DEMO*`
+- `docs/work-items/*DEMO*.md`
+- `prs/active/*DEMO*.md`
+- `prs/archive/*DEMO*.md`
+
+운영 예시:
+
+```bash
+factory cleanup-rehearsal --root .
+factory cleanup-rehearsal --root . --apply
+factory cleanup-rehearsal --root . --apply --include-demo
+```
+
 ## 실패 시 복구
 
 ### 설계 불명확
@@ -173,6 +218,10 @@ Docs Sync 단계로 되돌린다.
 
 ### approval request 또는 pending queue 누락
 `build-approval`를 다시 실행해 `approval-request.yaml`와 `approval_queue/pending/APR-<run-id>.yaml`를 복구한 뒤 `resolve-approval`를 재시도한다.
+
+### rehearsal/demo 흔적이 운영 상태를 오염시키는 경우
+먼저 `factory cleanup-rehearsal --root <repo>`로 dry-run 결과를 확인한다.  
+정리 대상이 맞으면 `--apply`를 붙여 rehearsal baseline만 정리하고, legacy demo까지 제거해야 할 때만 `--include-demo`를 추가한다.
 
 ### 승인 반려
 해당 반려 사유를 기준으로 Planner 또는 Architect 단계로 되돌린다.

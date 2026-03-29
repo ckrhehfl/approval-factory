@@ -9,6 +9,7 @@ from orchestrator.pipeline import (
     activate_pr,
     bootstrap_run,
     build_approval_request,
+    cleanup_rehearsal_artifacts,
     create_clarification,
     create_goal,
     create_pr_plan,
@@ -58,6 +59,30 @@ def _render_status(status: dict[str, object]) -> str:
         lines.append("Open Clarifications:")
         for clarification_id in open_clarifications:
             lines.append(f"- clarification_id: {clarification_id}")
+
+    return "\n".join(lines)
+
+
+def _render_cleanup_summary(result: dict[str, object]) -> str:
+    include_demo = bool(result["include_demo"])
+    mode = str(result["mode"])
+    targets = result["targets"]
+
+    lines = ["Cleanup Rehearsal:"]
+    lines.append(f"- mode: {mode}")
+    lines.append(f"- scope: {'rehearsal+demo' if include_demo else 'rehearsal-only'}")
+    lines.append(f"- matched: {result['matched_count']}")
+
+    if isinstance(targets, list) and targets:
+        lines.append("")
+        lines.append("Targets:")
+        for target in targets:
+            if isinstance(target, dict):
+                lines.append(f"- {target['path']}")
+    else:
+        lines.append("")
+        lines.append("Targets:")
+        lines.append("- none")
 
     return "\n".join(lines)
 
@@ -163,6 +188,18 @@ def build_parser() -> argparse.ArgumentParser:
     resolve_approval_parser.add_argument("--decision", choices=["approve", "reject", "exception"], required=True)
     resolve_approval_parser.add_argument("--actor", required=True)
     resolve_approval_parser.add_argument("--note", required=True)
+
+    cleanup_parser = subparsers.add_parser(
+        "cleanup-rehearsal",
+        help="List or remove rehearsal artifacts from repo-local operating paths",
+    )
+    cleanup_parser.add_argument("--root", default=".", help="Repository root path")
+    cleanup_parser.add_argument("--apply", action="store_true", help="Actually delete matched artifacts")
+    cleanup_parser.add_argument(
+        "--include-demo",
+        action="store_true",
+        help="Include legacy DEMO artifacts in addition to rehearsal artifacts",
+    )
 
     return parser
 
@@ -327,6 +364,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         print(decision_path.as_posix())
         print(queue_path.as_posix())
+        return 0
+
+    if args.command == "cleanup-rehearsal":
+        result = cleanup_rehearsal_artifacts(
+            root_dir=Path(args.root),
+            apply=args.apply,
+            include_demo=args.include_demo,
+        )
+        print(_render_cleanup_summary(result))
         return 0
 
     parser.error(f"Unsupported command: {args.command}")
