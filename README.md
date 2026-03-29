@@ -30,6 +30,7 @@
 엔트리포인트: `factory`
 
 - `bootstrap-run`
+- `status`
 - `start-execution`
 - `create-goal`
 - `create-clarification`
@@ -105,6 +106,24 @@ factory <command> --help
 재실행 규칙:
 - 같은 내용으로 재실행하면 queue 파일을 중복 생성하지 않는다(idempotent).
 - 같은 파일명이 이미 있고 내용이 다르면 `--r2`, `--r3` 접미사를 붙여 저장한다.
+
+## 상태 조회
+
+- `factory status`는 현재 repo-local 상태를 읽기 전용으로 요약 출력한다.
+- 이 명령은 파일을 변경하지 않는다.
+- 조회 경로는 `prs/active/`, `runs/latest/`, `approval_queue/`, `clarifications/` 고정이다.
+
+출력 항목:
+- Active PR: `pr_id`, `work_item_id`
+- Latest Run: `run_id`, `state`
+- Approval: `status` (`pending`, `approved`, `none`)
+- Open Clarifications: 열려 있는 clarification이 있으면 `clarification_id`
+
+예시:
+
+```bash
+factory status --root .
+```
 
 ## 주요 경로
 

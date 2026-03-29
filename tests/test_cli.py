@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import redirect_stdout
+from io import StringIO
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -581,6 +583,134 @@ class StartExecutionCliTest(unittest.TestCase):
                 )
 
             self.assertEqual(exc_info.exception.code, 2)
+
+
+class StatusCliTest(unittest.TestCase):
+    def test_status_shows_active_pr_latest_run_approval_and_open_clarifications(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "prs" / "active").mkdir(parents=True, exist_ok=True)
+            (root / "prs" / "active" / "PR-013.md").write_text(
+                "\n".join(
+                    [
+                        "# PR-013: system status visibility",
+                        "",
+                        "## PR ID",
+                        "PR-013",
+                        "",
+                        "## Work Item ID",
+                        "WI-013",
+                        "",
+                        "## Title",
+                        "system status visibility",
+                        "",
+                        "## Status",
+                        "planned",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / "runs" / "latest" / "RUN-013" / "artifacts").mkdir(parents=True, exist_ok=True)
+            (root / "runs" / "latest" / "RUN-013" / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-013",
+                        "  work_item_id: WI-013",
+                        "  pr_id: PR-013",
+                        "  state: approval_pending",
+                        "  created_at: '2026-03-29T00:00:00+00:00'",
+                        "  updated_at: '2026-03-29T01:00:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (root / "approval_queue" / "pending").mkdir(parents=True, exist_ok=True)
+            (root / "approval_queue" / "pending" / "APR-RUN-013.yaml").write_text(
+                "approval_request:\n  id: APR-RUN-013\n",
+                encoding="utf-8",
+            )
+            (root / "clarifications" / "GOAL-013").mkdir(parents=True, exist_ok=True)
+            (root / "clarifications" / "GOAL-013" / "CLAR-001.md").write_text(
+                "\n".join(
+                    [
+                        "# CLAR-001: missing scope detail",
+                        "",
+                        "## Clarification ID",
+                        "CLAR-001",
+                        "",
+                        "## Goal ID",
+                        "GOAL-013",
+                        "",
+                        "## Title",
+                        "missing scope detail",
+                        "",
+                        "## Status",
+                        "open",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                stdout.getvalue(),
+                "\n".join(
+                    [
+                        "Active PR:",
+                        "- pr_id: PR-013",
+                        "- work_item_id: WI-013",
+                        "",
+                        "Latest Run:",
+                        "- run_id: RUN-013",
+                        "- state: approval_pending",
+                        "",
+                        "Approval:",
+                        "- status: pending",
+                        "",
+                        "Open Clarifications:",
+                        "- clarification_id: CLAR-001",
+                    ]
+                )
+                + "\n",
+            )
+
+    def test_status_handles_missing_active_pr_run_and_approval(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            stdout = StringIO()
+
+            with redirect_stdout(stdout):
+                exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                stdout.getvalue(),
+                "\n".join(
+                    [
+                        "Active PR:",
+                        "- none",
+                        "",
+                        "Latest Run:",
+                        "- none",
+                        "",
+                        "Approval:",
+                        "- status: none",
+                    ]
+                )
+                + "\n",
+            )
 
     def test_start_execution_fails_with_multiple_active_pr_plans(self) -> None:
         from pathlib import Path
