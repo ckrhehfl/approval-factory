@@ -575,8 +575,25 @@ def cleanup_rehearsal_artifacts(*, root_dir: Path, apply: bool = False, include_
 def get_factory_status(root_dir: Path) -> dict[str, Any]:
     active_pr = _read_active_pr_summary(root_dir)
     latest_run = _latest_run_summary(root_dir)
+    active_pr_readiness: dict[str, Any] | None = None
+    if isinstance(active_pr, dict):
+        work_item_id = str(active_pr.get("work_item_id", "")).strip()
+        if work_item_id:
+            try:
+                readiness = get_work_item_readiness(root_dir=root_dir, work_item_id=work_item_id)
+                active_pr_readiness = {
+                    "work_item_id": readiness["work_item_id"],
+                    "linked_clarification_count": readiness["linked_clarification_count"],
+                    "overall_readiness_summary": readiness["overall_readiness_summary"],
+                }
+            except (FileNotFoundError, ValueError) as exc:
+                active_pr_readiness = {
+                    "work_item_id": work_item_id,
+                    "error": str(exc),
+                }
     return {
         "active_pr": active_pr,
+        "active_pr_readiness": active_pr_readiness,
         "latest_run": latest_run,
         "approval": _read_approval_summary(root_dir, latest_run["run_id"] if latest_run else None),
         "open_clarifications": _read_open_clarifications(root_dir),

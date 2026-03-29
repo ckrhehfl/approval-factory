@@ -119,9 +119,13 @@ factory <command> --help
 - 조회 경로는 `prs/active/`, `runs/latest/`, `approval_queue/`, `clarifications/` 고정이다.
 - latest run은 `runs/latest/*/run.yaml` 중 `updated_at` 우선, 없으면 `created_at` 기준으로 가장 최근 run 1개를 고른다.
 - timestamp가 같으면 `run_id`가 더 큰 항목을 고른다.
+- active PR가 있으면 status는 linked clarification 기준 source work item readiness context를 함께 읽기 전용으로 보여줄 수 있다.
+- readiness summary 규칙은 `work-item-readiness`와 동일하다: linked clarification 없음=`no-linked-clarifications`, 모두 resolved=`ready`, 하나라도 open/deferred/escalated 포함=`attention-needed`
+- readiness artifact를 읽는 데 실패해도 status 전체를 막지 않고 readiness 섹션만 제한적으로 `unavailable`로 보여준다.
 
 출력 항목:
 - Active PR: `pr_id`, `work_item_id`, 가능하면 active PR artifact path
+- Work Item Readiness: active PR 기준 `summary`, `linked_clarifications`, 또는 제한적 unavailable reason
 - Latest Run: `run_id`, `state`, 가능하면 run path
 - Approval: `status` (`pending`, `approved`, `none`), 가능하면 관련 queue 또는 artifact path
 - Open Clarifications: 열려 있는 clarification count와 `clarification_id`
@@ -144,6 +148,7 @@ operator 해석 규칙:
 
 ```bash
 factory status --root .
+# active PR가 있으면 source work item readiness summary도 함께 보여줄 수 있다.
 
 factory work-item-readiness --root . --work-item-id WI-020
 # linked clarification이 모두 resolved면 ready, 하나라도 open/deferred/escalated면 attention-needed를 읽기 전용으로 보여준다.

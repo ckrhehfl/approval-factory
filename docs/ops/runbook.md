@@ -206,6 +206,9 @@ factory resolve-approval --root . --latest --decision approve --actor approver.l
 - latest run 정보는 `runs/latest/*/run.yaml` 중 가장 최근 갱신된 run에서 읽는다.
 - approval 상태는 latest run 기준으로 `approval_queue/approved/`, `approval_queue/pending/`, `approval-decision.yaml`를 읽어 `approved`, `pending`, `none` 중 하나로 보여준다.
 - status는 가능하면 active PR path, latest run path, approval queue/artifact path도 함께 보여준다.
+- active PR가 있으면 status는 연결된 work item의 linked clarification readiness context도 함께 보여줄 수 있다.
+- readiness summary 규칙은 `factory work-item-readiness`와 동일하게 `no-linked-clarifications|ready|attention-needed` 이다.
+- readiness artifact를 읽지 못해도 status 전체는 계속 보여 주고 readiness 섹션만 제한적으로 `unavailable`로 표시한다.
 - open clarification은 `clarifications/*/*.md` 중 `Status=open` 인 항목의 `Clarification ID`를 count와 함께 읽기 쉽게 보여준다.
 - `resolve-clarification`로 종결된 항목은 status에서 더 이상 open clarification으로 보이지 않는다.
 - active PR, latest run, approval이 없으면 각 섹션에서 `none`으로 보여준다.
@@ -213,6 +216,7 @@ factory resolve-approval --root . --latest --decision approve --actor approver.l
 
 operator 해석 팁:
 - `factory status`에서 active PR path와 latest run path를 같이 보면 "내가 어떤 PR/run을 보고 있는지"를 즉시 확인할 수 있다.
+- active PR가 있을 때 `Work Item Readiness`를 같이 보면 source work item의 clarification 맥락을 별도 명령 없이 한 번에 파악할 수 있다.
 - approval이 `pending` 또는 `approved`면 표시된 path를 기준으로 queue/artifact를 바로 열어 본다.
 - `start-execution` guardrail 메시지는 bug report가 아니라 현재 active PR 흐름을 먼저 정리하라는 운영 안내로 해석한다.
 
