@@ -264,19 +264,7 @@ def _parse_iso_for_sort(value: Any) -> datetime:
     return datetime.fromisoformat(text)
 
 
-def _read_active_pr_summary(root_dir: Path) -> dict[str, str] | None:
-    plans = sorted(_pr_active_dir(root_dir).glob("*.md"))
-    if not plans:
-        return None
-
-    sections = _parse_markdown_sections(plans[0])
-    return {
-        "pr_id": sections.get("PR ID", plans[0].stem),
-        "work_item_id": sections.get("Work Item ID", "unknown"),
-    }
-
-
-def _read_latest_run_summary(root_dir: Path) -> dict[str, str] | None:
+def _latest_run_summary(root_dir: Path) -> dict[str, str] | None:
     candidates: list[tuple[datetime, str, dict[str, Any]]] = []
     latest_dir = root_dir / "runs" / "latest"
     for run_file in sorted(latest_dir.glob("*/run.yaml")):
@@ -292,6 +280,27 @@ def _read_latest_run_summary(root_dir: Path) -> dict[str, str] | None:
     return {
         "run_id": str(latest.get("run_id", "")),
         "state": str(latest.get("state", "unknown")),
+    }
+
+
+def resolve_latest_run_id(root_dir: Path) -> str:
+    latest = _latest_run_summary(root_dir)
+    if latest is None:
+        raise ValueError(
+            "no latest run found under runs/latest/*/run.yaml; run start-execution first or pass --run-id <id>"
+        )
+    return latest["run_id"]
+
+
+def _read_active_pr_summary(root_dir: Path) -> dict[str, str] | None:
+    plans = sorted(_pr_active_dir(root_dir).glob("*.md"))
+    if not plans:
+        return None
+
+    sections = _parse_markdown_sections(plans[0])
+    return {
+        "pr_id": sections.get("PR ID", plans[0].stem),
+        "work_item_id": sections.get("Work Item ID", "unknown"),
     }
 
 
@@ -370,7 +379,7 @@ def cleanup_rehearsal_artifacts(*, root_dir: Path, apply: bool = False, include_
 
 def get_factory_status(root_dir: Path) -> dict[str, Any]:
     active_pr = _read_active_pr_summary(root_dir)
-    latest_run = _read_latest_run_summary(root_dir)
+    latest_run = _latest_run_summary(root_dir)
     return {
         "active_pr": active_pr,
         "latest_run": latest_run,
@@ -406,11 +415,17 @@ def _find_work_item_artifact(root_dir: Path, work_item_id: str) -> Path:
 def _require_recorded_artifact(root_dir: Path, run_id: str, name: str, key: str, command: str) -> dict[str, Any]:
     path = _artifact_path(root_dir, run_id, name)
     if not path.exists():
-        raise ValueError(f"cannot build approval request without {name}")
+        raise ValueError(
+            f"cannot build approval request for run {run_id}: missing {name} at {path.as_posix()}; "
+            f"run `factory {command} --run-id {run_id}` first"
+        )
 
     payload = read_yaml(path)[key]
     if not payload.get("recorded_at"):
-        raise ValueError(f"cannot build approval request before {command} records {name}")
+        raise ValueError(
+            f"cannot build approval request for run {run_id} before {command} records {name}; "
+            f"run `factory {command} --run-id {run_id}` first"
+        )
     return payload
 
 
@@ -1323,12 +1338,16 @@ def build_approval_request(*, root_dir: Path, run_id: str) -> tuple[Path, Path |
 def resolve_approval(*, root_dir: Path, run_id: str, decision: str, actor: str, note: str) -> tuple[Path, Path]:
     approval_path = _artifact_path(root_dir, run_id, "approval-request.yaml")
     if not approval_path.exists():
-        raise ValueError(f"cannot resolve approval without approval request artifact: {approval_path.as_posix()}")
+        raise ValueError(
+            f"cannot resolve approval for run {run_id}: missing approval request artifact at {approval_path.as_posix()}; "
+            f"run `factory build-approval --run-id {run_id}` first"
+        )
 
     approval_request = read_yaml(approval_path).get("approval_request", {})
     if not approval_request.get("evidence_bundle"):
         raise ValueError(
-            "cannot resolve approval before build-approval creates a populated approval request artifact"
+            f"cannot resolve approval for run {run_id} before build-approval creates a populated approval request artifact; "
+            f"run `factory build-approval --run-id {run_id}` first"
         )
 
     source_relative = _queue_item_relative_path("pending", run_id)
@@ -1355,7 +1374,10 @@ def resolve_approval(*, root_dir: Path, run_id: str, decision: str, actor: str, 
             source_path.replace(target_path)
     else:
         if not target_path.exists():
-            raise ValueError(f"cannot resolve approval without pending queue item: {source_relative}")
+            raise ValueError(
+                f"cannot resolve approval for run {run_id} without pending queue item: {source_relative}; "
+                f"run `factory build-approval --run-id {run_id}` first"
+            )
 
     decision_payload = {
         "approval_decision": {

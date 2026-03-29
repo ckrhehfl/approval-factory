@@ -113,6 +113,8 @@ factory <command> --help
 - `factory status`는 현재 repo-local 상태를 읽기 전용으로 요약 출력한다.
 - 이 명령은 파일을 변경하지 않는다.
 - 조회 경로는 `prs/active/`, `runs/latest/`, `approval_queue/`, `clarifications/` 고정이다.
+- latest run은 `runs/latest/*/run.yaml` 중 `updated_at` 우선, 없으면 `created_at` 기준으로 가장 최근 run 1개를 고른다.
+- timestamp가 같으면 `run_id`가 더 큰 항목을 고른다.
 
 출력 항목:
 - Active PR: `pr_id`, `work_item_id`
@@ -201,6 +203,15 @@ factory cleanup-rehearsal --root . --apply --include-demo
 - 기록: `runs/latest/<run-id>/run.yaml`과 `artifacts/{pr-plan,work-item}.yaml`에 최소 `run_id`, `pr_id`, `work_item_id`, `pr_plan_path`, `work_item_path`가 식별 가능하게 남고 `run.yaml.state=in_progress`로 갱신된다.
 - 실패: active PR plan이 0개이거나 2개 이상이거나, work item 연결이 불가하면 안전하게 실패한다.
 
+run-scoped 명령의 `--latest` 최소 계약:
+- 대상 명령: `record-review`, `record-qa`, `record-docs-sync`, `record-verification`, `gate-check`, `build-approval`, `resolve-approval`
+- 입력: 각 명령은 기존 `--run-id <id>`를 그대로 지원하고, 같은 위치에서 `--latest`를 대안으로 지원한다.
+- 배타성: `--run-id`와 `--latest`를 함께 주면 명확히 실패한다.
+- 기본 계약: 둘 다 없으면 기존처럼 run selector가 필요하므로 실패한다.
+- 선택 규칙: `--latest`는 `factory status`와 동일하게 `runs/latest/*/run.yaml`에서 latest run 1개를 고른다.
+- 실패: latest run이 없으면 `start-execution` 또는 명시적 `--run-id`가 필요하다고 안내하며 실패한다.
+- 주의: `--latest`는 run-id 입력을 줄이는 convenience 계층일 뿐이며, artifact prerequisite 계약을 우회하지 않는다.
+
 `build-approval` 최소 계약:
 - 전제: `verification-report.yaml`, `review-report.yaml`, `qa-report.yaml`, `docs-sync-report.yaml`가 모두 존재하고 실제 record 명령으로 기록돼 있어야 한다.
 - 실패: prerequisite artifact가 없거나 아직 placeholder 상태면 누락된 record 명령을 명확히 보여주며 실패한다.
@@ -227,14 +238,16 @@ factory create-work-item --root . --work-item-id WI-LOCAL --title "local work it
 factory create-pr-plan --root . --pr-id PR-LOCAL --work-item-id WI-LOCAL --title "local PR plan" --summary "Track the single active PR plan as a repo-local Markdown artifact"
 factory activate-pr --root . --pr-id PR-LOCAL
 factory start-execution --root . --run-id RUN-LOCAL
-factory record-review --root . --run-id RUN-LOCAL --status pass --summary "review ok"
-factory record-qa --root . --run-id RUN-LOCAL --status pass --summary "qa ok"
-factory record-docs-sync --root . --run-id RUN-LOCAL --status complete --summary "docs aligned"
-factory record-verification --root . --run-id RUN-LOCAL --lint pass --tests pass --type-check pass --build pass --summary "all checks green"
-factory gate-check --root . --run-id RUN-LOCAL
-factory build-approval --root . --run-id RUN-LOCAL
-factory resolve-approval --root . --run-id RUN-LOCAL --decision approve --actor approver.local --note "all gates satisfied"
+factory record-review --root . --latest --status pass --summary "review ok"
+factory record-qa --root . --latest --status pass --summary "qa ok"
+factory record-docs-sync --root . --latest --status complete --summary "docs aligned"
+factory record-verification --root . --latest --lint pass --tests pass --type-check pass --build pass --summary "all checks green"
+factory gate-check --root . --latest
+factory build-approval --root . --latest
+factory resolve-approval --root . --latest --decision approve --actor approver.local --note "all gates satisfied"
 ```
+
+`--latest` 대신 언제든 기존 `--run-id RUN-LOCAL` 방식을 그대로 사용할 수 있다.
 
 ## 다음 단계 후보 (MVP 이후)
 

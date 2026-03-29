@@ -24,6 +24,11 @@
 19. `resolve-approval`로 승인자 결정 기록 및 queue 정리
 20. Merge
 
+run convenience:
+- `start-execution` 직후 이어지는 run-scoped 명령은 `--run-id <id>` 대신 `--latest`를 사용할 수 있다.
+- `--latest`는 `factory status`와 같은 latest-run 규칙을 사용하므로 operator가 방금 확인한 latest run과 같은 대상을 잡는다.
+- 명시성이 더 중요하거나 과거 run을 다시 다뤄야 할 때는 기존 `--run-id <id>`를 계속 사용한다.
+
 ## goal intake 최소 계약
 
 - Goal artifact는 `goals/<goal-id>.md`에 저장한다.
@@ -134,6 +139,26 @@
 - `build-approval`는 `record-review`, `record-qa`, `record-docs-sync`, `record-verification`이 실제로 실행되어 각 artifact에 `recorded_at`이 남은 뒤에만 진행된다.
 - 최종 승인 요청 판단은 `build-approval` 이후 산출물을 기준으로 한다.
 
+## run selector 최소 계약
+
+- 대상 명령은 `record-review`, `record-qa`, `record-docs-sync`, `record-verification`, `gate-check`, `build-approval`, `resolve-approval` 이다.
+- 각 명령은 `--run-id <id>` 또는 `--latest` 중 하나를 사용한다.
+- `--run-id`와 `--latest`를 함께 주면 실패한다.
+- 둘 다 없으면 명령은 실패한다.
+- `--latest`는 `runs/latest/*/run.yaml` 중 `updated_at` 우선, 없으면 `created_at` 기준으로 가장 최근 run 하나를 고른다.
+- timestamp가 같으면 `run_id`가 더 큰 run을 고른다.
+- latest run이 없으면 먼저 `factory start-execution --root <repo> --run-id <run-id>`로 run을 만들거나 `--run-id <id>`를 명시한다.
+
+예시:
+
+```bash
+factory status --root .
+factory record-review --root . --latest --status pass --summary "review ok"
+factory gate-check --root . --latest
+factory build-approval --root . --latest
+factory resolve-approval --root . --latest --decision approve --actor approver.local --note "all gates satisfied"
+```
+
 ## run state 최소 규칙
 
 - `draft`: bootstrap만 된 상태
@@ -218,12 +243,14 @@ Implementer로 되돌린다.
 
 ### review/qa/docs-sync 미기록 상태에서 build-approval 실행
 누락된 `record-*` 명령을 먼저 실행한다. placeholder artifact만 있는 상태는 prerequisite 충족으로 보지 않는다.
+`--latest`로 실행했다면 에러에 표시된 run-id를 그대로 따라 해당 run에 필요한 `record-*` 명령을 다시 실행한다.
 
 ### 문서 누락
 Docs Sync 단계로 되돌린다.
 
 ### approval request 또는 pending queue 누락
 `build-approval`를 다시 실행해 `approval-request.yaml`와 `approval_queue/pending/APR-<run-id>.yaml`를 복구한 뒤 `resolve-approval`를 재시도한다.
+`--latest`를 사용했다면 먼저 `factory status`로 latest run이 의도한 run인지 확인한다.
 
 ### rehearsal/demo 흔적이 운영 상태를 오염시키는 경우
 먼저 `factory cleanup-rehearsal --root <repo>`로 dry-run 결과를 확인한다.  

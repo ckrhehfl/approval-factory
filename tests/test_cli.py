@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from tempfile import TemporaryDirectory
 import unittest
@@ -1289,3 +1289,221 @@ class ActivatePrCliTest(unittest.TestCase):
             self.assertEqual(run_payload["run"]["pr_id"], "PR-011")
             self.assertEqual(run_payload["run"]["work_item_id"], "WI-011")
             self.assertEqual(run_payload["run"]["pr_plan_path"], (active_dir / "PR-011.md").as_posix())
+
+
+class LatestRunCliTest(unittest.TestCase):
+    def _prepare_gates_config(self, root) -> None:
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parents[1]
+        (root / "config").mkdir(parents=True, exist_ok=True)
+        (root / "approval_queue" / "pending").mkdir(parents=True, exist_ok=True)
+        (root / "config" / "gates.yaml").write_text(
+            (repo_root / "config" / "gates.yaml").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
+    def _bootstrap_run(self, root, run_id: str, updated_at: str) -> None:
+        exit_code = main(
+            [
+                "bootstrap-run",
+                "--root",
+                str(root),
+                "--run-id",
+                run_id,
+                "--pr-id",
+                f"PR-{run_id}",
+                "--work-item-id",
+                f"WI-{run_id}",
+                "--work-item-title",
+                f"title for {run_id}",
+            ]
+        )
+        self.assertEqual(exit_code, 0)
+
+        run_path = root / "runs" / "latest" / run_id / "run.yaml"
+        payload = read_yaml(run_path)
+        payload["run"]["created_at"] = updated_at
+        payload["run"]["updated_at"] = updated_at
+        from orchestrator.yaml_io import write_yaml
+
+        write_yaml(run_path, payload)
+
+    def test_run_scoped_commands_support_latest(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._prepare_gates_config(root)
+            self._bootstrap_run(root, "RUN-OLD", "2026-03-29T00:00:00+00:00")
+            self._bootstrap_run(root, "RUN-NEW", "2026-03-29T01:00:00+00:00")
+
+            self.assertEqual(
+                main(["record-review", "--root", str(root), "--latest", "--status", "pass", "--summary", "review ok"]),
+                0,
+            )
+            self.assertEqual(
+                main(["record-qa", "--root", str(root), "--latest", "--status", "pass", "--summary", "qa ok"]),
+                0,
+            )
+            self.assertEqual(
+                main(
+                    [
+                        "record-docs-sync",
+                        "--root",
+                        str(root),
+                        "--latest",
+                        "--status",
+                        "complete",
+                        "--summary",
+                        "docs synced",
+                    ]
+                ),
+                0,
+            )
+            self.assertEqual(
+                main(
+                    [
+                        "record-verification",
+                        "--root",
+                        str(root),
+                        "--latest",
+                        "--lint",
+                        "pass",
+                        "--tests",
+                        "pass",
+                        "--type-check",
+                        "pass",
+                        "--build",
+                        "pass",
+                        "--summary",
+                        "all checks green",
+                    ]
+                ),
+                0,
+            )
+            self.assertEqual(main(["gate-check", "--root", str(root), "--latest"]), 0)
+            self.assertEqual(main(["build-approval", "--root", str(root), "--latest"]), 0)
+            self.assertEqual(
+                main(
+                    [
+                        "resolve-approval",
+                        "--root",
+                        str(root),
+                        "--latest",
+                        "--decision",
+                        "approve",
+                        "--actor",
+                        "approver.local",
+                        "--note",
+                        "approved latest run",
+                    ]
+                ),
+                0,
+            )
+
+            latest_review = read_yaml(root / "runs" / "latest" / "RUN-NEW" / "artifacts" / "review-report.yaml")
+            old_review = read_yaml(root / "runs" / "latest" / "RUN-OLD" / "artifacts" / "review-report.yaml")
+            self.assertEqual(latest_review["review_report"]["status"], "pass")
+            self.assertNotIn("recorded_at", old_review["review_report"])
+            self.assertTrue((root / "approval_queue" / "approved" / "APR-RUN-NEW.yaml").exists())
+            self.assertFalse((root / "approval_queue" / "approved" / "APR-RUN-OLD.yaml").exists())
+
+    def test_latest_selector_matches_status_selection_rule(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._bootstrap_run(root, "RUN-100", "2026-03-29T01:00:00+00:00")
+            self._bootstrap_run(root, "RUN-200", "2026-03-29T01:00:00+00:00")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("- run_id: RUN-200", stdout.getvalue())
+            self.assertEqual(
+                main(["record-review", "--root", str(root), "--latest", "--status", "pass", "--summary", "review ok"]),
+                0,
+            )
+
+            picked = read_yaml(root / "runs" / "latest" / "RUN-200" / "artifacts" / "review-report.yaml")
+            other = read_yaml(root / "runs" / "latest" / "RUN-100" / "artifacts" / "review-report.yaml")
+            self.assertIn("recorded_at", picked["review_report"])
+            self.assertNotIn("recorded_at", other["review_report"])
+
+    def test_latest_requires_existing_run(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            stderr = StringIO()
+
+            with self.assertRaises(SystemExit) as exc_info, redirect_stderr(stderr):
+                main(["record-review", "--root", str(root), "--latest", "--status", "pass", "--summary", "review ok"])
+
+            self.assertEqual(exc_info.exception.code, 2)
+            self.assertIn("no latest run found under runs/latest/*/run.yaml", stderr.getvalue())
+
+    def test_run_id_and_latest_are_mutually_exclusive(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            stderr = StringIO()
+
+            with self.assertRaises(SystemExit) as exc_info, redirect_stderr(stderr):
+                main(
+                    [
+                        "record-review",
+                        "--root",
+                        str(root),
+                        "--run-id",
+                        "RUN-001",
+                        "--latest",
+                        "--status",
+                        "pass",
+                        "--summary",
+                        "review ok",
+                    ]
+                )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            self.assertIn("not allowed with argument --run-id", stderr.getvalue())
+
+    def test_build_approval_latest_reports_missing_prerequisite_with_next_step(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._prepare_gates_config(root)
+            self._bootstrap_run(root, "RUN-LATEST", "2026-03-29T01:00:00+00:00")
+
+            self.assertEqual(
+                main(
+                    [
+                        "record-verification",
+                        "--root",
+                        str(root),
+                        "--latest",
+                        "--lint",
+                        "pass",
+                        "--tests",
+                        "pass",
+                        "--type-check",
+                        "pass",
+                        "--build",
+                        "pass",
+                        "--summary",
+                        "verification ok",
+                    ]
+                ),
+                0,
+            )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                r"run `factory record-review --run-id RUN-LATEST` first",
+            ):
+                main(["build-approval", "--root", str(root), "--latest"])
