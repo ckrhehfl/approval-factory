@@ -52,6 +52,19 @@ VALID_CLARIFICATION_CATEGORIES = {
     "constraint",
     "approval-required",
 }
+VALID_CLARIFICATION_DECISIONS = {"resolved", "deferred", "escalated"}
+CLARIFICATION_SECTION_ORDER = (
+    "Clarification ID",
+    "Goal ID",
+    "Title",
+    "Status",
+    "Category",
+    "Question",
+    "Suggested Resolution",
+    "Escalation Required",
+    "Resolution Notes",
+    "Next Action",
+)
 
 CLEANUP_REHEARSAL_SPECS: tuple[tuple[str, str], ...] = (
     ("runs", "runs/latest/RUN-RH-*"),
@@ -105,6 +118,13 @@ def _normalize_multiline_text(value: str | None) -> list[str]:
     text = (value or "").strip()
     if not text:
         return ["TBD"]
+    return text.splitlines()
+
+
+def _normalize_markdown_section_text(value: str | None, *, default: str = "- TBD") -> list[str]:
+    text = (value or "").strip()
+    if not text:
+        return [default]
     return text.splitlines()
 
 
@@ -569,42 +589,104 @@ def create_clarification(
             f"{clarification_path.as_posix()}"
         )
 
-    lines = [
-        f"# {clarification_id}: {title}",
-        "",
-        "## Clarification ID",
-        clarification_id,
-        "",
-        "## Goal ID",
-        goal_id,
-        "",
-        "## Title",
-        title,
-        "",
-        "## Status",
-        CLARIFICATION_STATUS,
-        "",
-        "## Category",
-        normalized_category,
-        "",
-        "## Question",
-        *question.splitlines(),
-        "",
-        "## Suggested Resolution",
-        "- TBD",
-        "",
-        "## Escalation Required",
-        "yes" if escalation else "no",
-        "",
-        "## Resolution Notes",
-        "- TBD",
-        "",
-        "## Next Action",
-        "- TBD",
-        "",
-    ]
+    lines = _render_clarification_lines(
+        clarification_id=clarification_id,
+        goal_id=goal_id,
+        title=title,
+        status=CLARIFICATION_STATUS,
+        category=normalized_category,
+        question=question,
+        suggested_resolution=None,
+        escalation_required="yes" if escalation else "no",
+        resolution_notes=None,
+        next_action=None,
+    )
     clarification_path.parent.mkdir(parents=True, exist_ok=True)
     clarification_path.write_text("\n".join(lines), encoding="utf-8")
+    return clarification_path
+
+
+def _render_clarification_lines(
+    *,
+    clarification_id: str,
+    goal_id: str,
+    title: str,
+    status: str,
+    category: str,
+    question: str,
+    suggested_resolution: str | None,
+    escalation_required: str,
+    resolution_notes: str | None,
+    next_action: str | None,
+) -> list[str]:
+    section_values = {
+        "Clarification ID": clarification_id,
+        "Goal ID": goal_id,
+        "Title": title,
+        "Status": status,
+        "Category": category,
+        "Question": question,
+        "Suggested Resolution": suggested_resolution,
+        "Escalation Required": escalation_required,
+        "Resolution Notes": resolution_notes,
+        "Next Action": next_action,
+    }
+
+    lines = [f"# {clarification_id}: {title}", ""]
+    for heading in CLARIFICATION_SECTION_ORDER:
+        lines.append(f"## {heading}")
+        lines.extend(_normalize_markdown_section_text(section_values.get(heading)))
+        lines.append("")
+    return lines
+
+
+def resolve_clarification(
+    *,
+    root_dir: Path,
+    goal_id: str,
+    clarification_id: str,
+    decision: str,
+    resolution_notes: str,
+    next_action: str,
+    suggested_resolution: str | None = None,
+) -> Path:
+    normalized_decision = decision.strip()
+    if normalized_decision not in VALID_CLARIFICATION_DECISIONS:
+        allowed = ", ".join(sorted(VALID_CLARIFICATION_DECISIONS))
+        raise ValueError(f"clarification decision must be one of {allowed} (got: {normalized_decision or decision})")
+
+    clarification_path = root_dir / "clarifications" / goal_id / f"{clarification_id}.md"
+    if not clarification_path.exists():
+        raise FileNotFoundError(
+            "cannot resolve clarification because the artifact was not found "
+            f"at {clarification_path.as_posix()} for goal-id '{goal_id}' and clarification-id '{clarification_id}'. "
+            f"Next action: check the IDs or create it first with `factory create-clarification --root {root_dir.as_posix()} --goal-id {goal_id} --clarification-id {clarification_id} ...`"
+        )
+
+    sections = _parse_markdown_sections(clarification_path)
+    current_status = sections.get("Status", "").strip() or "missing"
+    if current_status != CLARIFICATION_STATUS:
+        raise ValueError(
+            "cannot resolve clarification because only open artifacts can be updated: "
+            f"{clarification_path.as_posix()} currently has Status={current_status}. "
+            "Next action: inspect the artifact and create a new clarification if a new open question is needed."
+        )
+
+    updated_lines = _render_clarification_lines(
+        clarification_id=sections.get("Clarification ID", clarification_id),
+        goal_id=sections.get("Goal ID", goal_id),
+        title=sections.get("Title", clarification_id),
+        status=normalized_decision,
+        category=sections.get("Category", ""),
+        question=sections.get("Question", ""),
+        suggested_resolution=(
+            suggested_resolution if suggested_resolution is not None else sections.get("Suggested Resolution", "")
+        ),
+        escalation_required="yes" if normalized_decision == "escalated" else "no",
+        resolution_notes=resolution_notes,
+        next_action=next_action,
+    )
+    clarification_path.write_text("\n".join(updated_lines), encoding="utf-8")
     return clarification_path
 
 

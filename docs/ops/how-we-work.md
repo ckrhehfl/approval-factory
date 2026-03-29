@@ -37,7 +37,10 @@
 2. Clarification queue
 - `factory create-clarification`로 `clarifications/<goal-id>/<clarification-id>.md`를 생성한다.
 - clarification은 Goal intake 다음 단계의 최소 질문 관리 계층이다.
-- 현재 단계는 질문 artifact 생성과 수동 관리까지만 제공하며, auto-generation/resolution은 다음 PR 범위다.
+- clarification queue는 생성만 가능하면 운영이 막히므로 `factory resolve-clarification`로 사람이 `resolved|deferred|escalated`를 명시적으로 기록할 수 있어야 한다.
+- 이 명령은 기존 Markdown 형식을 유지한 채 `Status`, `Resolution Notes`, `Next Action`, `Escalation Required`를 갱신한다.
+- `Status=open`인 artifact만 종결할 수 있고, 종결된 clarification은 `factory status`의 open clarification 목록에서 빠진다.
+- 현재 단계는 질문 artifact 생성과 최소 수동 종결까지만 제공하며, auto-generation/resolution은 다음 구조 확장 범위다.
 
 3. Work Item 정의
 - `factory create-work-item`로 `docs/work-items/<work-item-id>.md`를 생성한다.
