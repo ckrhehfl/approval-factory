@@ -56,11 +56,14 @@
 4. Active PR 계획
 - `factory create-pr-plan`로 PR plan 후보를 생성한다.
 - active PR plan은 Work Item을 현재 실행 중인 단 하나의 PR로 연결하는 수동 Markdown artifact다.
-- 기본 섹션은 PR ID, Work Item ID, Title, Status, Summary, Scope, Out of Scope, Implementation Notes, Risks, Open Questions다.
+- 기본 섹션은 PR ID, Work Item ID, Title, Status, Summary, Work Item Readiness, Linked Clarifications, Scope, Out of Scope, Implementation Notes, Risks, Open Questions다.
 - `prs/active/`는 항상 0 또는 1개의 PR만 가져야 한다.
 - active PR가 없으면 `create-pr-plan`은 `prs/active/<pr-id>.md`를 만든다.
 - active PR가 이미 있으면 `create-pr-plan`은 `prs/archive/<pr-id>.md`에 후보를 만든다.
-- CLI는 plan이 active에 생겼는지 archive에 생겼는지와 다음 action을 함께 보여주므로, archive 생성은 guardrail이지 버그가 아니다.
+- `create-pr-plan`은 source work item readiness를 read-only로 다시 계산해 plan 문서에 함께 남긴다.
+- readiness summary 규칙은 `work-item-readiness`와 동일하며 `no-linked-clarifications|ready|attention-needed` 중 하나다.
+- 이 정보는 operator auditability를 위한 visibility layer이며 `attention-needed`여도 생성 자체를 자동 차단하지 않는다.
+- CLI는 plan이 active에 생겼는지 archive에 생겼는지와 readiness summary, linked clarification count, 다음 action을 함께 보여주므로, archive 생성은 guardrail이지 버그가 아니다.
 - active PR를 명시적으로 바꿔야 할 때는 `factory activate-pr`로 기존 active를 `prs/archive/`로 옮기고 대상 PR을 active로 전환한다.
 - 이번 범위는 PR-011 execution flow 보강용 최소 전환만 포함하며, lifecycle 전체나 multi-PR orchestration은 포함하지 않는다.
 

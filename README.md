@@ -62,7 +62,7 @@ factory <command> --help
 3. 필요 시 `resolve-clarification`로 clarification artifact를 `resolved|deferred|escalated` 중 하나로 공식 종결
 4. `create-work-item`으로 Goal을 실행 가능한 Work Item Markdown artifact로 연결한다. 필요하면 관련 clarification id를 함께 남긴다.
 5. 필요하면 `work-item-readiness`로 linked clarification 기준 최소 readiness visibility를 읽기 전용으로 확인한다.
-6. `create-pr-plan`으로 Work Item 기준 PR plan 후보를 생성한다. active PR이 없으면 `prs/active/`에, 이미 있으면 `prs/archive/`에 만든다.
+6. `create-pr-plan`으로 Work Item 기준 PR plan 후보를 생성한다. active PR이 없으면 `prs/active/`에, 이미 있으면 `prs/archive/`에 만든다. 이때 source work item readiness context도 함께 기록한다.
 7. 필요 시 `activate-pr`로 기존 active PR을 `prs/archive/`로 이동하고 의도한 PR plan 후보를 active로 전환
 8. `start-execution`으로 `prs/active/`의 단일 active PR plan에서 run을 시작
 9. `record-verification`으로 lint/tests/type-check/build 상태 기록
@@ -150,6 +150,7 @@ factory work-item-readiness --root . --work-item-id WI-020
 
 factory create-pr-plan --root . --pr-id PR-017 --work-item-id WI-017 --title "operator UX" --summary "clarify active PR flow"
 # active PR가 이미 있으면 archive 생성과 함께 다음 activate-pr 예시를 출력한다.
+# 성공 출력에는 source work item readiness summary와 linked clarification count도 짧게 포함된다.
 
 factory activate-pr --root . --pr-id PR-017
 # 기존 active가 archive로 이동됐는지와 새 active path를 함께 보여준다.
@@ -224,6 +225,12 @@ factory cleanup-rehearsal --root . --apply --include-demo
 - active PR이 없으면 `prs/active/<pr-id>.md`를 생성한다.
 - active PR이 이미 있으면 새 PR plan 후보를 `prs/archive/<pr-id>.md`에 생성한다.
 - duplicate `pr-id`는 `prs/active/`와 `prs/archive/`를 함께 검사해 막는다.
+- source work item readiness context를 read-only로 읽어 PR plan markdown에 함께 남긴다.
+- PR plan에는 최소 `Work Item Readiness`, `Linked Clarifications` 섹션이 포함되며 linked clarification이 없으면 `- none`으로 기록한다.
+- readiness summary 규칙은 `work-item-readiness`와 동일하다: linked clarification 없음=`no-linked-clarifications`, 모두 resolved=`ready`, 하나라도 open/deferred/escalated 포함=`attention-needed`
+- readiness는 visibility only다. `attention-needed`여도 PR plan 생성은 허용되며 activation/start-execution/gate/approval semantics를 바꾸지 않는다.
+- linked clarification artifact가 누락된 work item이면 `work-item-readiness`와 같은 안전한 실패 규칙을 따른다.
+- 성공 출력은 기존 CLI tone을 유지하면서 readiness summary와 linked clarification count를 짧게 함께 보여준다.
 
 `resolve-clarification` 최소 계약:
 - 입력: `--root`, `--goal-id`, `--clarification-id`, `--decision <resolved|deferred|escalated>`, `--resolution-notes`, `--next-action`, 선택적 `--suggested-resolution`

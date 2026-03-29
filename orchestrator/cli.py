@@ -72,11 +72,18 @@ def _render_status(status: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def _render_create_pr_plan_summary(path: Path, had_active_pr: bool, pr_id: str) -> str:
+def _render_create_pr_plan_summary(
+    path: Path,
+    had_active_pr: bool,
+    pr_id: str,
+    readiness: dict[str, object],
+) -> str:
     lines = ["PR Plan Created:"]
     lines.append(f"- pr_id: {pr_id}")
     lines.append(f"- location: {'archive' if had_active_pr else 'active'}")
     lines.append(f"- path: {path.as_posix()}")
+    lines.append(f"- work_item_readiness: {readiness['overall_readiness_summary']}")
+    lines.append(f"- linked_clarifications: {readiness['linked_clarification_count']}")
     if had_active_pr:
         lines.append("- reason: active PR already exists, so the new plan was created in archive")
         lines.append(f"- next: factory activate-pr --root . --pr-id {pr_id}")
@@ -507,16 +514,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         root_dir = Path(args.root)
         had_active_pr = any((root_dir / "prs" / "active").glob("*.md"))
         try:
-            path = create_pr_plan(
+            result = create_pr_plan(
                 root_dir=root_dir,
                 pr_id=args.pr_id,
                 work_item_id=args.work_item_id,
                 title=args.title,
                 summary=args.summary,
             )
-        except FileExistsError as exc:
+        except (FileExistsError, FileNotFoundError, ValueError) as exc:
             parser.error(str(exc))
-        print(_render_create_pr_plan_summary(path, had_active_pr, args.pr_id))
+        print(
+            _render_create_pr_plan_summary(
+                result["path"],
+                had_active_pr,
+                args.pr_id,
+                result["readiness"],
+            )
+        )
         return 0
 
     if args.command == "activate-pr":

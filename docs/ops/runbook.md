@@ -11,20 +11,21 @@
 6. 필요 시 `factory work-item-readiness`로 linked clarification 기준 최소 readiness visibility 확인
 7. `factory create-pr-plan`로 PR plan 후보 생성
 8. active PR가 없으면 `prs/active/<pr-id>.md`, 이미 있으면 `prs/archive/<pr-id>.md`에 저장
-9. 필요 시 `factory activate-pr`로 기존 active PR을 `prs/archive/`로 옮기고 의도한 PR을 active로 전환
-10. `factory start-execution`로 active PR plan에서 `runs/latest/<run-id>/` 시작
-11. Scope 승인
-12. 설계 초안 생성
-13. Architecture 승인 필요 여부 판정
-14. PR별 구현
-15. Verification 기록(lint/tests/type_check/build)
-16. Review
-17. QA
-18. Docs Sync 완료
-19. `gate-check`로 gate 판정 확인
-20. `build-approval`로 Evidence Bundle + Approval Request 생성
-21. `resolve-approval`로 승인자 결정 기록 및 queue 정리
-22. Merge
+9. 생성된 PR plan에는 source work item readiness summary와 linked clarification 목록을 함께 기록
+10. 필요 시 `factory activate-pr`로 기존 active PR을 `prs/archive/`로 옮기고 의도한 PR을 active로 전환
+11. `factory start-execution`로 active PR plan에서 `runs/latest/<run-id>/` 시작
+12. Scope 승인
+13. 설계 초안 생성
+14. Architecture 승인 필요 여부 판정
+15. PR별 구현
+16. Verification 기록(lint/tests/type_check/build)
+17. Review
+18. QA
+19. Docs Sync 완료
+20. `gate-check`로 gate 판정 확인
+21. `build-approval`로 Evidence Bundle + Approval Request 생성
+22. `resolve-approval`로 승인자 결정 기록 및 queue 정리
+23. Merge
 
 run convenience:
 - `start-execution` 직후 이어지는 run-scoped 명령은 `--run-id <id>` 대신 `--latest`를 사용할 수 있다.
@@ -124,6 +125,8 @@ run convenience:
   - Title
   - Status
   - Summary
+  - Work Item Readiness
+  - Linked Clarifications
   - Scope
   - Out of Scope
   - Implementation Notes
@@ -134,7 +137,12 @@ run convenience:
 - 동일 `pr-id`가 `prs/active/` 또는 `prs/archive/`에 이미 존재하면 명령은 실패한다.
 - active PR plan이 없으면 `create-pr-plan`은 새 plan을 active에 만든다.
 - 다른 active PR plan이 이미 존재하면 `create-pr-plan`은 새 plan 후보를 archive에 만든다.
-- CLI 출력은 생성 위치가 active인지 archive인지와 artifact path를 함께 보여준다.
+- `create-pr-plan`은 source work item의 linked clarification status를 read-only로 다시 읽어 readiness summary와 linked clarification 목록을 PR plan에 함께 기록한다.
+- readiness summary 규칙은 linked clarification 없음=`no-linked-clarifications`, 모두 resolved=`ready`, 하나라도 open/deferred/escalated 포함=`attention-needed` 이다.
+- readiness는 visibility only이며 `attention-needed`여도 plan 생성은 허용된다.
+- linked clarification이 없으면 `Linked Clarifications`는 `- none`으로 기록한다.
+- linked clarification artifact가 누락되면 `work-item-readiness`와 같은 안전한 실패 규칙으로 명확히 실패한다.
+- CLI 출력은 생성 위치가 active인지 archive인지와 artifact path를 함께 보여주고, readiness summary와 linked clarification count도 짧게 포함한다.
 - archive 생성이면 이유가 "이미 active PR 존재"로 명시되고, 다음에 실행할 `factory activate-pr --root . --pr-id <id>` 예시가 같이 나온다.
 - active PR 전환은 `factory activate-pr --root <repo> --pr-id <id>`로 수행한다.
 - `activate-pr`는 기존 active PR을 `prs/archive/`로 이동시키고, 지정한 PR plan을 active로 이동시켜 `prs/active/`에 정확히 하나의 PR만 남긴다.
