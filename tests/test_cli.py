@@ -491,6 +491,57 @@ class ResolveClarificationCliTest(unittest.TestCase):
 
 
 class CreateWorkItemCliTest(unittest.TestCase):
+    def _write_clarification(
+        self,
+        root,
+        *,
+        goal_id: str,
+        clarification_id: str,
+        status: str = "open",
+        artifact_goal_id: str | None = None,
+    ) -> None:
+        effective_goal_id = artifact_goal_id or goal_id
+        (root / "clarifications" / goal_id).mkdir(parents=True, exist_ok=True)
+        (root / "clarifications" / goal_id / f"{clarification_id}.md").write_text(
+            "\n".join(
+                [
+                    f"# {clarification_id}: linked clarification",
+                    "",
+                    "## Clarification ID",
+                    clarification_id,
+                    "",
+                    "## Goal ID",
+                    effective_goal_id,
+                    "",
+                    "## Title",
+                    "linked clarification",
+                    "",
+                    "## Status",
+                    status,
+                    "",
+                    "## Category",
+                    "scope",
+                    "",
+                    "## Question",
+                    "What should the operator keep visible in the work item?",
+                    "",
+                    "## Suggested Resolution",
+                    "- TBD",
+                    "",
+                    "## Escalation Required",
+                    "no",
+                    "",
+                    "## Resolution Notes",
+                    "- TBD",
+                    "",
+                    "## Next Action",
+                    "- TBD",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
     def test_create_work_item_creates_markdown_artifact(self) -> None:
         from pathlib import Path
 
@@ -527,6 +578,7 @@ class CreateWorkItemCliTest(unittest.TestCase):
             self.assertIn("## Title\nGoal to work item decomposition", content)
             self.assertIn("## Status\ndraft", content)
             self.assertIn("## Description\nCreate a repo-local work item artifact contract.", content)
+            self.assertIn("## Related Clarifications\n- none", content)
             self.assertIn("## Scope\n- TBD", content)
             self.assertIn("## Out of Scope\n- TBD", content)
             self.assertIn(
@@ -563,6 +615,7 @@ class CreateWorkItemCliTest(unittest.TestCase):
 
             content = (root / "docs" / "work-items" / "WI-009.md").read_text(encoding="utf-8")
             self.assertIn("## Acceptance Criteria\nTBD", content)
+            self.assertIn("## Related Clarifications\n- none", content)
 
     def test_create_work_item_rejects_duplicate_work_item_id(self) -> None:
         from pathlib import Path
@@ -605,6 +658,178 @@ class CreateWorkItemCliTest(unittest.TestCase):
                 )
 
             self.assertEqual(exc_info.exception.code, 2)
+
+    def test_create_work_item_links_single_clarification(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_clarification(root, goal_id="GOAL-019", clarification_id="CLAR-001", status="resolved")
+
+            exit_code = main(
+                [
+                    "create-work-item",
+                    "--root",
+                    str(root),
+                    "--work-item-id",
+                    "WI-019",
+                    "--title",
+                    "Work item clarification linkage",
+                    "--goal-id",
+                    "GOAL-019",
+                    "--description",
+                    "Persist related clarification IDs in the work item artifact.",
+                    "--clarification-id",
+                    "CLAR-001",
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+            content = (root / "docs" / "work-items" / "WI-019.md").read_text(encoding="utf-8")
+            self.assertIn("## Related Clarifications\n- CLAR-001 (resolved)", content)
+
+    def test_create_work_item_links_multiple_clarifications_and_dedupes_duplicates(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_clarification(root, goal_id="GOAL-019", clarification_id="CLAR-001", status="open")
+            self._write_clarification(root, goal_id="GOAL-019", clarification_id="CLAR-002", status="deferred")
+
+            exit_code = main(
+                [
+                    "create-work-item",
+                    "--root",
+                    str(root),
+                    "--work-item-id",
+                    "WI-019",
+                    "--title",
+                    "Work item clarification linkage",
+                    "--goal-id",
+                    "GOAL-019",
+                    "--description",
+                    "Persist multiple clarification IDs in the work item artifact.",
+                    "--clarification-id",
+                    "CLAR-001",
+                    "--clarification-id",
+                    "CLAR-002",
+                    "--clarification-id",
+                    "CLAR-001",
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+            content = (root / "docs" / "work-items" / "WI-019.md").read_text(encoding="utf-8")
+            self.assertIn("## Related Clarifications\n- CLAR-001 (open)\n- CLAR-002 (deferred)", content)
+            self.assertEqual(content.count("CLAR-001 (open)"), 1)
+
+    def test_create_work_item_fails_when_clarification_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "create-work-item",
+                            "--root",
+                            str(root),
+                            "--work-item-id",
+                            "WI-019",
+                            "--title",
+                            "Work item clarification linkage",
+                            "--goal-id",
+                            "GOAL-019",
+                            "--description",
+                            "Persist related clarification IDs in the work item artifact.",
+                            "--clarification-id",
+                            "CLAR-404",
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("clarification artifact was not found", error_output)
+            self.assertIn((root / "clarifications" / "GOAL-019" / "CLAR-404.md").as_posix(), error_output)
+            self.assertIn("create it first with `factory create-clarification", error_output)
+
+    def test_create_work_item_fails_when_clarification_belongs_to_other_goal(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_clarification(root, goal_id="GOAL-020", clarification_id="CLAR-001", status="open")
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "create-work-item",
+                            "--root",
+                            str(root),
+                            "--work-item-id",
+                            "WI-019",
+                            "--title",
+                            "Work item clarification linkage",
+                            "--goal-id",
+                            "GOAL-019",
+                            "--description",
+                            "Persist related clarification IDs in the work item artifact.",
+                            "--clarification-id",
+                            "CLAR-001",
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("does not exist under the requested goal", error_output)
+            self.assertIn((root / "clarifications" / "GOAL-019" / "CLAR-001.md").as_posix(), error_output)
+            self.assertIn((root / "clarifications" / "GOAL-020" / "CLAR-001.md").as_posix(), error_output)
+            self.assertIn("use a clarification from goal 'GOAL-019'", error_output)
+
+    def test_create_work_item_fails_when_clarification_artifact_goal_id_mismatches_path_goal(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_clarification(
+                root,
+                goal_id="GOAL-019",
+                clarification_id="CLAR-001",
+                status="resolved",
+                artifact_goal_id="GOAL-021",
+            )
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "create-work-item",
+                            "--root",
+                            str(root),
+                            "--work-item-id",
+                            "WI-019",
+                            "--title",
+                            "Work item clarification linkage",
+                            "--goal-id",
+                            "GOAL-019",
+                            "--description",
+                            "Persist related clarification IDs in the work item artifact.",
+                            "--clarification-id",
+                            "CLAR-001",
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("clarification goal linkage is inconsistent", error_output)
+            self.assertIn((root / "clarifications" / "GOAL-019" / "CLAR-001.md").as_posix(), error_output)
+            self.assertIn("expected 'GOAL-019'", error_output)
 
 
 class CreatePrPlanCliTest(unittest.TestCase):

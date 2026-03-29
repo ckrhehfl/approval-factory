@@ -357,6 +357,73 @@ def _read_open_clarifications(root_dir: Path) -> list[str]:
     return clarifications
 
 
+def _dedupe_preserving_order(values: Iterable[str]) -> list[str]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        normalized = value.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return deduped
+
+
+def _clarification_path(root_dir: Path, goal_id: str, clarification_id: str) -> Path:
+    return root_dir / "clarifications" / goal_id / f"{clarification_id}.md"
+
+
+def _load_work_item_clarifications(
+    root_dir: Path,
+    goal_id: str,
+    clarification_ids: Iterable[str] | None,
+) -> list[dict[str, str]]:
+    linked_clarifications: list[dict[str, str]] = []
+    for clarification_id in _dedupe_preserving_order(clarification_ids or []):
+        clarification_path = _clarification_path(root_dir, goal_id, clarification_id)
+        if not clarification_path.exists():
+            sibling_matches = sorted((root_dir / "clarifications").glob(f"*/{clarification_id}.md"))
+            if sibling_matches:
+                candidate_list = ", ".join(path.as_posix() for path in sibling_matches)
+                raise FileNotFoundError(
+                    "cannot create work item because the clarification does not exist under the requested goal: "
+                    f"goal-id '{goal_id}', clarification-id '{clarification_id}'. "
+                    f"Expected path: {clarification_path.as_posix()}. "
+                    f"Found with a different goal at: {candidate_list}. "
+                    f"Next action: use a clarification from goal '{goal_id}' or create the correct artifact first."
+                )
+            raise FileNotFoundError(
+                "cannot create work item because the clarification artifact was not found: "
+                f"goal-id '{goal_id}', clarification-id '{clarification_id}'. "
+                f"Expected path: {clarification_path.as_posix()}. "
+                f"Next action: check the ID or create it first with `factory create-clarification --root {root_dir.as_posix()} --goal-id {goal_id} --clarification-id {clarification_id} ...`"
+            )
+
+        sections = _parse_markdown_sections(clarification_path)
+        artifact_goal_id = sections.get("Goal ID", "").strip()
+        if artifact_goal_id and artifact_goal_id != goal_id:
+            raise ValueError(
+                "cannot create work item because the clarification goal linkage is inconsistent: "
+                f"{clarification_path.as_posix()} declares Goal ID '{artifact_goal_id}', expected '{goal_id}'. "
+                "Next action: fix the clarification artifact or choose a clarification that matches the work item goal."
+            )
+
+        linked_clarifications.append(
+            {
+                "clarification_id": sections.get("Clarification ID", clarification_id).strip() or clarification_id,
+                "status": sections.get("Status", "unknown").strip() or "unknown",
+            }
+        )
+    return linked_clarifications
+
+
+def _render_related_clarifications_section(linked_clarifications: Iterable[dict[str, str]]) -> list[str]:
+    entries = list(linked_clarifications)
+    if not entries:
+        return ["- none"]
+    return [f"- {entry['clarification_id']} ({entry['status']})" for entry in entries]
+
+
 def _collect_cleanup_targets(root_dir: Path, specs: Iterable[tuple[str, str]]) -> list[dict[str, str]]:
     targets: list[dict[str, str]] = []
     seen: set[str] = set()
@@ -698,6 +765,7 @@ def create_work_item(
     goal_id: str,
     description: str,
     acceptance_criteria: str | None = None,
+    clarification_ids: Iterable[str] | None = None,
 ) -> Path:
     work_item_path = root_dir / "docs" / "work-items" / f"{work_item_id}.md"
     if work_item_path.exists():
@@ -706,6 +774,7 @@ def create_work_item(
         )
 
     acceptance_criteria_lines = _normalize_multiline_text(acceptance_criteria)
+    linked_clarifications = _load_work_item_clarifications(root_dir, goal_id, clarification_ids)
     lines = [
         f"# {work_item_id}: {title}",
         "",
@@ -723,6 +792,9 @@ def create_work_item(
         "",
         "## Description",
         *description.splitlines(),
+        "",
+        "## Related Clarifications",
+        *_render_related_clarifications_section(linked_clarifications),
         "",
         "## Scope",
         "- TBD",
