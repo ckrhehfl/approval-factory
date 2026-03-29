@@ -209,6 +209,103 @@ def _find_active_pr_plan(root_dir: Path) -> Path:
     return plans[0]
 
 
+def _parse_markdown_sections(path: Path) -> dict[str, str]:
+    sections: dict[str, list[str]] = {}
+    current_heading: str | None = None
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        if raw_line.startswith("## "):
+            current_heading = raw_line[3:].strip()
+            sections[current_heading] = []
+            continue
+        if current_heading is None:
+            continue
+        sections[current_heading].append(raw_line)
+
+    return {heading: "\n".join(lines).strip() for heading, lines in sections.items()}
+
+
+def _parse_iso_for_sort(value: Any) -> datetime:
+    text = str(value or "").strip()
+    if not text:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    return datetime.fromisoformat(text)
+
+
+def _read_active_pr_summary(root_dir: Path) -> dict[str, str] | None:
+    plans = sorted(_pr_active_dir(root_dir).glob("*.md"))
+    if not plans:
+        return None
+
+    sections = _parse_markdown_sections(plans[0])
+    return {
+        "pr_id": sections.get("PR ID", plans[0].stem),
+        "work_item_id": sections.get("Work Item ID", "unknown"),
+    }
+
+
+def _read_latest_run_summary(root_dir: Path) -> dict[str, str] | None:
+    candidates: list[tuple[datetime, str, dict[str, Any]]] = []
+    latest_dir = root_dir / "runs" / "latest"
+    for run_file in sorted(latest_dir.glob("*/run.yaml")):
+        payload = read_yaml(run_file).get("run", {})
+        timestamp = _parse_iso_for_sort(payload.get("updated_at") or payload.get("created_at"))
+        run_id = str(payload.get("run_id", run_file.parent.name))
+        candidates.append((timestamp, run_id, payload))
+
+    if not candidates:
+        return None
+
+    _, _, latest = max(candidates, key=lambda item: (item[0], item[1]))
+    return {
+        "run_id": str(latest.get("run_id", "")),
+        "state": str(latest.get("state", "unknown")),
+    }
+
+
+def _read_approval_status(root_dir: Path, run_id: str | None) -> str:
+    if not run_id:
+        return "none"
+
+    approval_id = f"APR-{run_id}.yaml"
+    approved_path = root_dir / "approval_queue" / "approved" / approval_id
+    pending_path = root_dir / "approval_queue" / "pending" / approval_id
+    decision_path = _artifact_path(root_dir, run_id, "approval-decision.yaml")
+
+    if approved_path.exists():
+        return "approved"
+    if pending_path.exists():
+        return "pending"
+    if decision_path.exists():
+        decision = read_yaml(decision_path).get("approval_decision", {}).get("decision")
+        if decision == "approve":
+            return "approved"
+    return "none"
+
+
+def _read_open_clarifications(root_dir: Path) -> list[str]:
+    clarifications: list[str] = []
+    for clarification_path in sorted((root_dir / "clarifications").glob("*/*.md")):
+        sections = _parse_markdown_sections(clarification_path)
+        if sections.get("Status") != CLARIFICATION_STATUS:
+            continue
+        clarifications.append(sections.get("Clarification ID", clarification_path.stem))
+    return clarifications
+
+
+def get_factory_status(root_dir: Path) -> dict[str, Any]:
+    active_pr = _read_active_pr_summary(root_dir)
+    latest_run = _read_latest_run_summary(root_dir)
+    return {
+        "active_pr": active_pr,
+        "latest_run": latest_run,
+        "approval": {
+            "status": _read_approval_status(root_dir, latest_run["run_id"] if latest_run else None),
+        },
+        "open_clarifications": _read_open_clarifications(root_dir),
+    }
+
+
 def _find_work_item_artifact(root_dir: Path, work_item_id: str) -> Path:
     work_items_dir = root_dir / "docs" / "work-items"
     exact_path = work_items_dir / f"{work_item_id}.md"

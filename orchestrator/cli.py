@@ -14,6 +14,7 @@ from orchestrator.pipeline import (
     create_pr_plan,
     create_work_item,
     evaluate_gates,
+    get_factory_status,
     record_docs_sync,
     record_qa,
     record_review,
@@ -27,9 +28,46 @@ def _default_run_id() -> str:
     return datetime.now(timezone.utc).strftime("RUN-%Y%m%dT%H%M%SZ")
 
 
+def _render_status(status: dict[str, object]) -> str:
+    lines = ["Active PR:"]
+
+    active_pr = status["active_pr"]
+    if isinstance(active_pr, dict):
+        lines.append(f"- pr_id: {active_pr['pr_id']}")
+        lines.append(f"- work_item_id: {active_pr['work_item_id']}")
+    else:
+        lines.append("- none")
+
+    lines.append("")
+    lines.append("Latest Run:")
+    latest_run = status["latest_run"]
+    if isinstance(latest_run, dict):
+        lines.append(f"- run_id: {latest_run['run_id']}")
+        lines.append(f"- state: {latest_run['state']}")
+    else:
+        lines.append("- none")
+
+    lines.append("")
+    lines.append("Approval:")
+    approval = status["approval"]
+    lines.append(f"- status: {approval['status']}")
+
+    open_clarifications = status["open_clarifications"]
+    if isinstance(open_clarifications, list) and open_clarifications:
+        lines.append("")
+        lines.append("Open Clarifications:")
+        for clarification_id in open_clarifications:
+            lines.append(f"- clarification_id: {clarification_id}")
+
+    return "\n".join(lines)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="factory")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    status_parser = subparsers.add_parser("status", help="Show current repo-local system status")
+    status_parser.add_argument("--root", default=".", help="Repository root path")
 
     bootstrap_parser = subparsers.add_parser("bootstrap-run", help="Create baseline run artifacts")
     bootstrap_parser.add_argument("--root", default=".", help="Repository root path")
@@ -132,6 +170,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.command == "status":
+        print(_render_status(get_factory_status(root_dir=Path(args.root))))
+        return 0
 
     if args.command == "bootstrap-run":
         run_root = bootstrap_run(

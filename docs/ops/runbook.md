@@ -2,6 +2,7 @@
 
 ## 정상 운영 순서
 
+0. 현재 상태 확인이 필요하면 `factory status`로 active PR, latest run, approval 상태, open clarification을 한 번에 본다.
 1. Work Item 생성
 2. Goal intake 필요 시 `factory create-goal`로 `goals/<goal-id>.md` 생성
 3. Goal 기준 clarification 필요 시 `factory create-clarification`로 `clarifications/<goal-id>/<clarification-id>.md` 생성
@@ -140,6 +141,17 @@
 - `approval_pending`: approval package가 생성되어 승인 대기 중인 상태
 - `approved`: 승인자가 approve를 기록한 상태
 - `rejected`: 승인자가 reject를 기록한 상태
+
+## status 최소 계약
+
+- 상태 조회 명령은 `factory status --root <repo>` 이다.
+- 이 명령은 읽기 전용이며 어떤 artifact도 생성, 수정, 이동하지 않는다.
+- active PR 정보는 `prs/active/*.md`에서 읽는다.
+- latest run 정보는 `runs/latest/*/run.yaml` 중 가장 최근 갱신된 run에서 읽는다.
+- approval 상태는 latest run 기준으로 `approval_queue/approved/`, `approval_queue/pending/`, `approval-decision.yaml`를 읽어 `approved`, `pending`, `none` 중 하나로 보여준다.
+- open clarification은 `clarifications/*/*.md` 중 `Status=open` 인 항목의 `Clarification ID`를 나열한다.
+- active PR, latest run, approval이 없으면 각 섹션에서 `none`으로 보여준다.
+- 출력 형식은 단순 텍스트이며 JSON 출력은 제공하지 않는다.
 
 ## 실패 시 복구
 
