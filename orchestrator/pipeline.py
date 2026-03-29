@@ -67,11 +67,16 @@ CLEANUP_REHEARSAL_SPECS: tuple[tuple[str, str], ...] = (
 )
 
 CLEANUP_DEMO_SPECS: tuple[tuple[str, str], ...] = (
-    ("runs_demo", "runs/latest/RUN-DEMO-*"),
-    ("approval_queue_pending_demo", "approval_queue/pending/APR-RUN-DEMO-*.yaml"),
-    ("approval_queue_approved_demo", "approval_queue/approved/APR-RUN-DEMO-*.yaml"),
-    ("approval_queue_rejected_demo", "approval_queue/rejected/APR-RUN-DEMO-*.yaml"),
-    ("approval_queue_exceptions_demo", "approval_queue/exceptions/APR-RUN-DEMO-*.yaml"),
+    ("runs_demo_prefix", "runs/latest/RUN-DEMO-*"),
+    ("runs_demo_suffix", "runs/latest/RUN-*-DEMO*"),
+    ("approval_queue_pending_demo_prefix", "approval_queue/pending/APR-RUN-DEMO-*.yaml"),
+    ("approval_queue_pending_demo_suffix", "approval_queue/pending/APR-RUN-*-DEMO*.yaml"),
+    ("approval_queue_approved_demo_prefix", "approval_queue/approved/APR-RUN-DEMO-*.yaml"),
+    ("approval_queue_approved_demo_suffix", "approval_queue/approved/APR-RUN-*-DEMO*.yaml"),
+    ("approval_queue_rejected_demo_prefix", "approval_queue/rejected/APR-RUN-DEMO-*.yaml"),
+    ("approval_queue_rejected_demo_suffix", "approval_queue/rejected/APR-RUN-*-DEMO*.yaml"),
+    ("approval_queue_exceptions_demo_prefix", "approval_queue/exceptions/APR-RUN-DEMO-*.yaml"),
+    ("approval_queue_exceptions_demo_suffix", "approval_queue/exceptions/APR-RUN-*-DEMO*.yaml"),
     ("goals_demo", "goals/*DEMO*.md"),
     ("clarifications_demo", "clarifications/*DEMO*"),
     ("work_items_demo", "docs/work-items/*DEMO*.md"),

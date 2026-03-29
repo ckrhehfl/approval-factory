@@ -765,11 +765,31 @@ class CleanupRehearsalCliTest(unittest.TestCase):
         (root / "runs" / "latest" / "RUN-RH-001" / "artifacts").mkdir(parents=True, exist_ok=True)
         (root / "runs" / "latest" / "RUN-RH-001" / "artifacts" / "placeholder.yaml").write_text("x: 1\n", encoding="utf-8")
         (root / "runs" / "latest" / "RUN-DEMO-001").mkdir(parents=True, exist_ok=True)
+        (root / "runs" / "latest" / "RUN-012-DEMO" / "artifacts").mkdir(parents=True, exist_ok=True)
+        (root / "runs" / "latest" / "RUN-012-DEMO" / "run.yaml").write_text(
+            "\n".join(
+                [
+                    "run:",
+                    "  run_id: RUN-012-DEMO",
+                    "  work_item_id: WI-012-DEMO",
+                    "  pr_id: PR-012-DEMO",
+                    "  state: approval_pending",
+                    "  created_at: '2026-03-29T02:00:00+00:00'",
+                    "  updated_at: '2026-03-29T02:00:00+00:00'",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         (root / "approval_queue" / "pending").mkdir(parents=True, exist_ok=True)
         (root / "approval_queue" / "approved").mkdir(parents=True, exist_ok=True)
         (root / "approval_queue" / "pending" / "APR-RUN-RH-001.yaml").write_text("approval_request:\n  id: APR-RUN-RH-001\n", encoding="utf-8")
         (root / "approval_queue" / "approved" / "APR-RUN-DEMO-001.yaml").write_text(
             "approval_request:\n  id: APR-RUN-DEMO-001\n",
+            encoding="utf-8",
+        )
+        (root / "approval_queue" / "pending" / "APR-RUN-012-DEMO.yaml").write_text(
+            "approval_request:\n  id: APR-RUN-012-DEMO\n",
             encoding="utf-8",
         )
         (root / "goals").mkdir(parents=True, exist_ok=True)
@@ -792,6 +812,64 @@ class CleanupRehearsalCliTest(unittest.TestCase):
         (root / "docs" / "prs" / "PR-010-DEMO").mkdir(parents=True, exist_ok=True)
         (root / "docs" / "prs" / "PR-010-DEMO" / "plan.md").write_text("# keep history\n", encoding="utf-8")
         (root / "README.md").write_text("# keep readme\n", encoding="utf-8")
+
+    def _write_demo_status_fixture(self, root) -> None:
+        (root / "runs" / "latest" / "RUN-100").mkdir(parents=True, exist_ok=True)
+        (root / "runs" / "latest" / "RUN-100" / "run.yaml").write_text(
+            "\n".join(
+                [
+                    "run:",
+                    "  run_id: RUN-100",
+                    "  work_item_id: WI-100",
+                    "  pr_id: PR-100",
+                    "  state: in_progress",
+                    "  created_at: '2026-03-29T00:00:00+00:00'",
+                    "  updated_at: '2026-03-29T00:00:00+00:00'",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (root / "runs" / "latest" / "RUN-012-DEMO").mkdir(parents=True, exist_ok=True)
+        (root / "runs" / "latest" / "RUN-012-DEMO" / "run.yaml").write_text(
+            "\n".join(
+                [
+                    "run:",
+                    "  run_id: RUN-012-DEMO",
+                    "  work_item_id: WI-012-DEMO",
+                    "  pr_id: PR-012-DEMO",
+                    "  state: approval_pending",
+                    "  created_at: '2026-03-29T03:00:00+00:00'",
+                    "  updated_at: '2026-03-29T03:00:00+00:00'",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (root / "approval_queue" / "pending").mkdir(parents=True, exist_ok=True)
+        (root / "approval_queue" / "pending" / "APR-RUN-012-DEMO.yaml").write_text(
+            "approval_request:\n  id: APR-RUN-012-DEMO\n",
+            encoding="utf-8",
+        )
+        (root / "clarifications" / "GOAL-012-DEMO").mkdir(parents=True, exist_ok=True)
+        (root / "clarifications" / "GOAL-012-DEMO" / "CLAR-012.md").write_text(
+            "\n".join(
+                [
+                    "# CLAR-012: demo clarification",
+                    "",
+                    "## Clarification ID",
+                    "CLAR-012",
+                    "",
+                    "## Goal ID",
+                    "GOAL-012-DEMO",
+                    "",
+                    "## Status",
+                    "open",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
 
     def test_cleanup_rehearsal_dry_run_reports_targets_without_deleting(self) -> None:
         from pathlib import Path
@@ -836,6 +914,8 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertFalse((root / "docs" / "work-items" / "WI-RH-001.md").exists())
             self.assertFalse((root / "prs" / "active" / "PR-RH-001.md").exists())
             self.assertTrue((root / "runs" / "latest" / "RUN-DEMO-001").exists())
+            self.assertTrue((root / "runs" / "latest" / "RUN-012-DEMO").exists())
+            self.assertTrue((root / "approval_queue" / "pending" / "APR-RUN-012-DEMO.yaml").exists())
             self.assertTrue((root / "approval_queue" / "approved" / "APR-RUN-DEMO-001.yaml").exists())
             self.assertTrue((root / "goals" / "GOAL-007-DEMO.md").exists())
             self.assertTrue((root / "docs" / "work-items" / "WI-009-DEMO.md").exists())
@@ -858,6 +938,8 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             output = stdout.getvalue()
             self.assertIn("- scope: rehearsal+demo", output)
             self.assertFalse((root / "runs" / "latest" / "RUN-DEMO-001").exists())
+            self.assertFalse((root / "runs" / "latest" / "RUN-012-DEMO").exists())
+            self.assertFalse((root / "approval_queue" / "pending" / "APR-RUN-012-DEMO.yaml").exists())
             self.assertFalse((root / "approval_queue" / "approved" / "APR-RUN-DEMO-001.yaml").exists())
             self.assertFalse((root / "goals" / "GOAL-007-DEMO.md").exists())
             self.assertFalse((root / "clarifications" / "GOAL-007-DEMO").exists())
@@ -876,6 +958,38 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self._write_status_fixture(root)
 
             self.assertEqual(main(["cleanup-rehearsal", "--root", str(root), "--apply"]), 0)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                stdout.getvalue(),
+                "\n".join(
+                    [
+                        "Active PR:",
+                        "- none",
+                        "",
+                        "Latest Run:",
+                        "- run_id: RUN-100",
+                        "- state: in_progress",
+                        "",
+                        "Approval:",
+                        "- status: none",
+                    ]
+                )
+                + "\n",
+            )
+
+    def test_cleanup_rehearsal_include_demo_clears_suffix_demo_status_entries(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_demo_status_fixture(root)
+
+            self.assertEqual(main(["cleanup-rehearsal", "--root", str(root), "--apply", "--include-demo"]), 0)
 
             stdout = StringIO()
             with redirect_stdout(stdout):

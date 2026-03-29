@@ -160,6 +160,7 @@
 - 실제 삭제는 `--apply`가 있을 때만 수행한다.
 - 기본 cleanup 범위는 공식 rehearsal prefix인 `RH` artifact만이다.
 - `--include-demo`를 추가하면 legacy scratch/demo 흔적인 `DEMO` artifact도 함께 cleanup 한다.
+- demo cleanup은 prefix형 `RUN-DEMO-*`뿐 아니라 suffix/infix형 `RUN-*-DEMO*` 및 `APR-RUN-*-DEMO*` naming variant도 포함한다.
 - cleanup은 partial normalization만 허용한다. docs/contracts/history 전체 reset은 제공하지 않는다.
 - `docs/prs/` 아래 이력 문서는 cleanup 대상이 아니다.
 - `README.md`, `docs/contracts/*`, `docs/adr/*`, 코드, 테스트는 cleanup 대상이 아니다.
@@ -180,10 +181,15 @@
 
 `--include-demo` 추가 대상:
 - `runs/latest/RUN-DEMO-*`
+- `runs/latest/RUN-*-DEMO*`
 - `approval_queue/pending/APR-RUN-DEMO-*.yaml`
+- `approval_queue/pending/APR-RUN-*-DEMO*.yaml`
 - `approval_queue/approved/APR-RUN-DEMO-*.yaml`
+- `approval_queue/approved/APR-RUN-*-DEMO*.yaml`
 - `approval_queue/rejected/APR-RUN-DEMO-*.yaml`
+- `approval_queue/rejected/APR-RUN-*-DEMO*.yaml`
 - `approval_queue/exceptions/APR-RUN-DEMO-*.yaml`
+- `approval_queue/exceptions/APR-RUN-*-DEMO*.yaml`
 - `goals/*DEMO*.md`
 - `clarifications/*DEMO*`
 - `docs/work-items/*DEMO*.md`

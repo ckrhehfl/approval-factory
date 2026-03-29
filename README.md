@@ -133,6 +133,7 @@ factory status --root .
 - 실제 삭제는 `--apply`가 있을 때만 수행한다.
 - 기본 대상은 공식 rehearsal prefix인 `RH` artifact만이다.
 - `--include-demo`를 주면 legacy scratch/demo 흔적인 `DEMO` artifact도 함께 정리한다.
+- demo cleanup은 prefix형 `RUN-DEMO-*`뿐 아니라 suffix/infix형 `RUN-*-DEMO*` 및 `APR-RUN-*-DEMO*` naming variant도 포함한다.
 - partial cleanup만 허용하며 전체 reset은 제공하지 않는다.
 - `docs/prs/` 아래 이력 문서는 cleanup 대상이 아니다.
 - `README.md`, `docs/contracts/*`, `docs/adr/*`, 코드, 테스트는 cleanup 대상이 아니다.
@@ -149,7 +150,9 @@ factory status --root .
 
 `--include-demo` 추가 대상:
 - `runs/latest/RUN-DEMO-*`
+- `runs/latest/RUN-*-DEMO*`
 - `approval_queue/{pending,approved,rejected,exceptions}/APR-RUN-DEMO-*`
+- `approval_queue/{pending,approved,rejected,exceptions}/APR-RUN-*-DEMO*.yaml`
 - `goals/*DEMO*`
 - `clarifications/*DEMO*`
 - `docs/work-items/*DEMO*`
