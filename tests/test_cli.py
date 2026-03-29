@@ -684,6 +684,221 @@ class StatusCliTest(unittest.TestCase):
                 + "\n",
             )
 
+
+class CleanupRehearsalCliTest(unittest.TestCase):
+    def _write_status_fixture(self, root) -> None:
+        (root / "runs" / "latest" / "RUN-100").mkdir(parents=True, exist_ok=True)
+        (root / "runs" / "latest" / "RUN-100" / "run.yaml").write_text(
+            "\n".join(
+                [
+                    "run:",
+                    "  run_id: RUN-100",
+                    "  work_item_id: WI-100",
+                    "  pr_id: PR-100",
+                    "  state: in_progress",
+                    "  created_at: '2026-03-29T00:00:00+00:00'",
+                    "  updated_at: '2026-03-29T00:00:00+00:00'",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (root / "runs" / "latest" / "RUN-RH-001").mkdir(parents=True, exist_ok=True)
+        (root / "runs" / "latest" / "RUN-RH-001" / "run.yaml").write_text(
+            "\n".join(
+                [
+                    "run:",
+                    "  run_id: RUN-RH-001",
+                    "  work_item_id: WI-RH-001",
+                    "  pr_id: PR-RH-001",
+                    "  state: approval_pending",
+                    "  created_at: '2026-03-29T01:00:00+00:00'",
+                    "  updated_at: '2026-03-29T01:00:00+00:00'",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (root / "approval_queue" / "pending").mkdir(parents=True, exist_ok=True)
+        (root / "approval_queue" / "pending" / "APR-RUN-RH-001.yaml").write_text(
+            "approval_request:\n  id: APR-RUN-RH-001\n",
+            encoding="utf-8",
+        )
+        (root / "prs" / "active").mkdir(parents=True, exist_ok=True)
+        (root / "prs" / "active" / "PR-RH-001.md").write_text(
+            "\n".join(
+                [
+                    "# PR-RH-001: rehearsal active",
+                    "",
+                    "## PR ID",
+                    "PR-RH-001",
+                    "",
+                    "## Work Item ID",
+                    "WI-RH-001",
+                    "",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (root / "clarifications" / "GOAL-RH-001").mkdir(parents=True, exist_ok=True)
+        (root / "clarifications" / "GOAL-RH-001" / "CLAR-RH-001.md").write_text(
+            "\n".join(
+                [
+                    "# CLAR-RH-001: rehearsal clarification",
+                    "",
+                    "## Clarification ID",
+                    "CLAR-RH-001",
+                    "",
+                    "## Goal ID",
+                    "GOAL-RH-001",
+                    "",
+                    "## Status",
+                    "open",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    def _write_cleanup_targets(self, root) -> None:
+        (root / "runs" / "latest" / "RUN-RH-001" / "artifacts").mkdir(parents=True, exist_ok=True)
+        (root / "runs" / "latest" / "RUN-RH-001" / "artifacts" / "placeholder.yaml").write_text("x: 1\n", encoding="utf-8")
+        (root / "runs" / "latest" / "RUN-DEMO-001").mkdir(parents=True, exist_ok=True)
+        (root / "approval_queue" / "pending").mkdir(parents=True, exist_ok=True)
+        (root / "approval_queue" / "approved").mkdir(parents=True, exist_ok=True)
+        (root / "approval_queue" / "pending" / "APR-RUN-RH-001.yaml").write_text("approval_request:\n  id: APR-RUN-RH-001\n", encoding="utf-8")
+        (root / "approval_queue" / "approved" / "APR-RUN-DEMO-001.yaml").write_text(
+            "approval_request:\n  id: APR-RUN-DEMO-001\n",
+            encoding="utf-8",
+        )
+        (root / "goals").mkdir(parents=True, exist_ok=True)
+        (root / "goals" / "GOAL-RH-001.md").write_text("# GOAL-RH-001\n", encoding="utf-8")
+        (root / "goals" / "GOAL-007-DEMO.md").write_text("# GOAL-007-DEMO\n", encoding="utf-8")
+        (root / "goals" / "GOAL-101.md").write_text("# GOAL-101\n", encoding="utf-8")
+        (root / "clarifications" / "GOAL-RH-001").mkdir(parents=True, exist_ok=True)
+        (root / "clarifications" / "GOAL-RH-001" / "CLAR-001.md").write_text("# CLAR-001\n\n## Status\nopen\n", encoding="utf-8")
+        (root / "clarifications" / "GOAL-007-DEMO").mkdir(parents=True, exist_ok=True)
+        (root / "clarifications" / "GOAL-007-DEMO" / "CLAR-007.md").write_text("# CLAR-007\n\n## Status\nopen\n", encoding="utf-8")
+        (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+        (root / "docs" / "work-items" / "WI-RH-001.md").write_text("# WI-RH-001\n", encoding="utf-8")
+        (root / "docs" / "work-items" / "WI-009-DEMO.md").write_text("# WI-009-DEMO\n", encoding="utf-8")
+        (root / "docs" / "work-items" / "WI-100.md").write_text("# WI-100\n", encoding="utf-8")
+        (root / "prs" / "active").mkdir(parents=True, exist_ok=True)
+        (root / "prs" / "archive").mkdir(parents=True, exist_ok=True)
+        (root / "prs" / "active" / "PR-RH-001.md").write_text("# PR-RH-001\n", encoding="utf-8")
+        (root / "prs" / "archive" / "PR-010-DEMO.md").write_text("# PR-010-DEMO\n", encoding="utf-8")
+        (root / "prs" / "archive" / "PR-100.md").write_text("# PR-100\n", encoding="utf-8")
+        (root / "docs" / "prs" / "PR-010-DEMO").mkdir(parents=True, exist_ok=True)
+        (root / "docs" / "prs" / "PR-010-DEMO" / "plan.md").write_text("# keep history\n", encoding="utf-8")
+        (root / "README.md").write_text("# keep readme\n", encoding="utf-8")
+
+    def test_cleanup_rehearsal_dry_run_reports_targets_without_deleting(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_cleanup_targets(root)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["cleanup-rehearsal", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Cleanup Rehearsal:", output)
+            self.assertIn("- mode: dry-run", output)
+            self.assertIn("- scope: rehearsal-only", output)
+            self.assertIn("- runs/latest/RUN-RH-001", output)
+            self.assertIn("- approval_queue/pending/APR-RUN-RH-001.yaml", output)
+            self.assertNotIn("RUN-DEMO-001", output)
+            self.assertTrue((root / "runs" / "latest" / "RUN-RH-001").exists())
+            self.assertTrue((root / "goals" / "GOAL-RH-001.md").exists())
+            self.assertTrue((root / "docs" / "prs" / "PR-010-DEMO" / "plan.md").exists())
+
+    def test_cleanup_rehearsal_apply_deletes_only_rehearsal_targets(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_cleanup_targets(root)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["cleanup-rehearsal", "--root", str(root), "--apply"])
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("- mode: apply", stdout.getvalue())
+            self.assertFalse((root / "runs" / "latest" / "RUN-RH-001").exists())
+            self.assertFalse((root / "approval_queue" / "pending" / "APR-RUN-RH-001.yaml").exists())
+            self.assertFalse((root / "goals" / "GOAL-RH-001.md").exists())
+            self.assertFalse((root / "clarifications" / "GOAL-RH-001").exists())
+            self.assertFalse((root / "docs" / "work-items" / "WI-RH-001.md").exists())
+            self.assertFalse((root / "prs" / "active" / "PR-RH-001.md").exists())
+            self.assertTrue((root / "runs" / "latest" / "RUN-DEMO-001").exists())
+            self.assertTrue((root / "approval_queue" / "approved" / "APR-RUN-DEMO-001.yaml").exists())
+            self.assertTrue((root / "goals" / "GOAL-007-DEMO.md").exists())
+            self.assertTrue((root / "docs" / "work-items" / "WI-009-DEMO.md").exists())
+            self.assertTrue((root / "prs" / "archive" / "PR-010-DEMO.md").exists())
+            self.assertTrue((root / "docs" / "prs" / "PR-010-DEMO" / "plan.md").exists())
+            self.assertTrue((root / "README.md").exists())
+
+    def test_cleanup_rehearsal_include_demo_removes_demo_targets(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_cleanup_targets(root)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["cleanup-rehearsal", "--root", str(root), "--apply", "--include-demo"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- scope: rehearsal+demo", output)
+            self.assertFalse((root / "runs" / "latest" / "RUN-DEMO-001").exists())
+            self.assertFalse((root / "approval_queue" / "approved" / "APR-RUN-DEMO-001.yaml").exists())
+            self.assertFalse((root / "goals" / "GOAL-007-DEMO.md").exists())
+            self.assertFalse((root / "clarifications" / "GOAL-007-DEMO").exists())
+            self.assertFalse((root / "docs" / "work-items" / "WI-009-DEMO.md").exists())
+            self.assertFalse((root / "prs" / "archive" / "PR-010-DEMO.md").exists())
+            self.assertTrue((root / "docs" / "prs" / "PR-010-DEMO" / "plan.md").exists())
+            self.assertTrue((root / "goals" / "GOAL-101.md").exists())
+            self.assertTrue((root / "docs" / "work-items" / "WI-100.md").exists())
+            self.assertTrue((root / "prs" / "archive" / "PR-100.md").exists())
+
+    def test_cleanup_rehearsal_apply_clears_stale_status_entries(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_status_fixture(root)
+
+            self.assertEqual(main(["cleanup-rehearsal", "--root", str(root), "--apply"]), 0)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                stdout.getvalue(),
+                "\n".join(
+                    [
+                        "Active PR:",
+                        "- none",
+                        "",
+                        "Latest Run:",
+                        "- run_id: RUN-100",
+                        "- state: in_progress",
+                        "",
+                        "Approval:",
+                        "- status: none",
+                    ]
+                )
+                + "\n",
+            )
     def test_status_handles_missing_active_pr_run_and_approval(self) -> None:
         from pathlib import Path
 

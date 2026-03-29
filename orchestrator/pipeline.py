@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from enum import StrEnum
 from pathlib import Path
+import shutil
 import re
 from typing import Any, Iterable
 
@@ -51,6 +52,32 @@ VALID_CLARIFICATION_CATEGORIES = {
     "constraint",
     "approval-required",
 }
+
+CLEANUP_REHEARSAL_SPECS: tuple[tuple[str, str], ...] = (
+    ("runs", "runs/latest/RUN-RH-*"),
+    ("approval_queue_pending", "approval_queue/pending/APR-RUN-RH-*.yaml"),
+    ("approval_queue_approved", "approval_queue/approved/APR-RUN-RH-*.yaml"),
+    ("approval_queue_rejected", "approval_queue/rejected/APR-RUN-RH-*.yaml"),
+    ("approval_queue_exceptions", "approval_queue/exceptions/APR-RUN-RH-*.yaml"),
+    ("goals", "goals/GOAL-RH-*.md"),
+    ("clarifications", "clarifications/GOAL-RH-*"),
+    ("work_items", "docs/work-items/WI-RH-*.md"),
+    ("prs_active", "prs/active/PR-RH-*.md"),
+    ("prs_archive", "prs/archive/PR-RH-*.md"),
+)
+
+CLEANUP_DEMO_SPECS: tuple[tuple[str, str], ...] = (
+    ("runs_demo", "runs/latest/RUN-DEMO-*"),
+    ("approval_queue_pending_demo", "approval_queue/pending/APR-RUN-DEMO-*.yaml"),
+    ("approval_queue_approved_demo", "approval_queue/approved/APR-RUN-DEMO-*.yaml"),
+    ("approval_queue_rejected_demo", "approval_queue/rejected/APR-RUN-DEMO-*.yaml"),
+    ("approval_queue_exceptions_demo", "approval_queue/exceptions/APR-RUN-DEMO-*.yaml"),
+    ("goals_demo", "goals/*DEMO*.md"),
+    ("clarifications_demo", "clarifications/*DEMO*"),
+    ("work_items_demo", "docs/work-items/*DEMO*.md"),
+    ("prs_active_demo", "prs/active/*DEMO*.md"),
+    ("prs_archive_demo", "prs/archive/*DEMO*.md"),
+)
 
 
 def _now_iso() -> str:
@@ -291,6 +318,49 @@ def _read_open_clarifications(root_dir: Path) -> list[str]:
             continue
         clarifications.append(sections.get("Clarification ID", clarification_path.stem))
     return clarifications
+
+
+def _collect_cleanup_targets(root_dir: Path, specs: Iterable[tuple[str, str]]) -> list[dict[str, str]]:
+    targets: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for category, pattern in specs:
+        for path in sorted(root_dir.glob(pattern)):
+            relative_path = path.relative_to(root_dir).as_posix()
+            if relative_path in seen:
+                continue
+            seen.add(relative_path)
+            targets.append(
+                {
+                    "category": category,
+                    "path": relative_path,
+                    "kind": "dir" if path.is_dir() else "file",
+                }
+            )
+    return targets
+
+
+def cleanup_rehearsal_artifacts(*, root_dir: Path, apply: bool = False, include_demo: bool = False) -> dict[str, Any]:
+    specs = list(CLEANUP_REHEARSAL_SPECS)
+    if include_demo:
+        specs.extend(CLEANUP_DEMO_SPECS)
+
+    targets = _collect_cleanup_targets(root_dir, specs)
+    if apply:
+        for target in sorted(targets, key=lambda item: (len(item["path"]), item["path"]), reverse=True):
+            path = root_dir / target["path"]
+            if not path.exists():
+                continue
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+
+    return {
+        "mode": "apply" if apply else "dry-run",
+        "include_demo": include_demo,
+        "matched_count": len(targets),
+        "targets": targets,
+    }
 
 
 def get_factory_status(root_dir: Path) -> dict[str, Any]:
