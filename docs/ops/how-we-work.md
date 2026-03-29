@@ -66,6 +66,8 @@
 - CLI는 plan이 active에 생겼는지 archive에 생겼는지와 readiness summary, linked clarification count, 다음 action을 함께 보여주므로, archive 생성은 guardrail이지 버그가 아니다.
 - active PR를 명시적으로 바꿔야 할 때는 `factory activate-pr`로 기존 active를 `prs/archive/`로 옮기고 대상 PR을 active로 전환한다.
 - 이번 범위는 PR-011 execution flow 보강용 최소 전환만 포함하며, lifecycle 전체나 multi-PR orchestration은 포함하지 않는다.
+- `factory status`는 active PR가 있을 때 source work item readiness summary를 같은 규칙으로 read-only 노출할 수 있다.
+- 이 status readiness는 visibility only이며 start-execution, gate, approval semantics를 바꾸지 않는다.
 
 5. Run 부트스트랩
 - `factory start-execution`으로 `prs/active/`의 단일 active PR plan을 읽어 `runs/latest/<run-id>/` 및 기본 artifact를 만든다.

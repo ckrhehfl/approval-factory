@@ -44,6 +44,20 @@ def _render_status(status: dict[str, object]) -> str:
     else:
         lines.append("- none")
 
+    active_pr_readiness = status.get("active_pr_readiness")
+    if isinstance(active_pr, dict):
+        lines.append("")
+        lines.append("Work Item Readiness:")
+        if isinstance(active_pr_readiness, dict) and active_pr_readiness.get("error"):
+            lines.append("- status: unavailable")
+            lines.append(f"- work_item_id: {active_pr_readiness['work_item_id']}")
+            lines.append(f"- reason: {active_pr_readiness['error']}")
+        elif isinstance(active_pr_readiness, dict):
+            lines.append(f"- summary: {active_pr_readiness['overall_readiness_summary']}")
+            lines.append(f"- linked_clarifications: {active_pr_readiness['linked_clarification_count']}")
+        else:
+            lines.append("- none")
+
     lines.append("")
     lines.append("Latest Run:")
     latest_run = status["latest_run"]

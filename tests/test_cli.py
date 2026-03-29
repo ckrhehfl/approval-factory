@@ -1510,6 +1510,7 @@ class StatusCliTest(unittest.TestCase):
 
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
+            _write_minimal_work_item(root, work_item_id="WI-013", goal_id="GOAL-013")
             (root / "prs" / "active").mkdir(parents=True, exist_ok=True)
             (root / "prs" / "active" / "PR-013.md").write_text(
                 "\n".join(
@@ -1590,6 +1591,10 @@ class StatusCliTest(unittest.TestCase):
                         "- work_item_id: WI-013",
                         f"- path: {(root / 'prs' / 'active' / 'PR-013.md').as_posix()}",
                         "",
+                        "Work Item Readiness:",
+                        "- summary: no-linked-clarifications",
+                        "- linked_clarifications: 0",
+                        "",
                         "Latest Run:",
                         "- run_id: RUN-013",
                         "- state: approval_pending",
@@ -1605,6 +1610,300 @@ class StatusCliTest(unittest.TestCase):
                 )
                 + "\n",
             )
+
+    def test_status_keeps_existing_output_when_no_active_pr_exists(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            stdout = StringIO()
+
+            with redirect_stdout(stdout):
+                exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                stdout.getvalue(),
+                "\n".join(
+                    [
+                        "Active PR:",
+                        "- none",
+                        "",
+                        "Latest Run:",
+                        "- none",
+                        "",
+                        "Approval:",
+                        "- status: none",
+                    ]
+                )
+                + "\n",
+            )
+
+    def test_status_shows_no_linked_clarifications_for_active_pr_work_item(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_minimal_work_item(root, work_item_id="WI-022", goal_id="GOAL-022")
+            (root / "prs" / "active").mkdir(parents=True, exist_ok=True)
+            (root / "prs" / "active" / "PR-022.md").write_text(
+                "# PR-022\n\n## PR ID\nPR-022\n\n## Work Item ID\nWI-022\n\n## Title\nstatus readiness\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Work Item Readiness:", output)
+            self.assertIn("- summary: no-linked-clarifications", output)
+            self.assertIn("- linked_clarifications: 0", output)
+
+    def test_status_shows_ready_for_active_pr_work_item_when_all_linked_clarifications_are_resolved(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+            (root / "docs" / "work-items" / "WI-023.md").write_text(
+                "\n".join(
+                    [
+                        "# WI-023: readiness visibility",
+                        "",
+                        "## Work Item ID",
+                        "WI-023",
+                        "",
+                        "## Goal ID",
+                        "GOAL-023",
+                        "",
+                        "## Title",
+                        "readiness visibility",
+                        "",
+                        "## Status",
+                        "draft",
+                        "",
+                        "## Description",
+                        "Status should reuse readiness visibility.",
+                        "",
+                        "## Related Clarifications",
+                        "- CLAR-001 (open)",
+                        "- CLAR-002 (resolved)",
+                        "",
+                        "## Scope",
+                        "- TBD",
+                        "",
+                        "## Out of Scope",
+                        "- TBD",
+                        "",
+                        "## Acceptance Criteria",
+                        "TBD",
+                        "",
+                        "## Dependencies",
+                        "- TBD",
+                        "",
+                        "## Risks",
+                        "- TBD",
+                        "",
+                        "## Notes",
+                        "- TBD",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / "clarifications" / "GOAL-023").mkdir(parents=True, exist_ok=True)
+            (root / "clarifications" / "GOAL-023" / "CLAR-001.md").write_text(
+                "# CLAR-001\n\n## Clarification ID\nCLAR-001\n\n## Goal ID\nGOAL-023\n\n## Status\nresolved\n",
+                encoding="utf-8",
+            )
+            (root / "clarifications" / "GOAL-023" / "CLAR-002.md").write_text(
+                "# CLAR-002\n\n## Clarification ID\nCLAR-002\n\n## Goal ID\nGOAL-023\n\n## Status\nresolved\n",
+                encoding="utf-8",
+            )
+            (root / "prs" / "active").mkdir(parents=True, exist_ok=True)
+            (root / "prs" / "active" / "PR-023.md").write_text(
+                "# PR-023\n\n## PR ID\nPR-023\n\n## Work Item ID\nWI-023\n\n## Title\nstatus readiness\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- summary: ready", output)
+            self.assertIn("- linked_clarifications: 2", output)
+
+    def test_status_shows_attention_needed_for_active_pr_work_item_when_open_deferred_or_escalated_exists(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+            (root / "docs" / "work-items" / "WI-024.md").write_text(
+                "\n".join(
+                    [
+                        "# WI-024: readiness visibility",
+                        "",
+                        "## Work Item ID",
+                        "WI-024",
+                        "",
+                        "## Goal ID",
+                        "GOAL-024",
+                        "",
+                        "## Title",
+                        "readiness visibility",
+                        "",
+                        "## Status",
+                        "draft",
+                        "",
+                        "## Description",
+                        "Status should show attention-needed without blocking.",
+                        "",
+                        "## Related Clarifications",
+                        "- CLAR-001 (resolved)",
+                        "- CLAR-002 (resolved)",
+                        "- CLAR-003 (resolved)",
+                        "",
+                        "## Scope",
+                        "- TBD",
+                        "",
+                        "## Out of Scope",
+                        "- TBD",
+                        "",
+                        "## Acceptance Criteria",
+                        "TBD",
+                        "",
+                        "## Dependencies",
+                        "- TBD",
+                        "",
+                        "## Risks",
+                        "- TBD",
+                        "",
+                        "## Notes",
+                        "- TBD",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / "clarifications" / "GOAL-024").mkdir(parents=True, exist_ok=True)
+            (root / "clarifications" / "GOAL-024" / "CLAR-001.md").write_text(
+                "# CLAR-001\n\n## Clarification ID\nCLAR-001\n\n## Goal ID\nGOAL-024\n\n## Status\nopen\n",
+                encoding="utf-8",
+            )
+            (root / "clarifications" / "GOAL-024" / "CLAR-002.md").write_text(
+                "# CLAR-002\n\n## Clarification ID\nCLAR-002\n\n## Goal ID\nGOAL-024\n\n## Status\ndeferred\n",
+                encoding="utf-8",
+            )
+            (root / "clarifications" / "GOAL-024" / "CLAR-003.md").write_text(
+                "# CLAR-003\n\n## Clarification ID\nCLAR-003\n\n## Goal ID\nGOAL-024\n\n## Status\nescalated\n",
+                encoding="utf-8",
+            )
+            (root / "prs" / "active").mkdir(parents=True, exist_ok=True)
+            (root / "prs" / "active" / "PR-024.md").write_text(
+                "# PR-024\n\n## PR ID\nPR-024\n\n## Work Item ID\nWI-024\n\n## Title\nstatus readiness\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- summary: attention-needed", output)
+            self.assertIn("- linked_clarifications: 3", output)
+
+    def test_status_limits_readiness_failure_to_readiness_section(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+            (root / "docs" / "work-items" / "WI-025.md").write_text(
+                "\n".join(
+                    [
+                        "# WI-025: readiness visibility",
+                        "",
+                        "## Work Item ID",
+                        "WI-025",
+                        "",
+                        "## Goal ID",
+                        "GOAL-025",
+                        "",
+                        "## Title",
+                        "readiness visibility",
+                        "",
+                        "## Status",
+                        "draft",
+                        "",
+                        "## Description",
+                        "Status should degrade safely if readiness artifacts are missing.",
+                        "",
+                        "## Related Clarifications",
+                        "- CLAR-404 (open)",
+                        "",
+                        "## Scope",
+                        "- TBD",
+                        "",
+                        "## Out of Scope",
+                        "- TBD",
+                        "",
+                        "## Acceptance Criteria",
+                        "TBD",
+                        "",
+                        "## Dependencies",
+                        "- TBD",
+                        "",
+                        "## Risks",
+                        "- TBD",
+                        "",
+                        "## Notes",
+                        "- TBD",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / "prs" / "active").mkdir(parents=True, exist_ok=True)
+            (root / "prs" / "active" / "PR-025.md").write_text(
+                "# PR-025\n\n## PR ID\nPR-025\n\n## Work Item ID\nWI-025\n\n## Title\nstatus readiness\n",
+                encoding="utf-8",
+            )
+            (root / "runs" / "latest" / "RUN-025").mkdir(parents=True, exist_ok=True)
+            (root / "runs" / "latest" / "RUN-025" / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-025",
+                        "  work_item_id: WI-025",
+                        "  pr_id: PR-025",
+                        "  state: in_progress",
+                        "  created_at: '2026-03-29T00:00:00+00:00'",
+                        "  updated_at: '2026-03-29T00:00:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Work Item Readiness:", output)
+            self.assertIn("- status: unavailable", output)
+            self.assertIn("- work_item_id: WI-025", output)
+            self.assertIn("linked clarification artifact was not found", output)
+            self.assertIn("Latest Run:", output)
+            self.assertIn("- run_id: RUN-025", output)
+            self.assertIn("Approval:", output)
 
 
 class CleanupRehearsalCliTest(unittest.TestCase):
