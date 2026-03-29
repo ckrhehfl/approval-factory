@@ -832,6 +832,213 @@ class CreateWorkItemCliTest(unittest.TestCase):
             self.assertIn("expected 'GOAL-019'", error_output)
 
 
+class WorkItemReadinessCliTest(unittest.TestCase):
+    def _write_work_item(self, root, *, work_item_id: str, goal_id: str, related_lines: list[str] | None = None) -> None:
+        (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+        lines = [
+            f"# {work_item_id}: readiness visibility",
+            "",
+            "## Work Item ID",
+            work_item_id,
+            "",
+            "## Goal ID",
+            goal_id,
+            "",
+            "## Title",
+            "readiness visibility",
+            "",
+            "## Status",
+            "draft",
+            "",
+            "## Description",
+            "Show linked clarification readiness without changing semantics.",
+            "",
+            "## Related Clarifications",
+            *(related_lines or ["- none"]),
+            "",
+            "## Scope",
+            "- TBD",
+            "",
+            "## Out of Scope",
+            "- TBD",
+            "",
+            "## Acceptance Criteria",
+            "TBD",
+            "",
+            "## Dependencies",
+            "- TBD",
+            "",
+            "## Risks",
+            "- TBD",
+            "",
+            "## Notes",
+            "- TBD",
+            "",
+        ]
+        (root / "docs" / "work-items" / f"{work_item_id}.md").write_text("\n".join(lines), encoding="utf-8")
+
+    def _write_clarification(self, root, *, goal_id: str, clarification_id: str, status: str) -> None:
+        (root / "clarifications" / goal_id).mkdir(parents=True, exist_ok=True)
+        (root / "clarifications" / goal_id / f"{clarification_id}.md").write_text(
+            "\n".join(
+                [
+                    f"# {clarification_id}: readiness visibility",
+                    "",
+                    "## Clarification ID",
+                    clarification_id,
+                    "",
+                    "## Goal ID",
+                    goal_id,
+                    "",
+                    "## Title",
+                    "readiness visibility",
+                    "",
+                    "## Status",
+                    status,
+                    "",
+                    "## Category",
+                    "scope",
+                    "",
+                    "## Question",
+                    "Can the operator proceed?",
+                    "",
+                    "## Suggested Resolution",
+                    "- TBD",
+                    "",
+                    "## Escalation Required",
+                    "no",
+                    "",
+                    "## Resolution Notes",
+                    "- TBD",
+                    "",
+                    "## Next Action",
+                    "- TBD",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    def test_work_item_readiness_returns_no_linked_clarifications(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_work_item(root, work_item_id="WI-020", goal_id="GOAL-020")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["work-item-readiness", "--root", str(root), "--work-item-id", "WI-020"])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                stdout.getvalue(),
+                "\n".join(
+                    [
+                        "Work Item Readiness:",
+                        "- work_item_id: WI-020",
+                        "- goal_id: GOAL-020",
+                        "- linked_clarification_count: 0",
+                        "",
+                        "Clarifications:",
+                        "- none",
+                        "",
+                        "Overall Readiness:",
+                        "- summary: no-linked-clarifications",
+                    ]
+                )
+                + "\n",
+            )
+
+    def test_work_item_readiness_returns_ready_when_all_linked_clarifications_are_resolved(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_work_item(
+                root,
+                work_item_id="WI-020",
+                goal_id="GOAL-020",
+                related_lines=["- CLAR-001 (open)", "- CLAR-002 (resolved)"],
+            )
+            self._write_clarification(root, goal_id="GOAL-020", clarification_id="CLAR-001", status="resolved")
+            self._write_clarification(root, goal_id="GOAL-020", clarification_id="CLAR-002", status="resolved")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["work-item-readiness", "--root", str(root), "--work-item-id", "WI-020"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- CLAR-001: resolved", output)
+            self.assertIn("- CLAR-002: resolved", output)
+            self.assertIn("- summary: ready", output)
+
+    def test_work_item_readiness_returns_attention_needed_when_open_deferred_or_escalated_exists(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_work_item(
+                root,
+                work_item_id="WI-020",
+                goal_id="GOAL-020",
+                related_lines=["- CLAR-001 (resolved)", "- CLAR-002 (resolved)", "- CLAR-003 (resolved)"],
+            )
+            self._write_clarification(root, goal_id="GOAL-020", clarification_id="CLAR-001", status="open")
+            self._write_clarification(root, goal_id="GOAL-020", clarification_id="CLAR-002", status="deferred")
+            self._write_clarification(root, goal_id="GOAL-020", clarification_id="CLAR-003", status="escalated")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["work-item-readiness", "--root", str(root), "--work-item-id", "WI-020"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- CLAR-001: open", output)
+            self.assertIn("- CLAR-002: deferred", output)
+            self.assertIn("- CLAR-003: escalated", output)
+            self.assertIn("- summary: attention-needed", output)
+
+    def test_work_item_readiness_fails_when_work_item_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(["work-item-readiness", "--root", str(root), "--work-item-id", "WI-404"])
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("work item artifact was not found", error_output)
+            self.assertIn((root / "docs" / "work-items" / "WI-404.md").as_posix(), error_output)
+
+    def test_work_item_readiness_fails_when_linked_clarification_artifact_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_work_item(
+                root,
+                work_item_id="WI-020",
+                goal_id="GOAL-020",
+                related_lines=["- CLAR-404 (open)"],
+            )
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(["work-item-readiness", "--root", str(root), "--work-item-id", "WI-020"])
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("linked clarification artifact was not found", error_output)
+            self.assertIn((root / "clarifications" / "GOAL-020" / "CLAR-404.md").as_posix(), error_output)
+
+
 class CreatePrPlanCliTest(unittest.TestCase):
     def test_create_pr_plan_creates_active_markdown_artifact_without_existing_active(self) -> None:
         from pathlib import Path
