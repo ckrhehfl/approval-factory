@@ -167,8 +167,11 @@ run convenience:
 
 - `gate-check`는 `gate-status.yaml` 판정만 갱신한다.
 - `build-approval`는 evidence를 재생성하고 gate를 다시 계산한 뒤 `approval-request.yaml`를 만든다.
+- `build-approval`는 source work item readiness context를 읽을 수 있으면 `evidence-bundle.yaml`, `approval-request.yaml`에 함께 남긴다.
 - `build-approval`는 `record-review`, `record-qa`, `record-docs-sync`, `record-verification`이 실제로 실행되어 각 artifact에 `recorded_at`이 남은 뒤에만 진행된다.
 - 최종 승인 요청 판단은 `build-approval` 이후 산출물을 기준으로 한다.
+- readiness는 visibility only다. gate, queue 적재, resolve-approval 의미는 바뀌지 않는다.
+- readiness source를 읽지 못하면 approval package 전체를 막지 않고 readiness만 제한적으로 `unavailable`로 남길 수 있다.
 
 ## run selector 최소 계약
 

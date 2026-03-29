@@ -90,7 +90,14 @@ factory <command> --help
 - `build-approval`:
   - 내부에서 evidence bundle 재생성 후 gate를 다시 계산한다.
   - `evidence-bundle.yaml`과 `approval-request.yaml`을 최신 상태로 만든다.
+  - 가능하면 source work item readiness context도 approval artifact에 함께 기록한다.
   - 조건 충족 시 `approval_queue/pending/APR-<run-id>.yaml`를 생성/갱신한다.
+
+approval artifact readiness visibility:
+- `build-approval`는 source PR/work item readiness context를 읽을 수 있으면 `evidence-bundle.yaml`과 `approval-request.yaml`에 함께 남긴다.
+- readiness summary 규칙은 기존과 동일하게 `no-linked-clarifications`, `ready`, `attention-needed`만 사용한다.
+- readiness는 visibility only다. gate 계산, queue 적재, merge/exception approval 의미, `resolve-approval` semantics를 바꾸지 않는다.
+- readiness source artifact를 읽지 못해도 기존 prerequisite 규칙은 그대로 유지하고, readiness 섹션만 제한적으로 `unavailable`로 기록할 수 있다.
 
 ## approval queue 설명
 
@@ -283,6 +290,9 @@ run-scoped 명령의 `--latest` 최소 계약:
 - 전제: `verification-report.yaml`, `review-report.yaml`, `qa-report.yaml`, `docs-sync-report.yaml`가 모두 존재하고 실제 record 명령으로 기록돼 있어야 한다.
 - 실패: prerequisite artifact가 없거나 아직 placeholder 상태면 누락된 record 명령을 명확히 보여주며 실패한다.
 - 상태: 승인 패키지를 만들면 `run.yaml.state=approval_pending`으로 갱신된다.
+- 출력 artifact인 `evidence-bundle.yaml`, `approval-request.yaml`는 가능하면 source work item readiness context를 visibility-only로 포함한다.
+- 최소 readiness context는 `readiness_summary`, `linked_clarification_count`, 가능하면 linked clarification status 요약, `readiness_source`(`work_item_id`, `pr_id`)다.
+- readiness를 읽지 못해도 `build-approval` 전체 prerequisite/queue semantics는 바뀌지 않으며 readiness만 제한적으로 `unavailable` 처리할 수 있다.
 
 `resolve-approval` 최소 계약:
 - 전제: `approval-request.yaml`가 실제 `build-approval` 결과로 채워져 있어야 하고 `approval_queue/pending/APR-<run-id>.yaml`가 존재해야 한다.

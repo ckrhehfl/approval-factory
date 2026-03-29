@@ -26,6 +26,7 @@ from orchestrator.pipeline import (
     resolve_approval,
     start_execution,
 )
+from orchestrator.yaml_io import read_yaml
 
 
 def _default_run_id() -> str:
@@ -206,6 +207,22 @@ def _render_work_item_readiness(readiness: dict[str, object]) -> str:
     lines.append("")
     lines.append("Overall Readiness:")
     lines.append(f"- summary: {readiness['overall_readiness_summary']}")
+    return "\n".join(lines)
+
+
+def _render_build_approval_summary(
+    approval_path: Path,
+    queue_path: Path | None,
+    readiness_context: dict[str, object],
+) -> str:
+    lines = ["Build Approval:"]
+    lines.append(f"- approval_request: {approval_path.as_posix()}")
+    lines.append(f"- queue_item: {queue_path.as_posix() if queue_path is not None else 'none'}")
+    if readiness_context.get("status") == "available":
+        lines.append(f"- readiness_summary: {readiness_context['readiness_summary']}")
+        lines.append(f"- linked_clarifications: {readiness_context['linked_clarification_count']}")
+    else:
+        lines.append("- readiness: unavailable")
     return "\n".join(lines)
 
 
@@ -448,9 +465,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "build-approval":
         run_id = _resolve_run_id_argument(parser, args)
         approval_path, queue_path = build_approval_request(root_dir=Path(args.root), run_id=run_id)
-        print(approval_path.as_posix())
-        if queue_path is not None:
-            print(queue_path.as_posix())
+        approval_payload = read_yaml(approval_path).get("approval_request", {})
+        readiness_context = approval_payload.get("readiness_context", {})
+        print(_render_build_approval_summary(approval_path, queue_path, readiness_context))
         return 0
 
     if args.command == "create-goal":

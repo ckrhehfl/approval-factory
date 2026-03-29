@@ -511,6 +511,29 @@ def get_work_item_readiness(*, root_dir: Path, work_item_id: str) -> dict[str, A
     }
 
 
+def _build_readiness_context(*, root_dir: Path, work_item_id: str, pr_id: str) -> dict[str, Any]:
+    readiness_source = {
+        "work_item_id": work_item_id,
+        "pr_id": pr_id,
+    }
+    try:
+        readiness = get_work_item_readiness(root_dir=root_dir, work_item_id=work_item_id)
+    except (FileNotFoundError, ValueError) as exc:
+        return {
+            "status": "unavailable",
+            "reason": str(exc),
+            "readiness_source": readiness_source,
+        }
+
+    return {
+        "status": "available",
+        "readiness_summary": readiness["overall_readiness_summary"],
+        "linked_clarification_count": readiness["linked_clarification_count"],
+        "linked_clarifications": readiness["clarifications"],
+        "readiness_source": readiness_source,
+    }
+
+
 def _render_pr_plan_readiness_lines(readiness: dict[str, Any]) -> list[str]:
     lines = [
         "## Work Item Readiness",
@@ -1200,6 +1223,14 @@ def bootstrap_run(
                     "changed_docs": [],
                 },
                 "residual_risks": [],
+                "readiness_context": {
+                    "status": "unavailable",
+                    "reason": "source work item readiness has not been evaluated yet",
+                    "readiness_source": {
+                        "work_item_id": work_item_id,
+                        "pr_id": pr_id,
+                    },
+                },
                 "status": "pending",
             }
         },
@@ -1241,6 +1272,14 @@ def bootstrap_run(
                 "adr_refs": [],
                 "evidence_bundle": "",
                 "recommended_decision": "",
+                "readiness_context": {
+                    "status": "unavailable",
+                    "reason": "source work item readiness has not been evaluated yet",
+                    "readiness_source": {
+                        "work_item_id": work_item_id,
+                        "pr_id": pr_id,
+                    },
+                },
             }
         },
     )
@@ -1392,6 +1431,11 @@ def build_evidence_bundle(*, root_dir: Path, run_id: str) -> Path:
     qa = _read_artifact(root_dir, run_id, "qa-report.yaml")["qa_report"]
     docs_sync = _read_artifact(root_dir, run_id, "docs-sync-report.yaml")["docs_sync_report"]
     verification = _verification_payload_or_pending(root_dir, run_id)
+    readiness_context = _build_readiness_context(
+        root_dir=root_dir,
+        work_item_id=str(run.get("work_item_id", "")),
+        pr_id=str(run.get("pr_id", "")),
+    )
 
     existing = _read_artifact(root_dir, run_id, "evidence-bundle.yaml").get("evidence_bundle", {})
     lint = {
@@ -1446,6 +1490,7 @@ def build_evidence_bundle(*, root_dir: Path, run_id: str) -> Path:
                 "changed_docs": docs_sync.get("changed_docs", []),
             },
             "residual_risks": existing.get("residual_risks", []),
+            "readiness_context": readiness_context,
             "status": "complete" if complete else "incomplete",
         }
     }
@@ -1538,6 +1583,11 @@ def build_approval_request(*, root_dir: Path, run_id: str) -> tuple[Path, Path |
     review = _read_artifact(root_dir, run_id, "review-report.yaml")["review_report"]
     qa = _read_artifact(root_dir, run_id, "qa-report.yaml")["qa_report"]
     docs_sync = _read_artifact(root_dir, run_id, "docs-sync-report.yaml")["docs_sync_report"]
+    readiness_context = _build_readiness_context(
+        root_dir=root_dir,
+        work_item_id=str(run.get("work_item_id", "")),
+        pr_id=str(run.get("pr_id", "")),
+    )
 
     merge_gate = gate["gates"]["merge_approval"]
     exceptions: list[str] = []
@@ -1590,6 +1640,7 @@ def build_approval_request(*, root_dir: Path, run_id: str) -> tuple[Path, Path |
             "adr_refs": [],
             "evidence_bundle": evidence_path.as_posix(),
             "recommended_decision": recommended_decision,
+            "readiness_context": readiness_context,
         }
     }
 
