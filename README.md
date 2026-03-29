@@ -35,6 +35,7 @@
 - `start-execution`
 - `create-goal`
 - `create-clarification`
+- `resolve-clarification`
 - `create-work-item`
 - `create-pr-plan`
 - `activate-pr`
@@ -57,17 +58,18 @@ factory <command> --help
 
 1. `create-goal`로 repo-local Goal artifact 생성
 2. `create-clarification`로 Goal 기준 clarification queue artifact 생성
-3. `create-work-item`으로 Goal을 실행 가능한 Work Item Markdown artifact로 연결
-4. `create-pr-plan`으로 Work Item 기준 PR plan 후보를 생성한다. active PR이 없으면 `prs/active/`에, 이미 있으면 `prs/archive/`에 만든다.
-5. 필요 시 `activate-pr`로 기존 active PR을 `prs/archive/`로 이동하고 의도한 PR plan 후보를 active로 전환
-6. `start-execution`으로 `prs/active/`의 단일 active PR plan에서 run을 시작
-7. `record-verification`으로 lint/tests/type-check/build 상태 기록
-8. `record-review` 기록
-9. `record-qa` 기록
-10. `record-docs-sync` 기록
-11. `gate-check`로 merge/exception gate 판정
-12. `build-approval`로 evidence/approval-request 생성 및 조건 충족 시 queue 적재
-13. `resolve-approval`로 승인자 결정을 기록하고 queue를 pending에서 최종 queue로 이동
+3. 필요 시 `resolve-clarification`로 clarification artifact를 `resolved|deferred|escalated` 중 하나로 공식 종결
+4. `create-work-item`으로 Goal을 실행 가능한 Work Item Markdown artifact로 연결
+5. `create-pr-plan`으로 Work Item 기준 PR plan 후보를 생성한다. active PR이 없으면 `prs/active/`에, 이미 있으면 `prs/archive/`에 만든다.
+6. 필요 시 `activate-pr`로 기존 active PR을 `prs/archive/`로 이동하고 의도한 PR plan 후보를 active로 전환
+7. `start-execution`으로 `prs/active/`의 단일 active PR plan에서 run을 시작
+8. `record-verification`으로 lint/tests/type-check/build 상태 기록
+9. `record-review` 기록
+10. `record-qa` 기록
+11. `record-docs-sync` 기록
+12. `gate-check`로 merge/exception gate 판정
+13. `build-approval`로 evidence/approval-request 생성 및 조건 충족 시 queue 적재
+14. `resolve-approval`로 승인자 결정을 기록하고 queue를 pending에서 최종 queue로 이동
 
 조건 요약:
 - review/qa 실패 시 `merge_approval=blocked`
@@ -121,6 +123,7 @@ factory <command> --help
 - Latest Run: `run_id`, `state`, 가능하면 run path
 - Approval: `status` (`pending`, `approved`, `none`), 가능하면 관련 queue 또는 artifact path
 - Open Clarifications: 열려 있는 clarification count와 `clarification_id`
+- `resolve-clarification`로 `resolved`, `deferred`, `escalated` 된 항목은 open clarification 목록에서 제외된다.
 
 operator 해석 규칙:
 - `create-pr-plan` 결과가 `archive`면 버그가 아니라 이미 다른 active PR가 있다는 뜻이다.
@@ -209,6 +212,14 @@ factory cleanup-rehearsal --root . --apply --include-demo
 - active PR이 이미 있으면 새 PR plan 후보를 `prs/archive/<pr-id>.md`에 생성한다.
 - duplicate `pr-id`는 `prs/active/`와 `prs/archive/`를 함께 검사해 막는다.
 
+`resolve-clarification` 최소 계약:
+- 입력: `--root`, `--goal-id`, `--clarification-id`, `--decision <resolved|deferred|escalated>`, `--resolution-notes`, `--next-action`, 선택적 `--suggested-resolution`
+- 전제: `clarifications/<goal-id>/<clarification-id>.md`가 존재하고 `Status=open` 이어야 한다.
+- 동작: 기존 clarification Markdown 형식을 유지한 채 `Status`, `Resolution Notes`, `Next Action`, `Escalation Required`를 갱신한다.
+- 규칙: `decision=escalated`면 `Escalation Required=yes`, 나머지는 `no`로 기록한다.
+- 범위: clarification artifact 상태만 갱신하며 goal/work-item/pr/run/approval 상태는 자동 변경하지 않는다.
+- 실패: artifact가 없거나 이미 open이 아니면, 경로와 다음 action을 함께 보여주며 안전하게 실패한다.
+
 `start-execution` 최소 계약:
 - 입력: `--root`, `--run-id`
 - 전제: `prs/active/` 아래 active PR plan이 정확히 하나여야 한다.
@@ -248,6 +259,7 @@ run-scoped 명령의 `--latest` 최소 계약:
 pip install -e ".[dev]"
 factory create-goal --root . --goal-id GOAL-LOCAL --title "local intake" --problem "Need a formal goal artifact" --outcome "A readable goal file exists" --constraints "repo-local only"
 factory create-clarification --root . --goal-id GOAL-LOCAL --clarification-id CLAR-001 --title "scope boundary" --category scope --question "What must stay out of scope for this goal?"
+factory resolve-clarification --root . --goal-id GOAL-LOCAL --clarification-id CLAR-001 --decision resolved --resolution-notes "Scope boundary confirmed by operator review" --next-action "Proceed to work item drafting"
 factory create-work-item --root . --work-item-id WI-LOCAL --title "local work item" --goal-id GOAL-LOCAL --description "Create a minimal work item artifact" --acceptance-criteria $'- docs/work-items/WI-LOCAL.md exists\n- Duplicate IDs fail safely'
 factory create-pr-plan --root . --pr-id PR-LOCAL --work-item-id WI-LOCAL --title "local PR plan" --summary "Track the single active PR plan as a repo-local Markdown artifact"
 factory activate-pr --root . --pr-id PR-LOCAL

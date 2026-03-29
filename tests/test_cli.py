@@ -265,6 +265,231 @@ class CreateClarificationCliTest(unittest.TestCase):
             self.assertEqual(exc_info.exception.code, 2)
 
 
+class ResolveClarificationCliTest(unittest.TestCase):
+    def _write_open_clarification(self, root, *, goal_id: str = "GOAL-018", clarification_id: str = "CLAR-001") -> None:
+        (root / "clarifications" / goal_id).mkdir(parents=True, exist_ok=True)
+        (root / "clarifications" / goal_id / f"{clarification_id}.md").write_text(
+            "\n".join(
+                [
+                    f"# {clarification_id}: clarify resolution contract",
+                    "",
+                    "## Clarification ID",
+                    clarification_id,
+                    "",
+                    "## Goal ID",
+                    goal_id,
+                    "",
+                    "## Title",
+                    "clarify resolution contract",
+                    "",
+                    "## Status",
+                    "open",
+                    "",
+                    "## Category",
+                    "scope",
+                    "",
+                    "## Question",
+                    "How should operators close the clarification queue item?",
+                    "",
+                    "## Suggested Resolution",
+                    "- TBD",
+                    "",
+                    "## Escalation Required",
+                    "no",
+                    "",
+                    "## Resolution Notes",
+                    "- TBD",
+                    "",
+                    "## Next Action",
+                    "- TBD",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    def test_resolve_clarification_updates_artifact_fields(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_open_clarification(root)
+
+            exit_code = main(
+                [
+                    "resolve-clarification",
+                    "--root",
+                    str(root),
+                    "--goal-id",
+                    "GOAL-018",
+                    "--clarification-id",
+                    "CLAR-001",
+                    "--decision",
+                    "escalated",
+                    "--resolution-notes",
+                    "Operator cannot decide this without approver input.",
+                    "--next-action",
+                    "Escalate the scope tradeoff to the approver.",
+                    "--suggested-resolution",
+                    "Keep manual closure and ask the approver for the boundary.",
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+
+            content = (root / "clarifications" / "GOAL-018" / "CLAR-001.md").read_text(encoding="utf-8")
+            self.assertIn("## Status\nescalated", content)
+            self.assertIn("## Resolution Notes\nOperator cannot decide this without approver input.", content)
+            self.assertIn("## Next Action\nEscalate the scope tradeoff to the approver.", content)
+            self.assertIn("## Escalation Required\nyes", content)
+            self.assertIn(
+                "## Suggested Resolution\nKeep manual closure and ask the approver for the boundary.",
+                content,
+            )
+            self.assertIn("## Question\nHow should operators close the clarification queue item?", content)
+
+    def test_resolved_deferred_and_escalated_clarifications_disappear_from_status(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for goal_id, clarification_id, decision in (
+                ("GOAL-018-A", "CLAR-001", "resolved"),
+                ("GOAL-018-B", "CLAR-002", "deferred"),
+                ("GOAL-018-C", "CLAR-003", "escalated"),
+            ):
+                self._write_open_clarification(root, goal_id=goal_id, clarification_id=clarification_id)
+                self.assertEqual(
+                    main(
+                        [
+                            "resolve-clarification",
+                            "--root",
+                            str(root),
+                            "--goal-id",
+                            goal_id,
+                            "--clarification-id",
+                            clarification_id,
+                            "--decision",
+                            decision,
+                            "--resolution-notes",
+                            f"{decision} notes",
+                            "--next-action",
+                            f"{decision} next action",
+                        ]
+                    ),
+                    0,
+                )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                stdout.getvalue(),
+                "\n".join(
+                    [
+                        "Active PR:",
+                        "- none",
+                        "",
+                        "Latest Run:",
+                        "- none",
+                        "",
+                        "Approval:",
+                        "- status: none",
+                    ]
+                )
+                + "\n",
+            )
+
+    def test_resolve_clarification_fails_when_artifact_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "resolve-clarification",
+                            "--root",
+                            str(root),
+                            "--goal-id",
+                            "GOAL-018",
+                            "--clarification-id",
+                            "CLAR-404",
+                            "--decision",
+                            "resolved",
+                            "--resolution-notes",
+                            "done",
+                            "--next-action",
+                            "none",
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("artifact was not found", error_output)
+            self.assertIn((root / "clarifications" / "GOAL-018" / "CLAR-404.md").as_posix(), error_output)
+            self.assertIn("create it first with `factory create-clarification", error_output)
+
+    def test_resolve_clarification_fails_when_status_is_not_open(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_open_clarification(root)
+            self.assertEqual(
+                main(
+                    [
+                        "resolve-clarification",
+                        "--root",
+                        str(root),
+                        "--goal-id",
+                        "GOAL-018",
+                        "--clarification-id",
+                        "CLAR-001",
+                        "--decision",
+                        "resolved",
+                        "--resolution-notes",
+                        "answered by the updated contract",
+                        "--next-action",
+                        "continue WI planning",
+                    ]
+                ),
+                0,
+            )
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "resolve-clarification",
+                            "--root",
+                            str(root),
+                            "--goal-id",
+                            "GOAL-018",
+                            "--clarification-id",
+                            "CLAR-001",
+                            "--decision",
+                            "resolved",
+                            "--resolution-notes",
+                            "repeat close",
+                            "--next-action",
+                            "none",
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("only open artifacts can be updated", error_output)
+            self.assertIn("Status=resolved", error_output)
+            self.assertIn((root / "clarifications" / "GOAL-018" / "CLAR-001.md").as_posix(), error_output)
+
+
 class CreateWorkItemCliTest(unittest.TestCase):
     def test_create_work_item_creates_markdown_artifact(self) -> None:
         from pathlib import Path

@@ -20,6 +20,7 @@ from orchestrator.pipeline import (
     record_qa,
     record_review,
     record_verification,
+    resolve_clarification,
     resolve_latest_run_id,
     resolve_approval,
     start_execution,
@@ -255,6 +256,18 @@ def build_parser() -> argparse.ArgumentParser:
     create_clarification_parser.add_argument("--question", required=True)
     create_clarification_parser.add_argument("--escalation", action="store_true")
 
+    resolve_clarification_parser = subparsers.add_parser(
+        "resolve-clarification",
+        help="Resolve an open clarification artifact for a goal",
+    )
+    resolve_clarification_parser.add_argument("--root", default=".", help="Repository root path")
+    resolve_clarification_parser.add_argument("--goal-id", required=True)
+    resolve_clarification_parser.add_argument("--clarification-id", required=True)
+    resolve_clarification_parser.add_argument("--decision", choices=["resolved", "deferred", "escalated"], required=True)
+    resolve_clarification_parser.add_argument("--resolution-notes", required=True)
+    resolve_clarification_parser.add_argument("--next-action", required=True)
+    resolve_clarification_parser.add_argument("--suggested-resolution")
+
     create_work_item_parser = subparsers.add_parser("create-work-item", help="Create a work item artifact")
     create_work_item_parser.add_argument("--root", default=".", help="Repository root path")
     create_work_item_parser.add_argument("--work-item-id", required=True)
@@ -410,6 +423,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                 escalation=args.escalation,
             )
         except (FileExistsError, ValueError) as exc:
+            parser.error(str(exc))
+        print(path.as_posix())
+        return 0
+
+    if args.command == "resolve-clarification":
+        try:
+            path = resolve_clarification(
+                root_dir=Path(args.root),
+                goal_id=args.goal_id,
+                clarification_id=args.clarification_id,
+                decision=args.decision,
+                resolution_notes=args.resolution_notes,
+                next_action=args.next_action,
+                suggested_resolution=args.suggested_resolution,
+            )
+        except (FileNotFoundError, ValueError) as exc:
             parser.error(str(exc))
         print(path.as_posix())
         return 0
