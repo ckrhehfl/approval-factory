@@ -275,6 +275,12 @@ def build_parser() -> argparse.ArgumentParser:
     create_work_item_parser.add_argument("--goal-id", required=True)
     create_work_item_parser.add_argument("--description", required=True)
     create_work_item_parser.add_argument("--acceptance-criteria")
+    create_work_item_parser.add_argument(
+        "--clarification-id",
+        action="append",
+        dest="clarification_ids",
+        help="Link one or more clarification artifacts under the same goal",
+    )
 
     create_pr_plan_parser = subparsers.add_parser("create-pr-plan", help="Create the single active PR plan artifact")
     create_pr_plan_parser.add_argument("--root", default=".", help="Repository root path")
@@ -452,8 +458,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 goal_id=args.goal_id,
                 description=args.description,
                 acceptance_criteria=args.acceptance_criteria,
+                clarification_ids=args.clarification_ids,
             )
-        except FileExistsError as exc:
+        except (FileExistsError, FileNotFoundError, ValueError) as exc:
             parser.error(str(exc))
         print(path.as_posix())
         return 0

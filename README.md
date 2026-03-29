@@ -59,7 +59,7 @@ factory <command> --help
 1. `create-goal`로 repo-local Goal artifact 생성
 2. `create-clarification`로 Goal 기준 clarification queue artifact 생성
 3. 필요 시 `resolve-clarification`로 clarification artifact를 `resolved|deferred|escalated` 중 하나로 공식 종결
-4. `create-work-item`으로 Goal을 실행 가능한 Work Item Markdown artifact로 연결
+4. `create-work-item`으로 Goal을 실행 가능한 Work Item Markdown artifact로 연결한다. 필요하면 관련 clarification id를 함께 남긴다.
 5. `create-pr-plan`으로 Work Item 기준 PR plan 후보를 생성한다. active PR이 없으면 `prs/active/`에, 이미 있으면 `prs/archive/`에 만든다.
 6. 필요 시 `activate-pr`로 기존 active PR을 `prs/archive/`로 이동하고 의도한 PR plan 후보를 active로 전환
 7. `start-execution`으로 `prs/active/`의 단일 active PR plan에서 run을 시작
@@ -220,6 +220,15 @@ factory cleanup-rehearsal --root . --apply --include-demo
 - 범위: clarification artifact 상태만 갱신하며 goal/work-item/pr/run/approval 상태는 자동 변경하지 않는다.
 - 실패: artifact가 없거나 이미 open이 아니면, 경로와 다음 action을 함께 보여주며 안전하게 실패한다.
 
+`create-work-item` 최소 계약:
+- 입력: `--root`, `--work-item-id`, `--title`, `--goal-id`, `--description`, 선택적 `--acceptance-criteria`, 반복 가능한 `--clarification-id <id>`
+- 기존 계약: `--clarification-id`를 생략하면 기존 work item 생성 동작을 그대로 유지한다.
+- linkage 규칙: 지정한 clarification은 모두 `clarifications/<goal-id>/<clarification-id>.md` 아래에서 찾는다.
+- validation: clarification이 없으면 실패하고, 같은 `clarification-id`가 다른 goal 아래만 있으면 goal mismatch를 설명하며 실패한다.
+- artifact: Work Item 문서에 `Related Clarifications` 섹션을 추가하고 `- <clarification-id> (<status>)` 형식으로 기록한다.
+- no-linkage 표기: clarification을 지정하지 않으면 `Related Clarifications`는 `- none`으로 기록한다.
+- 범위 제한: unresolved clarification을 자동 차단하지 않으며, planner/resolver/recommendation automation은 추가하지 않는다.
+
 `start-execution` 최소 계약:
 - 입력: `--root`, `--run-id`
 - 전제: `prs/active/` 아래 active PR plan이 정확히 하나여야 한다.
@@ -260,7 +269,7 @@ pip install -e ".[dev]"
 factory create-goal --root . --goal-id GOAL-LOCAL --title "local intake" --problem "Need a formal goal artifact" --outcome "A readable goal file exists" --constraints "repo-local only"
 factory create-clarification --root . --goal-id GOAL-LOCAL --clarification-id CLAR-001 --title "scope boundary" --category scope --question "What must stay out of scope for this goal?"
 factory resolve-clarification --root . --goal-id GOAL-LOCAL --clarification-id CLAR-001 --decision resolved --resolution-notes "Scope boundary confirmed by operator review" --next-action "Proceed to work item drafting"
-factory create-work-item --root . --work-item-id WI-LOCAL --title "local work item" --goal-id GOAL-LOCAL --description "Create a minimal work item artifact" --acceptance-criteria $'- docs/work-items/WI-LOCAL.md exists\n- Duplicate IDs fail safely'
+factory create-work-item --root . --work-item-id WI-LOCAL --title "local work item" --goal-id GOAL-LOCAL --description "Create a minimal work item artifact" --clarification-id CLAR-001 --acceptance-criteria $'- docs/work-items/WI-LOCAL.md exists\n- Duplicate IDs fail safely'
 factory create-pr-plan --root . --pr-id PR-LOCAL --work-item-id WI-LOCAL --title "local PR plan" --summary "Track the single active PR plan as a repo-local Markdown artifact"
 factory activate-pr --root . --pr-id PR-LOCAL
 factory start-execution --root . --run-id RUN-LOCAL

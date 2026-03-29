@@ -81,7 +81,7 @@ run convenience:
 ## work item 최소 계약
 
 - Work Item artifact는 `docs/work-items/<work-item-id>.md`에 저장한다.
-- 생성 명령은 `factory create-work-item --root <repo> --work-item-id <id> --title <title> --goal-id <goal-id> --description <text> [--acceptance-criteria <text>]` 이다.
+- 생성 명령은 `factory create-work-item --root <repo> --work-item-id <id> --title <title> --goal-id <goal-id> --description <text> [--acceptance-criteria <text>] [--clarification-id <id> ...]` 이다.
 - Work Item은 Goal/clarification을 실제 PR 실행 단위로 연결하는 최소 수동 계층이다.
 - 생성되는 문서는 사람 검토용 Markdown이며 다음 섹션을 항상 포함한다:
   - Work Item ID
@@ -89,6 +89,7 @@ run convenience:
   - Title
   - Status
   - Description
+  - Related Clarifications
   - Scope
   - Out of Scope
   - Acceptance Criteria
@@ -97,9 +98,14 @@ run convenience:
   - Notes
 - 기본 `Status`는 `draft`다.
 - `--acceptance-criteria`를 생략하면 `Acceptance Criteria`는 `TBD`로 채운다.
+- `--clarification-id`는 반복 가능하며, 모두 같은 `goal-id` 아래 clarification artifact여야 한다.
+- linked clarification은 Work Item 문서에 `- <clarification-id> (<status>)`로 기록한다.
+- clarification을 지정하지 않으면 `Related Clarifications`는 `- none`으로 기록한다.
+- clarification이 없거나 다른 goal 아래만 있으면 명령은 기대 경로와 다음 action을 함께 보여주며 실패한다.
 - 동일 `work-item-id`가 이미 존재하면 명령은 실패한다.
 - 이번 PR 범위에서 Work Item은 artifact 생성과 수동 관리까지만 제공한다.
-- Goal to Work Item 자동 분해, clarification 강한 연결, planner 자동화, LLM 연결은 아직 없다.
+- unresolved clarification을 자동 차단하지 않으며 사람이 status를 보고 판단한다.
+- Goal to Work Item 자동 분해, clarification 자동 추천/해결, planner 자동화, LLM 연결은 아직 없다.
 
 ## active pr plan 최소 계약
 
