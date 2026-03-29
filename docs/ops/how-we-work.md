@@ -68,6 +68,7 @@
 - 기능 확장 전에 repo-local baseline normalization이 필요하면 `factory cleanup-rehearsal`를 먼저 사용한다.
 - 기본값은 dry-run이며 공식 rehearsal prefix `RH` artifact만 보여준다.
 - legacy scratch artifact까지 정리해야 할 때만 `--include-demo`를 사용한다.
+- demo cleanup에는 `RUN-DEMO-*`뿐 아니라 `RUN-*-DEMO*`, `APR-RUN-*-DEMO*` 같은 naming variant도 포함된다.
 - 이 명령은 전체 reset이 아니라 partial cleanup만 허용하며, `docs/prs/` 이력 문서는 유지한다.
 - 실제 운영 이력과 non-rehearsal artifact는 기본적으로 보존한다.
 
