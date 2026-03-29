@@ -511,6 +511,24 @@ def get_work_item_readiness(*, root_dir: Path, work_item_id: str) -> dict[str, A
     }
 
 
+def _render_pr_plan_readiness_lines(readiness: dict[str, Any]) -> list[str]:
+    lines = [
+        "## Work Item Readiness",
+        f"- summary: {readiness['overall_readiness_summary']}",
+        f"- linked_clarification_count: {readiness['linked_clarification_count']}",
+        "",
+        "## Linked Clarifications",
+    ]
+    clarifications = readiness["clarifications"]
+    if isinstance(clarifications, list) and clarifications:
+        for clarification in clarifications:
+            lines.append(f"- {clarification['clarification_id']} ({clarification['status']})")
+    else:
+        lines.append("- none")
+    lines.append("")
+    return lines
+
+
 def _collect_cleanup_targets(root_dir: Path, specs: Iterable[tuple[str, str]]) -> list[dict[str, str]]:
     targets: list[dict[str, str]] = []
     seen: set[str] = set()
@@ -914,7 +932,7 @@ def create_pr_plan(
     work_item_id: str,
     title: str,
     summary: str,
-) -> Path:
+) -> dict[str, Any]:
     active_dir = _pr_active_dir(root_dir)
     archive_dir = _pr_archive_dir(root_dir)
     active_pr_plan_path = active_dir / f"{pr_id}.md"
@@ -928,6 +946,7 @@ def create_pr_plan(
             f"PR plan artifact already exists for pr-id '{pr_id}': {archive_pr_plan_path.as_posix()}"
         )
 
+    readiness = get_work_item_readiness(root_dir=root_dir, work_item_id=work_item_id)
     existing_active_plans = sorted(active_dir.glob("*.md"))
     pr_plan_path = active_pr_plan_path if not existing_active_plans else archive_pr_plan_path
 
@@ -949,6 +968,7 @@ def create_pr_plan(
         "## Summary",
         *summary.splitlines(),
         "",
+        *_render_pr_plan_readiness_lines(readiness),
         "## Scope",
         "- TBD",
         "",
@@ -967,7 +987,10 @@ def create_pr_plan(
     ]
     pr_plan_path.parent.mkdir(parents=True, exist_ok=True)
     pr_plan_path.write_text("\n".join(lines), encoding="utf-8")
-    return pr_plan_path
+    return {
+        "path": pr_plan_path,
+        "readiness": readiness,
+    }
 
 
 def activate_pr(*, root_dir: Path, pr_id: str) -> Path:

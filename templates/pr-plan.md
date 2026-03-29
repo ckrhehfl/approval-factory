@@ -11,6 +11,13 @@
 - Design doc:
 - ADR:
 
+## Work Item Readiness
+- summary:
+- linked_clarification_count:
+
+## Linked Clarifications
+- none
+
 ## Files likely to change
 -
 

@@ -9,6 +9,55 @@ from orchestrator.cli import main
 from orchestrator.yaml_io import read_yaml
 
 
+def _write_minimal_work_item(root, *, work_item_id: str, goal_id: str = "GOAL-TEST") -> None:
+    (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+    (root / "docs" / "work-items" / f"{work_item_id}.md").write_text(
+        "\n".join(
+            [
+                f"# {work_item_id}: minimal work item",
+                "",
+                "## Work Item ID",
+                work_item_id,
+                "",
+                "## Goal ID",
+                goal_id,
+                "",
+                "## Title",
+                "minimal work item",
+                "",
+                "## Status",
+                "draft",
+                "",
+                "## Description",
+                "Minimal source work item for PR planning tests.",
+                "",
+                "## Related Clarifications",
+                "- none",
+                "",
+                "## Scope",
+                "- TBD",
+                "",
+                "## Out of Scope",
+                "- TBD",
+                "",
+                "## Acceptance Criteria",
+                "TBD",
+                "",
+                "## Dependencies",
+                "- TBD",
+                "",
+                "## Risks",
+                "- TBD",
+                "",
+                "## Notes",
+                "- TBD",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 class BootstrapCliTest(unittest.TestCase):
     def test_bootstrap_run_creates_canonical_artifacts(self) -> None:
         from pathlib import Path
@@ -1040,11 +1089,98 @@ class WorkItemReadinessCliTest(unittest.TestCase):
 
 
 class CreatePrPlanCliTest(unittest.TestCase):
+    def _write_work_item(self, root, *, work_item_id: str, goal_id: str, related_lines: list[str] | None = None) -> None:
+        (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+        lines = [
+            f"# {work_item_id}: pr plan readiness visibility",
+            "",
+            "## Work Item ID",
+            work_item_id,
+            "",
+            "## Goal ID",
+            goal_id,
+            "",
+            "## Title",
+            "pr plan readiness visibility",
+            "",
+            "## Status",
+            "draft",
+            "",
+            "## Description",
+            "Persist readiness visibility into the PR plan artifact.",
+            "",
+            "## Related Clarifications",
+            *(related_lines or ["- none"]),
+            "",
+            "## Scope",
+            "- TBD",
+            "",
+            "## Out of Scope",
+            "- TBD",
+            "",
+            "## Acceptance Criteria",
+            "TBD",
+            "",
+            "## Dependencies",
+            "- TBD",
+            "",
+            "## Risks",
+            "- TBD",
+            "",
+            "## Notes",
+            "- TBD",
+            "",
+        ]
+        (root / "docs" / "work-items" / f"{work_item_id}.md").write_text("\n".join(lines), encoding="utf-8")
+
+    def _write_clarification(self, root, *, goal_id: str, clarification_id: str, status: str) -> None:
+        (root / "clarifications" / goal_id).mkdir(parents=True, exist_ok=True)
+        (root / "clarifications" / goal_id / f"{clarification_id}.md").write_text(
+            "\n".join(
+                [
+                    f"# {clarification_id}: pr plan readiness visibility",
+                    "",
+                    "## Clarification ID",
+                    clarification_id,
+                    "",
+                    "## Goal ID",
+                    goal_id,
+                    "",
+                    "## Title",
+                    "pr plan readiness visibility",
+                    "",
+                    "## Status",
+                    status,
+                    "",
+                    "## Category",
+                    "scope",
+                    "",
+                    "## Question",
+                    "Should this plan move forward?",
+                    "",
+                    "## Suggested Resolution",
+                    "- TBD",
+                    "",
+                    "## Escalation Required",
+                    "no",
+                    "",
+                    "## Resolution Notes",
+                    "- TBD",
+                    "",
+                    "## Next Action",
+                    "- TBD",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
     def test_create_pr_plan_creates_active_markdown_artifact_without_existing_active(self) -> None:
         from pathlib import Path
 
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
+            self._write_work_item(root, work_item_id="WI-010", goal_id="GOAL-010")
 
             exit_code = main(
                 [
@@ -1078,6 +1214,8 @@ class CreatePrPlanCliTest(unittest.TestCase):
                 "## Summary\nCreate the minimum repo-local artifact for the single active PR plan.",
                 content,
             )
+            self.assertIn("## Work Item Readiness\n- summary: no-linked-clarifications", content)
+            self.assertIn("## Linked Clarifications\n- none", content)
             self.assertIn("## Scope\n- TBD", content)
             self.assertIn("## Out of Scope\n- TBD", content)
             self.assertIn("## Implementation Notes\n- TBD", content)
@@ -1089,6 +1227,8 @@ class CreatePrPlanCliTest(unittest.TestCase):
 
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
+            self._write_work_item(root, work_item_id="WI-010", goal_id="GOAL-010")
+            self._write_work_item(root, work_item_id="WI-011", goal_id="GOAL-011")
 
             first_exit_code = main(
                 [
@@ -1131,6 +1271,122 @@ class CreatePrPlanCliTest(unittest.TestCase):
             self.assertIn("## PR ID\nPR-011", content)
             self.assertIn("## Work Item ID\nWI-011", content)
             self.assertIn("## Title\nAnother PR plan", content)
+
+    def test_create_pr_plan_records_ready_linked_clarifications_in_markdown_and_output(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_work_item(
+                root,
+                work_item_id="WI-021",
+                goal_id="GOAL-021",
+                related_lines=["- CLAR-001 (open)", "- CLAR-002 (resolved)"],
+            )
+            self._write_clarification(root, goal_id="GOAL-021", clarification_id="CLAR-001", status="resolved")
+            self._write_clarification(root, goal_id="GOAL-021", clarification_id="CLAR-002", status="resolved")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "create-pr-plan",
+                        "--root",
+                        str(root),
+                        "--pr-id",
+                        "PR-021",
+                        "--work-item-id",
+                        "WI-021",
+                        "--title",
+                        "PR plan readiness visibility",
+                        "--summary",
+                        "Persist source work item readiness context in the PR plan artifact.",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- work_item_readiness: ready", output)
+            self.assertIn("- linked_clarifications: 2", output)
+
+            content = (root / "prs" / "active" / "PR-021.md").read_text(encoding="utf-8")
+            self.assertIn("## Work Item Readiness\n- summary: ready\n- linked_clarification_count: 2", content)
+            self.assertIn("## Linked Clarifications\n- CLAR-001 (resolved)\n- CLAR-002 (resolved)", content)
+
+    def test_create_pr_plan_records_attention_needed_without_blocking_creation(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_work_item(
+                root,
+                work_item_id="WI-022",
+                goal_id="GOAL-022",
+                related_lines=["- CLAR-001 (resolved)", "- CLAR-002 (resolved)", "- CLAR-003 (resolved)"],
+            )
+            self._write_clarification(root, goal_id="GOAL-022", clarification_id="CLAR-001", status="open")
+            self._write_clarification(root, goal_id="GOAL-022", clarification_id="CLAR-002", status="deferred")
+            self._write_clarification(root, goal_id="GOAL-022", clarification_id="CLAR-003", status="escalated")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "create-pr-plan",
+                        "--root",
+                        str(root),
+                        "--pr-id",
+                        "PR-022",
+                        "--work-item-id",
+                        "WI-022",
+                        "--title",
+                        "Non-blocking readiness visibility",
+                        "--summary",
+                        "Add visibility without changing PR planning semantics.",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((root / "prs" / "active" / "PR-022.md").exists())
+            output = stdout.getvalue()
+            self.assertIn("- work_item_readiness: attention-needed", output)
+            self.assertIn("- linked_clarifications: 3", output)
+
+            content = (root / "prs" / "active" / "PR-022.md").read_text(encoding="utf-8")
+            self.assertIn("## Work Item Readiness\n- summary: attention-needed", content)
+            self.assertIn("- CLAR-001 (open)", content)
+            self.assertIn("- CLAR-002 (deferred)", content)
+            self.assertIn("- CLAR-003 (escalated)", content)
+
+    def test_create_pr_plan_fails_when_source_work_item_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "create-pr-plan",
+                            "--root",
+                            str(root),
+                            "--pr-id",
+                            "PR-404",
+                            "--work-item-id",
+                            "WI-404",
+                            "--title",
+                            "Missing source work item",
+                            "--summary",
+                            "This should fail clearly.",
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("work item artifact was not found", error_output)
+            self.assertIn((root / "docs" / "work-items" / "WI-404.md").as_posix(), error_output)
 
 
 class StartExecutionCliTest(unittest.TestCase):
@@ -1774,6 +2030,7 @@ class CleanupRehearsalCliTest(unittest.TestCase):
 
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
+            _write_minimal_work_item(root, work_item_id="WI-010", goal_id="GOAL-010")
 
             stdout = StringIO()
             with redirect_stdout(stdout):
@@ -1858,6 +2115,8 @@ class ActivatePrCliTest(unittest.TestCase):
             root = Path(tmp)
             active_dir = root / "prs" / "active"
             archive_dir = root / "prs" / "archive"
+            _write_minimal_work_item(root, work_item_id="WI-010", goal_id="GOAL-010")
+            _write_minimal_work_item(root, work_item_id="WI-011", goal_id="GOAL-011")
 
             active_stdout = StringIO()
             with redirect_stdout(active_stdout):
@@ -1952,10 +2211,8 @@ class ActivatePrCliTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             active_dir = root / "prs" / "active"
-            work_items_dir = root / "docs" / "work-items"
-            work_items_dir.mkdir(parents=True, exist_ok=True)
-            (work_items_dir / "WI-010.md").write_text("# WI-010\n", encoding="utf-8")
-            (work_items_dir / "WI-011.md").write_text("# WI-011\n", encoding="utf-8")
+            _write_minimal_work_item(root, work_item_id="WI-010", goal_id="GOAL-010")
+            _write_minimal_work_item(root, work_item_id="WI-011", goal_id="GOAL-011")
             first_exit_code = main(
                 [
                     "create-pr-plan",
