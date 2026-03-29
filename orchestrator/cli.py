@@ -20,6 +20,7 @@ from orchestrator.pipeline import (
     record_qa,
     record_review,
     record_verification,
+    resolve_latest_run_id,
     resolve_approval,
     start_execution,
 )
@@ -87,6 +88,28 @@ def _render_cleanup_summary(result: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def _add_run_selector_arguments(parser: argparse.ArgumentParser) -> None:
+    selector = parser.add_mutually_exclusive_group()
+    selector.add_argument("--run-id")
+    selector.add_argument(
+        "--latest",
+        action="store_true",
+        help="Use the latest run selected from runs/latest/*/run.yaml",
+    )
+
+
+def _resolve_run_id_argument(parser: argparse.ArgumentParser, args: argparse.Namespace) -> str:
+    if getattr(args, "run_id", None):
+        return str(args.run_id)
+    if getattr(args, "latest", False):
+        try:
+            return resolve_latest_run_id(root_dir=Path(args.root))
+        except ValueError as exc:
+            parser.error(str(exc))
+    parser.error(f"{args.command} requires either --run-id <id> or --latest")
+    return ""
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="factory")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -103,13 +126,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     record_review_parser = subparsers.add_parser("record-review", help="Record review result")
     record_review_parser.add_argument("--root", default=".", help="Repository root path")
-    record_review_parser.add_argument("--run-id", required=True)
+    _add_run_selector_arguments(record_review_parser)
     record_review_parser.add_argument("--status", choices=["pass", "fail"], required=True)
     record_review_parser.add_argument("--summary", required=True)
 
     record_verification_parser = subparsers.add_parser("record-verification", help="Record verification checks result")
     record_verification_parser.add_argument("--root", default=".", help="Repository root path")
-    record_verification_parser.add_argument("--run-id", required=True)
+    _add_run_selector_arguments(record_verification_parser)
     record_verification_parser.add_argument("--lint", choices=["pass", "fail", "pending"], required=True)
     record_verification_parser.add_argument("--tests", choices=["pass", "fail", "pending"], required=True)
     record_verification_parser.add_argument("--type-check", choices=["pass", "fail", "pending"], required=True)
@@ -118,23 +141,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     record_qa_parser = subparsers.add_parser("record-qa", help="Record QA result")
     record_qa_parser.add_argument("--root", default=".", help="Repository root path")
-    record_qa_parser.add_argument("--run-id", required=True)
+    _add_run_selector_arguments(record_qa_parser)
     record_qa_parser.add_argument("--status", choices=["pass", "fail"], required=True)
     record_qa_parser.add_argument("--summary", required=True)
 
     record_docs_sync_parser = subparsers.add_parser("record-docs-sync", help="Record docs sync result")
     record_docs_sync_parser.add_argument("--root", default=".", help="Repository root path")
-    record_docs_sync_parser.add_argument("--run-id", required=True)
+    _add_run_selector_arguments(record_docs_sync_parser)
     record_docs_sync_parser.add_argument("--status", choices=["complete", "required", "not-needed"], required=True)
     record_docs_sync_parser.add_argument("--summary", required=True)
 
     gate_check_parser = subparsers.add_parser("gate-check", help="Evaluate gate status")
     gate_check_parser.add_argument("--root", default=".", help="Repository root path")
-    gate_check_parser.add_argument("--run-id", required=True)
+    _add_run_selector_arguments(gate_check_parser)
 
     build_approval_parser = subparsers.add_parser("build-approval", help="Build evidence and approval request")
     build_approval_parser.add_argument("--root", default=".", help="Repository root path")
-    build_approval_parser.add_argument("--run-id", required=True)
+    _add_run_selector_arguments(build_approval_parser)
 
     create_goal_parser = subparsers.add_parser("create-goal", help="Create a goal intake artifact")
     create_goal_parser.add_argument("--root", default=".", help="Repository root path")
@@ -184,7 +207,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     resolve_approval_parser = subparsers.add_parser("resolve-approval", help="Resolve pending approval request")
     resolve_approval_parser.add_argument("--root", default=".", help="Repository root path")
-    resolve_approval_parser.add_argument("--run-id", required=True)
+    _add_run_selector_arguments(resolve_approval_parser)
     resolve_approval_parser.add_argument("--decision", choices=["approve", "reject", "exception"], required=True)
     resolve_approval_parser.add_argument("--actor", required=True)
     resolve_approval_parser.add_argument("--note", required=True)
@@ -224,9 +247,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.command == "record-review":
+        run_id = _resolve_run_id_argument(parser, args)
         path = record_review(
             root_dir=Path(args.root),
-            run_id=args.run_id,
+            run_id=run_id,
             status=args.status,
             summary=args.summary,
         )
@@ -234,9 +258,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.command == "record-verification":
+        run_id = _resolve_run_id_argument(parser, args)
         path = record_verification(
             root_dir=Path(args.root),
-            run_id=args.run_id,
+            run_id=run_id,
             lint=args.lint,
             tests=args.tests,
             type_check=args.type_check,
@@ -247,9 +272,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.command == "record-qa":
+        run_id = _resolve_run_id_argument(parser, args)
         path = record_qa(
             root_dir=Path(args.root),
-            run_id=args.run_id,
+            run_id=run_id,
             status=args.status,
             summary=args.summary,
         )
@@ -257,9 +283,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.command == "record-docs-sync":
+        run_id = _resolve_run_id_argument(parser, args)
         path = record_docs_sync(
             root_dir=Path(args.root),
-            run_id=args.run_id,
+            run_id=run_id,
             status=args.status,
             summary=args.summary,
         )
@@ -267,12 +294,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.command == "gate-check":
-        path = evaluate_gates(root_dir=Path(args.root), run_id=args.run_id)
+        run_id = _resolve_run_id_argument(parser, args)
+        path = evaluate_gates(root_dir=Path(args.root), run_id=run_id)
         print(path.as_posix())
         return 0
 
     if args.command == "build-approval":
-        approval_path, queue_path = build_approval_request(root_dir=Path(args.root), run_id=args.run_id)
+        run_id = _resolve_run_id_argument(parser, args)
+        approval_path, queue_path = build_approval_request(root_dir=Path(args.root), run_id=run_id)
         print(approval_path.as_posix())
         if queue_path is not None:
             print(queue_path.as_posix())
@@ -355,9 +384,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.command == "resolve-approval":
+        run_id = _resolve_run_id_argument(parser, args)
         decision_path, queue_path = resolve_approval(
             root_dir=Path(args.root),
-            run_id=args.run_id,
+            run_id=run_id,
             decision=args.decision,
             actor=args.actor,
             note=args.note,

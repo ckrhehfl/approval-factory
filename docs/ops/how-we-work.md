@@ -74,6 +74,9 @@
 
 6. 역할별 결과 기록
 - Implementer/Reviewer/QA/Docs Sync/Verification 결과를 해당 record 명령으로 artifact에 반영한다.
+- 같은 세션에서 방금 시작한 run에 계속 기록할 때는 `--run-id <id>` 대신 `--latest`를 사용할 수 있다.
+- `--latest`는 `factory status`와 같은 latest-run 규칙을 사용하므로 operator가 상태 화면에서 본 latest run과 같은 대상을 고른다.
+- 과거 run 재작업이나 명시성이 필요한 상황에서는 기존 `--run-id <id>`를 유지한다.
 
 7. 게이트 판정
 - `factory gate-check`로 `gate-status.yaml`을 갱신한다.
@@ -84,6 +87,7 @@
 - 이 단계는 `record-review`, `record-qa`, `record-docs-sync`, `record-verification`이 모두 실제로 기록된 뒤에만 허용된다.
 - 조건이 맞으면 `approval_queue/pending/`에 approval 요청 파일이 적재된다.
 - approval package가 생성되면 run state는 `approval_pending`이 된다.
+- latest run에는 placeholder artifact가 남아 있어도 prerequisite를 충족한 것이 아니므로, 에러가 나면 안내된 `record-*` 명령을 먼저 수행한다.
 
 9. 승인자 결정
 - 승인자는 queue 파일과 evidence를 보고 `approve/reject/exception`을 결정한다.
