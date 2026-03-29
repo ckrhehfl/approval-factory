@@ -117,15 +117,29 @@ factory <command> --help
 - timestamp가 같으면 `run_id`가 더 큰 항목을 고른다.
 
 출력 항목:
-- Active PR: `pr_id`, `work_item_id`
-- Latest Run: `run_id`, `state`
-- Approval: `status` (`pending`, `approved`, `none`)
-- Open Clarifications: 열려 있는 clarification이 있으면 `clarification_id`
+- Active PR: `pr_id`, `work_item_id`, 가능하면 active PR artifact path
+- Latest Run: `run_id`, `state`, 가능하면 run path
+- Approval: `status` (`pending`, `approved`, `none`), 가능하면 관련 queue 또는 artifact path
+- Open Clarifications: 열려 있는 clarification count와 `clarification_id`
+
+operator 해석 규칙:
+- `create-pr-plan` 결과가 `archive`면 버그가 아니라 이미 다른 active PR가 있다는 뜻이다.
+- `activate-pr`는 semantics를 바꾸지 않고 active/archive 위치만 명시적으로 전환한다.
+- `start-execution` guardrail 실패는 lifecycle 버그가 아니라 현재 repo-local 상태를 먼저 정리하라는 안내다.
 
 예시:
 
 ```bash
 factory status --root .
+
+factory create-pr-plan --root . --pr-id PR-017 --work-item-id WI-017 --title "operator UX" --summary "clarify active PR flow"
+# active PR가 이미 있으면 archive 생성과 함께 다음 activate-pr 예시를 출력한다.
+
+factory activate-pr --root . --pr-id PR-017
+# 기존 active가 archive로 이동됐는지와 새 active path를 함께 보여준다.
+
+factory start-execution --root . --run-id RUN-017
+# active PR가 없거나 여러 개이거나 work item 연결이 깨졌으면, 왜 실패했는지와 다음 명령 예시를 함께 보여준다.
 ```
 
 ## rehearsal cleanup
