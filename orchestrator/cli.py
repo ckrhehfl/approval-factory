@@ -16,6 +16,7 @@ from orchestrator.pipeline import (
     create_work_item,
     evaluate_gates,
     get_factory_status,
+    get_work_item_readiness,
     record_docs_sync,
     record_qa,
     record_review,
@@ -165,6 +166,28 @@ def _render_cleanup_summary(result: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def _render_work_item_readiness(readiness: dict[str, object]) -> str:
+    lines = ["Work Item Readiness:"]
+    lines.append(f"- work_item_id: {readiness['work_item_id']}")
+    lines.append(f"- goal_id: {readiness['goal_id']}")
+    lines.append(f"- linked_clarification_count: {readiness['linked_clarification_count']}")
+    lines.append("")
+    lines.append("Clarifications:")
+
+    clarifications = readiness["clarifications"]
+    if isinstance(clarifications, list) and clarifications:
+        for clarification in clarifications:
+            if isinstance(clarification, dict):
+                lines.append(f"- {clarification['clarification_id']}: {clarification['status']}")
+    else:
+        lines.append("- none")
+
+    lines.append("")
+    lines.append("Overall Readiness:")
+    lines.append(f"- summary: {readiness['overall_readiness_summary']}")
+    return "\n".join(lines)
+
+
 def _add_run_selector_arguments(parser: argparse.ArgumentParser) -> None:
     selector = parser.add_mutually_exclusive_group()
     selector.add_argument("--run-id")
@@ -281,6 +304,13 @@ def build_parser() -> argparse.ArgumentParser:
         dest="clarification_ids",
         help="Link one or more clarification artifacts under the same goal",
     )
+
+    work_item_readiness_parser = subparsers.add_parser(
+        "work-item-readiness",
+        help="Show read-only clarification readiness visibility for a work item",
+    )
+    work_item_readiness_parser.add_argument("--root", default=".", help="Repository root path")
+    work_item_readiness_parser.add_argument("--work-item-id", required=True)
 
     create_pr_plan_parser = subparsers.add_parser("create-pr-plan", help="Create the single active PR plan artifact")
     create_pr_plan_parser.add_argument("--root", default=".", help="Repository root path")
@@ -463,6 +493,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         except (FileExistsError, FileNotFoundError, ValueError) as exc:
             parser.error(str(exc))
         print(path.as_posix())
+        return 0
+
+    if args.command == "work-item-readiness":
+        try:
+            readiness = get_work_item_readiness(root_dir=Path(args.root), work_item_id=args.work_item_id)
+        except (FileNotFoundError, ValueError) as exc:
+            parser.error(str(exc))
+        print(_render_work_item_readiness(readiness))
         return 0
 
     if args.command == "create-pr-plan":

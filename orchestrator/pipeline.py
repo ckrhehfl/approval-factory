@@ -424,6 +424,93 @@ def _render_related_clarifications_section(linked_clarifications: Iterable[dict[
     return [f"- {entry['clarification_id']} ({entry['status']})" for entry in entries]
 
 
+def _read_required_markdown_section(path: Path, heading: str) -> str:
+    sections = _parse_markdown_sections(path)
+    if heading not in sections:
+        raise ValueError(f"required section '## {heading}' not found in {path.as_posix()}")
+    return sections[heading]
+
+
+def _parse_related_clarification_ids(path: Path) -> list[str]:
+    related = _read_required_markdown_section(path, "Related Clarifications")
+    lines = [line.strip() for line in related.splitlines() if line.strip()]
+    if not lines or lines == ["- none"]:
+        return []
+
+    clarification_ids: list[str] = []
+    for line in lines:
+        match = re.fullmatch(r"-\s+([^\s(]+)\s+\(([^)]+)\)", line)
+        if match is None:
+            raise ValueError(
+                "cannot read work item readiness because the Related Clarifications section is malformed in "
+                f"{path.as_posix()}: expected '- <clarification-id> (<status>)', got '{line}'"
+            )
+        clarification_ids.append(match.group(1).strip())
+    return clarification_ids
+
+
+def get_work_item_readiness(*, root_dir: Path, work_item_id: str) -> dict[str, Any]:
+    work_item_path = root_dir / "docs" / "work-items" / f"{work_item_id}.md"
+    if not work_item_path.exists():
+        raise FileNotFoundError(
+            "cannot read work item readiness because the work item artifact was not found at "
+            f"{work_item_path.as_posix()}. Next action: check the work-item-id or create the artifact first."
+        )
+
+    sections = _parse_markdown_sections(work_item_path)
+    goal_id = sections.get("Goal ID", "").strip()
+    if not goal_id:
+        raise ValueError(
+            "cannot read work item readiness because the work item is missing a Goal ID section value: "
+            f"{work_item_path.as_posix()}"
+        )
+
+    clarification_ids = _parse_related_clarification_ids(work_item_path)
+    linked_clarifications: list[dict[str, str]] = []
+    for clarification_id in clarification_ids:
+        clarification_path = _clarification_path(root_dir, goal_id, clarification_id)
+        if not clarification_path.exists():
+            raise FileNotFoundError(
+                "cannot read work item readiness because a linked clarification artifact was not found: "
+                f"goal-id '{goal_id}', clarification-id '{clarification_id}', expected at "
+                f"{clarification_path.as_posix()}. Next action: restore the clarification artifact or update the "
+                "work item linkage."
+            )
+        clarification_sections = _parse_markdown_sections(clarification_path)
+        status = clarification_sections.get("Status", "").strip()
+        if not status:
+            raise ValueError(
+                "cannot read work item readiness because a linked clarification is missing Status: "
+                f"{clarification_path.as_posix()}"
+            )
+        linked_clarifications.append(
+            {
+                "clarification_id": clarification_sections.get("Clarification ID", clarification_id).strip()
+                or clarification_id,
+                "status": status,
+            }
+        )
+
+    statuses = {entry["status"] for entry in linked_clarifications}
+    if not linked_clarifications:
+        readiness_summary = "no-linked-clarifications"
+    elif statuses.issubset({"resolved"}):
+        readiness_summary = "ready"
+    elif {"open", "deferred", "escalated"} & statuses:
+        readiness_summary = "attention-needed"
+    else:
+        readiness_summary = "attention-needed"
+
+    return {
+        "work_item_id": work_item_id,
+        "goal_id": goal_id,
+        "linked_clarification_count": len(linked_clarifications),
+        "clarifications": linked_clarifications,
+        "overall_readiness_summary": readiness_summary,
+        "work_item_path": work_item_path.as_posix(),
+    }
+
+
 def _collect_cleanup_targets(root_dir: Path, specs: Iterable[tuple[str, str]]) -> list[dict[str, str]]:
     targets: list[dict[str, str]] = []
     seen: set[str] = set()

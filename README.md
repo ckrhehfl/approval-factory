@@ -37,6 +37,7 @@
 - `create-clarification`
 - `resolve-clarification`
 - `create-work-item`
+- `work-item-readiness`
 - `create-pr-plan`
 - `activate-pr`
 - `record-review`
@@ -60,16 +61,17 @@ factory <command> --help
 2. `create-clarification`로 Goal 기준 clarification queue artifact 생성
 3. 필요 시 `resolve-clarification`로 clarification artifact를 `resolved|deferred|escalated` 중 하나로 공식 종결
 4. `create-work-item`으로 Goal을 실행 가능한 Work Item Markdown artifact로 연결한다. 필요하면 관련 clarification id를 함께 남긴다.
-5. `create-pr-plan`으로 Work Item 기준 PR plan 후보를 생성한다. active PR이 없으면 `prs/active/`에, 이미 있으면 `prs/archive/`에 만든다.
-6. 필요 시 `activate-pr`로 기존 active PR을 `prs/archive/`로 이동하고 의도한 PR plan 후보를 active로 전환
-7. `start-execution`으로 `prs/active/`의 단일 active PR plan에서 run을 시작
-8. `record-verification`으로 lint/tests/type-check/build 상태 기록
-9. `record-review` 기록
-10. `record-qa` 기록
-11. `record-docs-sync` 기록
-12. `gate-check`로 merge/exception gate 판정
-13. `build-approval`로 evidence/approval-request 생성 및 조건 충족 시 queue 적재
-14. `resolve-approval`로 승인자 결정을 기록하고 queue를 pending에서 최종 queue로 이동
+5. 필요하면 `work-item-readiness`로 linked clarification 기준 최소 readiness visibility를 읽기 전용으로 확인한다.
+6. `create-pr-plan`으로 Work Item 기준 PR plan 후보를 생성한다. active PR이 없으면 `prs/active/`에, 이미 있으면 `prs/archive/`에 만든다.
+7. 필요 시 `activate-pr`로 기존 active PR을 `prs/archive/`로 이동하고 의도한 PR plan 후보를 active로 전환
+8. `start-execution`으로 `prs/active/`의 단일 active PR plan에서 run을 시작
+9. `record-verification`으로 lint/tests/type-check/build 상태 기록
+10. `record-review` 기록
+11. `record-qa` 기록
+12. `record-docs-sync` 기록
+13. `gate-check`로 merge/exception gate 판정
+14. `build-approval`로 evidence/approval-request 생성 및 조건 충족 시 queue 적재
+15. `resolve-approval`로 승인자 결정을 기록하고 queue를 pending에서 최종 queue로 이동
 
 조건 요약:
 - review/qa 실패 시 `merge_approval=blocked`
@@ -130,10 +132,21 @@ operator 해석 규칙:
 - `activate-pr`는 semantics를 바꾸지 않고 active/archive 위치만 명시적으로 전환한다.
 - `start-execution` guardrail 실패는 lifecycle 버그가 아니라 현재 repo-local 상태를 먼저 정리하라는 안내다.
 
+`work-item-readiness` 최소 계약:
+- 입력: `--root`, `--work-item-id`
+- 조회 경로: `docs/work-items/<work-item-id>.md`와 linked clarification의 `clarifications/<goal-id>/<clarification-id>.md`
+- 출력: `Work Item ID`, `Goal ID`, linked clarification count, clarification별 현재 status, overall readiness summary
+- summary 규칙: linked clarification이 없으면 `no-linked-clarifications`, 모두 `resolved`면 `ready`, 하나라도 `open|deferred|escalated`가 있으면 `attention-needed`
+- visibility only: 이 summary는 operator 판단 보조용이며 `create-work-item`, `create-pr-plan`, `start-execution`, approval/gate semantics를 바꾸지 않는다.
+- 실패: work item 또는 linked clarification artifact를 읽을 수 없으면 경로와 함께 명확히 실패한다.
+
 예시:
 
 ```bash
 factory status --root .
+
+factory work-item-readiness --root . --work-item-id WI-020
+# linked clarification이 모두 resolved면 ready, 하나라도 open/deferred/escalated면 attention-needed를 읽기 전용으로 보여준다.
 
 factory create-pr-plan --root . --pr-id PR-017 --work-item-id WI-017 --title "operator UX" --summary "clarify active PR flow"
 # active PR가 이미 있으면 archive 생성과 함께 다음 activate-pr 예시를 출력한다.
@@ -228,6 +241,14 @@ factory cleanup-rehearsal --root . --apply --include-demo
 - artifact: Work Item 문서에 `Related Clarifications` 섹션을 추가하고 `- <clarification-id> (<status>)` 형식으로 기록한다.
 - no-linkage 표기: clarification을 지정하지 않으면 `Related Clarifications`는 `- none`으로 기록한다.
 - 범위 제한: unresolved clarification을 자동 차단하지 않으며, planner/resolver/recommendation automation은 추가하지 않는다.
+
+`work-item-readiness` 최소 계약:
+- 입력: `--root`, `--work-item-id`
+- 전제: `docs/work-items/<work-item-id>.md`가 존재해야 한다.
+- 동작: work item의 `Goal ID`, `Related Clarifications`를 읽고 linked clarification artifact의 현재 `Status`를 다시 조회해 짧은 readiness summary를 출력한다.
+- summary 규칙: linked clarification 없음=`no-linked-clarifications`, 모두 resolved=`ready`, 하나라도 open/deferred/escalated 포함=`attention-needed`
+- 범위 제한: visibility-only 명령이며 work item/pr/run/approval semantics, 허용/차단, 자동 resolution은 바꾸지 않는다.
+- 실패: work item 또는 linked clarification artifact가 없으면 안전하게 실패한다.
 
 `start-execution` 최소 계약:
 - 입력: `--root`, `--run-id`

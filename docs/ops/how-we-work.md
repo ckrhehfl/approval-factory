@@ -48,7 +48,9 @@
 - 필요하면 반복 가능한 `--clarification-id`로 같은 goal 아래 clarification linkage를 함께 기록할 수 있다.
 - 기본 섹션은 Work Item ID, Goal ID, Title, Status, Description, Related Clarifications, Scope, Out of Scope, Acceptance Criteria, Dependencies, Risks, Notes다.
 - `Related Clarifications`는 `clarification_id (status)`를 보여주며, 없으면 `- none`으로 남긴다.
+- `factory work-item-readiness --root <repo> --work-item-id <id>`는 linked clarification의 현재 상태를 다시 읽어 `no-linked-clarifications|ready|attention-needed` 중 하나로 짧게 요약한다.
 - clarification status는 가시성 목적이며 생성 허용 여부를 자동 판정하지 않는다.
+- readiness summary도 visibility only이며 create-pr-plan, start-execution, gate, approval semantics를 바꾸지 않는다.
 - 현재 단계는 artifact 생성과 수동 관리까지만 제공하며 auto decomposition, clarification auto-link recommendation, 강제 gating은 다음 PR 범위다.
 
 4. Active PR 계획

@@ -8,22 +8,23 @@
 3. Goal 기준 clarification 필요 시 `factory create-clarification`로 `clarifications/<goal-id>/<clarification-id>.md` 생성
 4. clarification을 공식 종결해야 하면 `factory resolve-clarification`로 `resolved|deferred|escalated` 중 하나를 기록
 5. `factory create-work-item`로 `docs/work-items/<work-item-id>.md` 생성
-6. `factory create-pr-plan`로 PR plan 후보 생성
-7. active PR가 없으면 `prs/active/<pr-id>.md`, 이미 있으면 `prs/archive/<pr-id>.md`에 저장
-8. 필요 시 `factory activate-pr`로 기존 active PR을 `prs/archive/`로 옮기고 의도한 PR을 active로 전환
-9. `factory start-execution`로 active PR plan에서 `runs/latest/<run-id>/` 시작
-10. Scope 승인
-11. 설계 초안 생성
-12. Architecture 승인 필요 여부 판정
-13. PR별 구현
-14. Verification 기록(lint/tests/type_check/build)
-15. Review
-16. QA
-17. Docs Sync 완료
-18. `gate-check`로 gate 판정 확인
-19. `build-approval`로 Evidence Bundle + Approval Request 생성
-20. `resolve-approval`로 승인자 결정 기록 및 queue 정리
-21. Merge
+6. 필요 시 `factory work-item-readiness`로 linked clarification 기준 최소 readiness visibility 확인
+7. `factory create-pr-plan`로 PR plan 후보 생성
+8. active PR가 없으면 `prs/active/<pr-id>.md`, 이미 있으면 `prs/archive/<pr-id>.md`에 저장
+9. 필요 시 `factory activate-pr`로 기존 active PR을 `prs/archive/`로 옮기고 의도한 PR을 active로 전환
+10. `factory start-execution`로 active PR plan에서 `runs/latest/<run-id>/` 시작
+11. Scope 승인
+12. 설계 초안 생성
+13. Architecture 승인 필요 여부 판정
+14. PR별 구현
+15. Verification 기록(lint/tests/type_check/build)
+16. Review
+17. QA
+18. Docs Sync 완료
+19. `gate-check`로 gate 판정 확인
+20. `build-approval`로 Evidence Bundle + Approval Request 생성
+21. `resolve-approval`로 승인자 결정 기록 및 queue 정리
+22. Merge
 
 run convenience:
 - `start-execution` 직후 이어지는 run-scoped 명령은 `--run-id <id>` 대신 `--latest`를 사용할 수 있다.
@@ -102,6 +103,10 @@ run convenience:
 - linked clarification은 Work Item 문서에 `- <clarification-id> (<status>)`로 기록한다.
 - clarification을 지정하지 않으면 `Related Clarifications`는 `- none`으로 기록한다.
 - clarification이 없거나 다른 goal 아래만 있으면 명령은 기대 경로와 다음 action을 함께 보여주며 실패한다.
+- `factory work-item-readiness --root <repo> --work-item-id <id>`는 같은 artifact를 읽어 linked clarification의 현재 status와 overall readiness summary를 보여준다.
+- readiness summary 규칙은 linked clarification 없음=`no-linked-clarifications`, 모두 resolved=`ready`, 하나라도 open/deferred/escalated 포함=`attention-needed` 이다.
+- 이 summary는 visibility only이며 create-pr-plan/start-execution/gate/approval 허용 여부를 바꾸지 않는다.
+- linked clarification artifact가 누락되면 readiness 조회는 경로와 함께 명확히 실패한다.
 - 동일 `work-item-id`가 이미 존재하면 명령은 실패한다.
 - 이번 PR 범위에서 Work Item은 artifact 생성과 수동 관리까지만 제공한다.
 - unresolved clarification을 자동 차단하지 않으며 사람이 status를 보고 판단한다.
