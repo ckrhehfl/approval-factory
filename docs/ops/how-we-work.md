@@ -99,10 +99,12 @@
 
 8. 승인 패키지 생성
 - `factory build-approval`로 `evidence-bundle.yaml`, `approval-request.yaml`를 최신 상태로 만든다.
+- 이 단계는 가능하면 source work item readiness context를 approval artifact에 함께 남겨 approver가 evidence와 readiness 맥락을 같이 볼 수 있게 한다.
 - 이 단계는 `record-review`, `record-qa`, `record-docs-sync`, `record-verification`이 모두 실제로 기록된 뒤에만 허용된다.
 - 조건이 맞으면 `approval_queue/pending/`에 approval 요청 파일이 적재된다.
 - approval package가 생성되면 run state는 `approval_pending`이 된다.
 - latest run에는 placeholder artifact가 남아 있어도 prerequisite를 충족한 것이 아니므로, 에러가 나면 안내된 `record-*` 명령을 먼저 수행한다.
+- readiness는 informational only이며 queue 적재, gate 계산, resolve-approval semantics를 바꾸지 않는다.
 
 9. 승인자 결정
 - 승인자는 queue 파일과 evidence를 보고 `approve/reject/exception`을 결정한다.

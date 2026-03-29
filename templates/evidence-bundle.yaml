@@ -25,3 +25,9 @@ evidence_bundle:
     status: pending
     changed_docs: []
   residual_risks: []
+  readiness_context:
+    status: unavailable
+    reason: ""
+    readiness_source:
+      work_item_id: WI-000
+      pr_id: PR-000

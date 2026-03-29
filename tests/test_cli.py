@@ -2791,3 +2791,180 @@ class LatestRunCliTest(unittest.TestCase):
                 r"run `factory record-review --run-id RUN-LATEST` first",
             ):
                 main(["build-approval", "--root", str(root), "--latest"])
+
+
+class BuildApprovalCliReadinessTest(unittest.TestCase):
+    def _prepare_root(self, root) -> None:
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parents[1]
+        (root / "config").mkdir(parents=True, exist_ok=True)
+        (root / "approval_queue" / "pending").mkdir(parents=True, exist_ok=True)
+        (root / "config" / "gates.yaml").write_text(
+            (repo_root / "config" / "gates.yaml").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
+    def _write_work_item(self, root, *, work_item_id: str, goal_id: str, related_lines: list[str] | None = None) -> None:
+        (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+        (root / "docs" / "work-items" / f"{work_item_id}.md").write_text(
+            "\n".join(
+                [
+                    f"# {work_item_id}: build approval readiness",
+                    "",
+                    "## Work Item ID",
+                    work_item_id,
+                    "",
+                    "## Goal ID",
+                    goal_id,
+                    "",
+                    "## Title",
+                    "build approval readiness",
+                    "",
+                    "## Status",
+                    "draft",
+                    "",
+                    "## Description",
+                    "Source work item for approval output tests.",
+                    "",
+                    "## Related Clarifications",
+                    *(related_lines or ["- none"]),
+                    "",
+                    "## Scope",
+                    "- TBD",
+                    "",
+                    "## Out of Scope",
+                    "- TBD",
+                    "",
+                    "## Acceptance Criteria",
+                    "TBD",
+                    "",
+                    "## Dependencies",
+                    "- TBD",
+                    "",
+                    "## Risks",
+                    "- TBD",
+                    "",
+                    "## Notes",
+                    "- TBD",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    def _write_clarification(self, root, *, goal_id: str, clarification_id: str, status: str) -> None:
+        (root / "clarifications" / goal_id).mkdir(parents=True, exist_ok=True)
+        (root / "clarifications" / goal_id / f"{clarification_id}.md").write_text(
+            "\n".join(
+                [
+                    f"# {clarification_id}",
+                    "",
+                    "## Clarification ID",
+                    clarification_id,
+                    "",
+                    "## Goal ID",
+                    goal_id,
+                    "",
+                    "## Status",
+                    status,
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    def _bootstrap(self, root, run_id: str) -> None:
+        self.assertEqual(
+            main(
+                [
+                    "bootstrap-run",
+                    "--root",
+                    str(root),
+                    "--run-id",
+                    run_id,
+                    "--pr-id",
+                    "PR-READINESS",
+                    "--work-item-id",
+                    "WI-READINESS",
+                    "--work-item-title",
+                    "build approval readiness",
+                ]
+            ),
+            0,
+        )
+
+    def _record_ready_artifacts(self, root, run_id: str) -> None:
+        self.assertEqual(
+            main(
+                [
+                    "record-verification",
+                    "--root",
+                    str(root),
+                    "--run-id",
+                    run_id,
+                    "--lint",
+                    "pass",
+                    "--tests",
+                    "pass",
+                    "--type-check",
+                    "pass",
+                    "--build",
+                    "pass",
+                    "--summary",
+                    "all green",
+                ]
+            ),
+            0,
+        )
+        self.assertEqual(main(["record-review", "--root", str(root), "--run-id", run_id, "--status", "pass", "--summary", "review ok"]), 0)
+        self.assertEqual(main(["record-qa", "--root", str(root), "--run-id", run_id, "--status", "pass", "--summary", "qa ok"]), 0)
+        self.assertEqual(
+            main(["record-docs-sync", "--root", str(root), "--run-id", run_id, "--status", "complete", "--summary", "docs ok"]),
+            0,
+        )
+
+    def test_build_approval_output_includes_readiness_summary_and_count(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._prepare_root(root)
+            self._bootstrap(root, "RUN-CLI-READY")
+            self._write_work_item(
+                root,
+                work_item_id="WI-READINESS",
+                goal_id="GOAL-READINESS",
+                related_lines=["- CLAR-001 (open)", "- CLAR-002 (resolved)"],
+            )
+            self._write_clarification(root, goal_id="GOAL-READINESS", clarification_id="CLAR-001", status="resolved")
+            self._write_clarification(root, goal_id="GOAL-READINESS", clarification_id="CLAR-002", status="resolved")
+            self._record_ready_artifacts(root, "RUN-CLI-READY")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["build-approval", "--root", str(root), "--run-id", "RUN-CLI-READY"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Build Approval:", output)
+            self.assertIn("- readiness_summary: ready", output)
+            self.assertIn("- linked_clarifications: 2", output)
+
+    def test_build_approval_output_marks_unavailable_readiness_without_failing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._prepare_root(root)
+            self._bootstrap(root, "RUN-CLI-UNAVAILABLE")
+            self._record_ready_artifacts(root, "RUN-CLI-UNAVAILABLE")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["build-approval", "--root", str(root), "--run-id", "RUN-CLI-UNAVAILABLE"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Build Approval:", output)
+            self.assertIn("- readiness: unavailable", output)

@@ -26,3 +26,9 @@ approval_request:
   adr_refs: []
   evidence_bundle: ""
   recommended_decision: ""
+  readiness_context:
+    status: unavailable
+    reason: ""
+    readiness_source:
+      work_item_id: WI-000
+      pr_id: PR-000

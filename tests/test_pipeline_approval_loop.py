@@ -84,6 +84,85 @@ class PipelineApprovalLoopTest(unittest.TestCase):
     def _build_approval(self, root: Path, run_id: str) -> None:
         self.assertEqual(main(["build-approval", "--root", str(root), "--run-id", run_id]), 0)
 
+    def _write_work_item(
+        self,
+        root: Path,
+        *,
+        work_item_id: str,
+        goal_id: str,
+        related_lines: list[str] | None = None,
+    ) -> None:
+        (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+        (root / "docs" / "work-items" / f"{work_item_id}.md").write_text(
+            "\n".join(
+                [
+                    f"# {work_item_id}: readiness source",
+                    "",
+                    "## Work Item ID",
+                    work_item_id,
+                    "",
+                    "## Goal ID",
+                    goal_id,
+                    "",
+                    "## Title",
+                    "readiness source",
+                    "",
+                    "## Status",
+                    "draft",
+                    "",
+                    "## Description",
+                    "Source work item for approval readiness visibility tests.",
+                    "",
+                    "## Related Clarifications",
+                    *(related_lines or ["- none"]),
+                    "",
+                    "## Scope",
+                    "- TBD",
+                    "",
+                    "## Out of Scope",
+                    "- TBD",
+                    "",
+                    "## Acceptance Criteria",
+                    "TBD",
+                    "",
+                    "## Dependencies",
+                    "- TBD",
+                    "",
+                    "## Risks",
+                    "- TBD",
+                    "",
+                    "## Notes",
+                    "- TBD",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    def _write_clarification(self, root: Path, *, goal_id: str, clarification_id: str, status: str) -> None:
+        (root / "clarifications" / goal_id).mkdir(parents=True, exist_ok=True)
+        (root / "clarifications" / goal_id / f"{clarification_id}.md").write_text(
+            "\n".join(
+                [
+                    f"# {clarification_id}: readiness detail",
+                    "",
+                    "## Clarification ID",
+                    clarification_id,
+                    "",
+                    "## Goal ID",
+                    goal_id,
+                    "",
+                    "## Title",
+                    "readiness detail",
+                    "",
+                    "## Status",
+                    status,
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
     def _resolve_approval(self, root: Path, run_id: str, decision: str) -> None:
         self.assertEqual(
             main(
@@ -481,6 +560,111 @@ class PipelineApprovalLoopTest(unittest.TestCase):
             self._resolve_approval(root, run_id, "approve")
             run_payload = read_yaml(root / "runs" / "latest" / run_id / "run.yaml")
             self.assertEqual(run_payload["run"]["state"], "approved")
+
+    def test_build_approval_records_no_linked_clarifications_readiness_context(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-READINESS-NONE"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._write_work_item(root, work_item_id="WI-002", goal_id="GOAL-002")
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+
+            self._build_approval(root, run_id)
+
+            evidence = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "evidence-bundle.yaml")
+            approval = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "approval-request.yaml")
+            evidence_readiness = evidence["evidence_bundle"]["readiness_context"]
+            approval_readiness = approval["approval_request"]["readiness_context"]
+
+            self.assertEqual(evidence_readiness["status"], "available")
+            self.assertEqual(evidence_readiness["readiness_summary"], "no-linked-clarifications")
+            self.assertEqual(evidence_readiness["linked_clarification_count"], 0)
+            self.assertEqual(evidence_readiness["readiness_source"]["work_item_id"], "WI-002")
+            self.assertEqual(approval_readiness["readiness_summary"], "no-linked-clarifications")
+
+    def test_build_approval_records_ready_readiness_context(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-READINESS-READY"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._write_work_item(
+                root,
+                work_item_id="WI-002",
+                goal_id="GOAL-READY",
+                related_lines=["- CLAR-001 (open)", "- CLAR-002 (resolved)"],
+            )
+            self._write_clarification(root, goal_id="GOAL-READY", clarification_id="CLAR-001", status="resolved")
+            self._write_clarification(root, goal_id="GOAL-READY", clarification_id="CLAR-002", status="resolved")
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+
+            self._build_approval(root, run_id)
+
+            approval = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "approval-request.yaml")
+            readiness = approval["approval_request"]["readiness_context"]
+            self.assertEqual(readiness["status"], "available")
+            self.assertEqual(readiness["readiness_summary"], "ready")
+            self.assertEqual(readiness["linked_clarification_count"], 2)
+            self.assertEqual(
+                readiness["linked_clarifications"],
+                [
+                    {"clarification_id": "CLAR-001", "status": "resolved"},
+                    {"clarification_id": "CLAR-002", "status": "resolved"},
+                ],
+            )
+            self.assertTrue((root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").exists())
+
+    def test_build_approval_records_attention_needed_readiness_context_without_changing_queue_semantics(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-READINESS-ATTN"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._write_work_item(
+                root,
+                work_item_id="WI-002",
+                goal_id="GOAL-ATTN",
+                related_lines=["- CLAR-001 (resolved)", "- CLAR-002 (resolved)", "- CLAR-003 (resolved)"],
+            )
+            self._write_clarification(root, goal_id="GOAL-ATTN", clarification_id="CLAR-001", status="open")
+            self._write_clarification(root, goal_id="GOAL-ATTN", clarification_id="CLAR-002", status="deferred")
+            self._write_clarification(root, goal_id="GOAL-ATTN", clarification_id="CLAR-003", status="escalated")
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+
+            self._build_approval(root, run_id)
+
+            evidence = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "evidence-bundle.yaml")
+            gate = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "gate-status.yaml")
+            readiness = evidence["evidence_bundle"]["readiness_context"]
+            self.assertEqual(readiness["status"], "available")
+            self.assertEqual(readiness["readiness_summary"], "attention-needed")
+            self.assertEqual(readiness["linked_clarification_count"], 3)
+            self.assertEqual(gate["gate_status"]["gates"]["merge_approval"], "ready")
+            self.assertTrue((root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").exists())
+
+    def test_build_approval_marks_readiness_unavailable_without_failing_or_changing_queue_semantics(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-READINESS-UNAVAILABLE"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+
+            self._build_approval(root, run_id)
+
+            evidence = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "evidence-bundle.yaml")
+            approval = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "approval-request.yaml")
+            gate = read_yaml(root / "runs" / "latest" / run_id / "artifacts" / "gate-status.yaml")
+            self.assertEqual(evidence["evidence_bundle"]["readiness_context"]["status"], "unavailable")
+            self.assertIn("work item artifact was not found", evidence["evidence_bundle"]["readiness_context"]["reason"])
+            self.assertEqual(approval["approval_request"]["readiness_context"]["status"], "unavailable")
+            self.assertEqual(gate["gate_status"]["gates"]["merge_approval"], "ready")
+            self.assertTrue((root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").exists())
 
 
 if __name__ == "__main__":
