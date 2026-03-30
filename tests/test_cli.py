@@ -2613,6 +2613,256 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("  matching_run_state: none", output)
             self.assertIn("matching run missing from filesystem", output)
 
+    def test_inspect_approval_latest_successfully(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "runs" / "latest" / "RUN-701"
+            artifacts = run_dir / "artifacts"
+            artifacts.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-701",
+                        "  work_item_id: WI-701",
+                        "  pr_id: PR-701",
+                        "  state: approval_pending",
+                        "  created_at: '2026-03-29T07:01:00+00:00'",
+                        "  updated_at: '2026-03-29T07:01:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            evidence_path = artifacts / "evidence-bundle.yaml"
+            evidence_path.write_text("evidence_bundle:\n  run_id: RUN-701\n", encoding="utf-8")
+            approval_path = artifacts / "approval-request.yaml"
+            approval_path.write_text(
+                "\n".join(
+                    [
+                        "approval_request:",
+                        "  id: APR-RUN-701",
+                        "  status: pending",
+                        f"  evidence_bundle: {evidence_path.as_posix()}",
+                        "  readiness_context:",
+                        "    status: available",
+                        "    readiness_summary: ready",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-approval", "--root", str(root), "--latest"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Approval Inspection:", output)
+            self.assertIn("- run_id: RUN-701", output)
+            self.assertIn(f"- approval_request_path: {approval_path.as_posix()}", output)
+            self.assertIn("- approval_request_exists: True", output)
+            self.assertIn("- approval_request_status: pending", output)
+            self.assertIn(f"- evidence_bundle_path: {evidence_path.as_posix()}", output)
+            self.assertIn("- evidence_bundle_exists: True", output)
+            self.assertIn("- run_state: approval_pending", output)
+            self.assertIn("- readiness_summary: ready", output)
+            self.assertIn("- degraded_note: none", output)
+
+    def test_inspect_approval_by_run_id_successfully(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "runs" / "latest" / "RUN-702"
+            artifacts = run_dir / "artifacts"
+            artifacts.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-702",
+                        "  work_item_id: WI-702",
+                        "  pr_id: PR-702",
+                        "  state: approved",
+                        "  created_at: '2026-03-29T07:02:00+00:00'",
+                        "  updated_at: '2026-03-29T07:02:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            evidence_path = artifacts / "evidence-bundle.yaml"
+            evidence_path.write_text("evidence_bundle:\n  run_id: RUN-702\n", encoding="utf-8")
+            approval_path = artifacts / "approval-request.yaml"
+            approval_path.write_text(
+                "\n".join(
+                    [
+                        "approval_request:",
+                        "  id: APR-RUN-702",
+                        f"  evidence_bundle: {evidence_path.as_posix()}",
+                        "  readiness_context:",
+                        "    status: unavailable",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-approval", "--root", str(root), "--run-id", "RUN-702"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- run_id: RUN-702", output)
+            self.assertIn("- run_state: approved", output)
+            self.assertIn("- approval_request_exists: True", output)
+            self.assertIn("- approval_request_status: none", output)
+            self.assertIn("- readiness_summary: unavailable", output)
+            self.assertIn("- degraded_note: none", output)
+
+    def test_inspect_approval_degrades_safely_when_approval_request_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "runs" / "latest" / "RUN-703"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-703",
+                        "  work_item_id: WI-703",
+                        "  pr_id: PR-703",
+                        "  state: approval_pending",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-approval", "--root", str(root), "--run-id", "RUN-703"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- approval_request_exists: False", output)
+            self.assertIn("- evidence_bundle_exists: False", output)
+            self.assertIn("approval request artifact missing:", output)
+
+    def test_inspect_approval_degrades_safely_when_evidence_bundle_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "runs" / "latest" / "RUN-704"
+            artifacts = run_dir / "artifacts"
+            artifacts.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-704",
+                        "  work_item_id: WI-704",
+                        "  pr_id: PR-704",
+                        "  state: approval_pending",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            approval_path = artifacts / "approval-request.yaml"
+            missing_evidence = artifacts / "evidence-bundle.yaml"
+            approval_path.write_text(
+                "\n".join(
+                    [
+                        "approval_request:",
+                        "  id: APR-RUN-704",
+                        f"  evidence_bundle: {missing_evidence.as_posix()}",
+                        "  readiness_context:",
+                        "    readiness_summary: attention-needed",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-approval", "--root", str(root), "--run-id", "RUN-704"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- approval_request_exists: True", output)
+            self.assertIn(f"- evidence_bundle_path: {missing_evidence.as_posix()}", output)
+            self.assertIn("- evidence_bundle_exists: False", output)
+            self.assertIn("- readiness_summary: attention-needed", output)
+            self.assertIn("evidence bundle artifact missing:", output)
+
+    def test_inspect_approval_latest_degrades_safely_when_no_latest_run_exists(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-approval", "--root", str(root), "--latest"])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                stdout.getvalue(),
+                "\n".join(
+                    [
+                        "Approval Inspection:",
+                        "- run_id: none",
+                        "- run_path: none",
+                        "- run_exists: False",
+                        "- run_state: none",
+                        "- approval_request_path: none",
+                        "- approval_request_exists: False",
+                        "- approval_request_status: none",
+                        "- evidence_bundle_path: none",
+                        "- evidence_bundle_exists: False",
+                        "- readiness_summary: none",
+                        "- degraded_note: no latest run found under runs/latest/*/run.yaml",
+                    ]
+                )
+                + "\n",
+            )
+
+    def test_inspect_approval_degrades_safely_for_unreadable_or_partial_artifacts(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "runs" / "latest" / "RUN-705"
+            artifacts = run_dir / "artifacts"
+            artifacts.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text("run: [\n", encoding="utf-8")
+            approval_path = artifacts / "approval-request.yaml"
+            approval_path.write_text("approval_request:\n  id: APR-RUN-705\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-approval", "--root", str(root), "--run-id", "RUN-705"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- run_exists: True", output)
+            self.assertIn("- run_state: none", output)
+            self.assertIn("- approval_request_exists: True", output)
+            self.assertIn("- evidence_bundle_exists: False", output)
+            self.assertIn("run artifact unreadable:", output)
+            self.assertIn("approval request missing evidence bundle path", output)
+            self.assertIn("approval request missing readiness_context summary", output)
+
     def test_status_handles_missing_active_pr_run_and_approval(self) -> None:
         from pathlib import Path
 
