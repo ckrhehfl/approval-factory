@@ -347,6 +347,35 @@ def _read_approval_summary(root_dir: Path, run_id: str | None) -> dict[str, str]
     return {"status": "none"}
 
 
+def _approval_queue_run_id(queue_item: Path) -> str:
+    match = re.fullmatch(r"APR-(.+?)(?:--r\d+)?\.yaml", queue_item.name)
+    if not match:
+        return queue_item.stem.removeprefix("APR-")
+    return match.group(1)
+
+
+def _read_approval_queue_visibility(root_dir: Path, latest_run_id: str | None) -> dict[str, Any]:
+    pending_items = sorted((root_dir / "approval_queue" / "pending").glob("APR-*.yaml"))
+    stale_items: list[Path] = []
+    latest_run_has_pending = False
+
+    for pending_item in pending_items:
+        queue_run_id = _approval_queue_run_id(pending_item)
+        if latest_run_id and queue_run_id == latest_run_id:
+            latest_run_has_pending = True
+            continue
+        stale_items.append(pending_item)
+
+    return {
+        "pending_total": len(pending_items),
+        "latest_run_id": latest_run_id,
+        "latest_run_has_pending": latest_run_has_pending if latest_run_id else "unavailable",
+        "stale_pending_count": len(stale_items),
+        "stale_pending_run_ids": [_approval_queue_run_id(path) for path in stale_items],
+        "stale_pending_paths": [path.as_posix() for path in stale_items],
+    }
+
+
 def _read_open_clarifications(root_dir: Path) -> list[str]:
     clarifications: list[str] = []
     for clarification_path in sorted((root_dir / "clarifications").glob("*/*.md")):
@@ -598,6 +627,7 @@ def cleanup_rehearsal_artifacts(*, root_dir: Path, apply: bool = False, include_
 def get_factory_status(root_dir: Path) -> dict[str, Any]:
     active_pr = _read_active_pr_summary(root_dir)
     latest_run = _latest_run_summary(root_dir)
+    latest_run_id = latest_run["run_id"] if latest_run else None
     active_pr_readiness: dict[str, Any] | None = None
     if isinstance(active_pr, dict):
         work_item_id = str(active_pr.get("work_item_id", "")).strip()
@@ -618,7 +648,8 @@ def get_factory_status(root_dir: Path) -> dict[str, Any]:
         "active_pr": active_pr,
         "active_pr_readiness": active_pr_readiness,
         "latest_run": latest_run,
-        "approval": _read_approval_summary(root_dir, latest_run["run_id"] if latest_run else None),
+        "approval": _read_approval_summary(root_dir, latest_run_id),
+        "approval_queue": _read_approval_queue_visibility(root_dir, latest_run_id),
         "open_clarifications": _read_open_clarifications(root_dir),
     }
 
