@@ -17,6 +17,7 @@ from orchestrator.pipeline import (
     evaluate_gates,
     get_factory_status,
     get_work_item_readiness,
+    inspect_approval,
     inspect_approval_queue,
     record_docs_sync,
     record_qa,
@@ -129,6 +130,22 @@ def _render_approval_queue_inspection(inspection: dict[str, object]) -> str:
         lines.append(f"  matching_run_state: {item.get('matching_run_state') or 'none'}")
         lines.append(f"  readiness_context: {item['readiness_context_presence']}")
         lines.append(f"  note: {item.get('note') or 'none'}")
+    return "\n".join(lines)
+
+
+def _render_approval_inspection(inspection: dict[str, object]) -> str:
+    lines = ["Approval Inspection:"]
+    lines.append(f"- run_id: {inspection.get('run_id') or 'none'}")
+    lines.append(f"- run_path: {inspection.get('run_path') or 'none'}")
+    lines.append(f"- run_exists: {inspection['run_exists']}")
+    lines.append(f"- run_state: {inspection.get('run_state') or 'none'}")
+    lines.append(f"- approval_request_path: {inspection.get('approval_request_path') or 'none'}")
+    lines.append(f"- approval_request_exists: {inspection['approval_request_exists']}")
+    lines.append(f"- approval_request_status: {inspection.get('approval_request_status') or 'none'}")
+    lines.append(f"- evidence_bundle_path: {inspection.get('evidence_bundle_path') or 'none'}")
+    lines.append(f"- evidence_bundle_exists: {inspection['evidence_bundle_exists']}")
+    lines.append(f"- readiness_summary: {inspection.get('readiness_summary') or 'none'}")
+    lines.append(f"- degraded_note: {inspection.get('degraded_note') or 'none'}")
     return "\n".join(lines)
 
 
@@ -306,6 +323,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     inspect_approval_queue_parser.add_argument("--root", default=".", help="Repository root path")
 
+    inspect_approval_parser = subparsers.add_parser(
+        "inspect-approval",
+        help="Inspect approval package artifacts in visibility-only mode",
+    )
+    inspect_approval_parser.add_argument("--root", default=".", help="Repository root path")
+    _add_run_selector_arguments(inspect_approval_parser)
+
     bootstrap_parser = subparsers.add_parser("bootstrap-run", help="Create baseline run artifacts")
     bootstrap_parser.add_argument("--root", default=".", help="Repository root path")
     bootstrap_parser.add_argument("--run-id", default=_default_run_id())
@@ -451,6 +475,18 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "inspect-approval-queue":
         print(_render_approval_queue_inspection(inspect_approval_queue(root_dir=Path(args.root))))
+        return 0
+
+    if args.command == "inspect-approval":
+        run_id = str(args.run_id) if getattr(args, "run_id", None) else None
+        if getattr(args, "latest", False):
+            try:
+                run_id = resolve_latest_run_id(root_dir=Path(args.root))
+            except ValueError:
+                run_id = None
+        elif run_id is None:
+            parser.error("inspect-approval requires either --run-id <id> or --latest")
+        print(_render_approval_inspection(inspect_approval(root_dir=Path(args.root), run_id=run_id)))
         return 0
 
     if args.command == "bootstrap-run":

@@ -394,6 +394,16 @@ def _safe_read_approval_queue_item(queue_item: Path) -> tuple[dict[str, Any] | N
     return payload, None
 
 
+def _safe_read_mapping(path: Path, *, label: str) -> tuple[dict[str, Any] | None, str | None]:
+    try:
+        payload = read_yaml(path)
+    except Exception as exc:  # pragma: no cover - defensive visibility fallback
+        return None, f"{label} unreadable: {exc}"
+    if not isinstance(payload, dict):
+        return None, f"{label} payload is not a mapping"
+    return payload, None
+
+
 def inspect_approval_queue(root_dir: Path) -> dict[str, Any]:
     latest_run = _latest_run_summary(root_dir)
     latest_run_id = latest_run["run_id"] if latest_run else None
@@ -449,6 +459,90 @@ def inspect_approval_queue(root_dir: Path) -> dict[str, Any]:
         "latest_run_path": latest_run.get("path") if latest_run else None,
         "pending_total": len(pending_items),
         "items": items,
+    }
+
+
+def inspect_approval(*, root_dir: Path, run_id: str | None) -> dict[str, Any]:
+    approval_path = _artifact_path(root_dir, run_id, "approval-request.yaml") if run_id else None
+    evidence_path: Path | None = None
+    run_path = _run_root(root_dir, run_id) / "run.yaml" if run_id else None
+
+    notes: list[str] = []
+    run_state: str | None = None
+    approval_request_status: str | None = None
+    readiness_summary: str | None = None
+
+    run_exists = bool(run_path and run_path.exists())
+    approval_exists = bool(approval_path and approval_path.exists())
+
+    if run_id is None:
+        notes.append("no latest run found under runs/latest/*/run.yaml")
+
+    if run_path is not None:
+        if run_exists:
+            run_payload, run_note = _safe_read_mapping(run_path, label="run artifact")
+            if run_note:
+                notes.append(run_note)
+            run = run_payload.get("run", {}) if isinstance(run_payload, dict) else {}
+            if isinstance(run, dict) and run:
+                run_state = str(run.get("state", "unknown"))
+            elif run_exists:
+                notes.append("run artifact missing run mapping")
+        else:
+            notes.append(f"run artifact missing: {run_path.as_posix()}")
+
+    if approval_path is not None:
+        if approval_exists:
+            approval_payload, approval_note = _safe_read_mapping(approval_path, label="approval request artifact")
+            if approval_note:
+                notes.append(approval_note)
+            approval_request = approval_payload.get("approval_request", {}) if isinstance(approval_payload, dict) else {}
+            if isinstance(approval_request, dict) and approval_request:
+                status = approval_request.get("status")
+                if status is not None:
+                    approval_request_status = str(status)
+                evidence_raw = approval_request.get("evidence_bundle")
+                if isinstance(evidence_raw, str) and evidence_raw.strip():
+                    evidence_path = Path(evidence_raw)
+                else:
+                    notes.append("approval request missing evidence bundle path")
+                readiness_context = approval_request.get("readiness_context", {})
+                if isinstance(readiness_context, dict) and readiness_context:
+                    if "readiness_summary" in readiness_context:
+                        readiness_summary = str(readiness_context.get("readiness_summary"))
+                    elif "status" in readiness_context:
+                        readiness_summary = str(readiness_context.get("status"))
+                elif approval_exists:
+                    notes.append("approval request missing readiness_context summary")
+            elif approval_exists:
+                notes.append("approval request artifact missing approval_request mapping")
+        else:
+            notes.append(f"approval request artifact missing: {approval_path.as_posix()}")
+
+    if evidence_path is None and run_id is not None:
+        evidence_path = _artifact_path(root_dir, run_id, "evidence-bundle.yaml")
+
+    evidence_exists = bool(evidence_path and evidence_path.exists())
+    if evidence_path is not None:
+        if evidence_exists:
+            _, evidence_note = _safe_read_mapping(evidence_path, label="evidence bundle artifact")
+            if evidence_note:
+                notes.append(evidence_note)
+        else:
+            notes.append(f"evidence bundle artifact missing: {evidence_path.as_posix()}")
+
+    return {
+        "run_id": run_id,
+        "run_path": run_path.as_posix() if run_path is not None else None,
+        "run_exists": run_exists,
+        "run_state": run_state,
+        "approval_request_path": approval_path.as_posix() if approval_path is not None else None,
+        "approval_request_exists": approval_exists,
+        "approval_request_status": approval_request_status,
+        "evidence_bundle_path": evidence_path.as_posix() if evidence_path is not None else None,
+        "evidence_bundle_exists": evidence_exists,
+        "readiness_summary": readiness_summary,
+        "degraded_note": "; ".join(notes) if notes else None,
     }
 
 
