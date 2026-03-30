@@ -17,6 +17,7 @@ from orchestrator.pipeline import (
     evaluate_gates,
     get_factory_status,
     get_work_item_readiness,
+    inspect_approval_queue,
     record_docs_sync,
     record_qa,
     record_review,
@@ -102,6 +103,32 @@ def _render_status(status: dict[str, object]) -> str:
         for clarification_id in open_clarifications:
             lines.append(f"- clarification_id: {clarification_id}")
 
+    return "\n".join(lines)
+
+
+def _render_approval_queue_inspection(inspection: dict[str, object]) -> str:
+    lines = ["Approval Queue Inspection:"]
+    lines.append(f"- latest_run_id: {inspection.get('latest_run_id') or 'none'}")
+    lines.append(f"- pending_total: {inspection['pending_total']}")
+
+    lines.append("")
+    lines.append("Pending Approvals:")
+    items = inspection.get("items")
+    if not isinstance(items, list) or not items:
+        lines.append("- none")
+        return "\n".join(lines)
+
+    for index, item in enumerate(items, start=1):
+        if not isinstance(item, dict):
+            continue
+        lines.append(f"- item: {index}")
+        lines.append(f"  path: {item['path']}")
+        lines.append(f"  parsed_run_id: {item.get('parsed_run_id') or 'unparseable'}")
+        lines.append(f"  latest_relation: {item['latest_relation']}")
+        lines.append(f"  matching_run_path: {item.get('matching_run_path') or 'none'}")
+        lines.append(f"  matching_run_state: {item.get('matching_run_state') or 'none'}")
+        lines.append(f"  readiness_context: {item['readiness_context_presence']}")
+        lines.append(f"  note: {item.get('note') or 'none'}")
     return "\n".join(lines)
 
 
@@ -273,6 +300,12 @@ def build_parser() -> argparse.ArgumentParser:
     status_parser = subparsers.add_parser("status", help="Show current repo-local system status")
     status_parser.add_argument("--root", default=".", help="Repository root path")
 
+    inspect_approval_queue_parser = subparsers.add_parser(
+        "inspect-approval-queue",
+        help="Inspect pending approval queue entries without changing approval semantics",
+    )
+    inspect_approval_queue_parser.add_argument("--root", default=".", help="Repository root path")
+
     bootstrap_parser = subparsers.add_parser("bootstrap-run", help="Create baseline run artifacts")
     bootstrap_parser.add_argument("--root", default=".", help="Repository root path")
     bootstrap_parser.add_argument("--run-id", default=_default_run_id())
@@ -414,6 +447,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "status":
         print(_render_status(get_factory_status(root_dir=Path(args.root))))
+        return 0
+
+    if args.command == "inspect-approval-queue":
+        print(_render_approval_queue_inspection(inspect_approval_queue(root_dir=Path(args.root))))
         return 0
 
     if args.command == "bootstrap-run":

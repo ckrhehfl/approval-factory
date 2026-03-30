@@ -376,6 +376,82 @@ def _read_approval_queue_visibility(root_dir: Path, latest_run_id: str | None) -
     }
 
 
+def _parse_pending_approval_run_id(queue_item: Path) -> str | None:
+    match = re.fullmatch(r"APR-([A-Za-z0-9][A-Za-z0-9-]*)(?:--r\d+)?\.yaml", queue_item.name)
+    if match is None:
+        return None
+    run_id = match.group(1).strip()
+    return run_id or None
+
+
+def _safe_read_approval_queue_item(queue_item: Path) -> tuple[dict[str, Any] | None, str | None]:
+    try:
+        payload = read_yaml(queue_item)
+    except Exception as exc:  # pragma: no cover - defensive visibility fallback
+        return None, f"queue item unreadable: {exc}"
+    if not isinstance(payload, dict):
+        return None, "queue item payload is not a mapping"
+    return payload, None
+
+
+def inspect_approval_queue(root_dir: Path) -> dict[str, Any]:
+    latest_run = _latest_run_summary(root_dir)
+    latest_run_id = latest_run["run_id"] if latest_run else None
+    pending_items = sorted((root_dir / "approval_queue" / "pending").glob("APR-*.yaml"))
+    items: list[dict[str, Any]] = []
+
+    for pending_item in pending_items:
+        parsed_run_id = _parse_pending_approval_run_id(pending_item)
+        relation = "unparseable"
+        if parsed_run_id is not None:
+            relation = "no-latest-run" if latest_run_id is None else ("latest" if parsed_run_id == latest_run_id else "stale")
+
+        payload, payload_note = _safe_read_approval_queue_item(pending_item)
+        approval_request = payload.get("approval_request", {}) if isinstance(payload, dict) else {}
+        readiness_context = approval_request.get("readiness_context", {}) if isinstance(approval_request, dict) else {}
+        readiness_presence = "present" if isinstance(readiness_context, dict) and readiness_context else "absent"
+
+        matching_run_path: str | None = None
+        matching_run_state: str | None = None
+        note_parts: list[str] = []
+        if payload_note:
+            note_parts.append(payload_note)
+
+        if parsed_run_id is None:
+            note_parts.append("could not parse run_id from pending approval filename")
+        else:
+            run_path = _run_root(root_dir, parsed_run_id) / "run.yaml"
+            if run_path.exists():
+                matching_run_path = run_path.as_posix()
+                try:
+                    run_payload = read_yaml(run_path).get("run", {})
+                except Exception as exc:  # pragma: no cover - defensive visibility fallback
+                    note_parts.append(f"matching run unreadable: {exc}")
+                else:
+                    matching_run_state = str(run_payload.get("state", "unknown"))
+            else:
+                note_parts.append(f"matching run missing from filesystem: {run_path.as_posix()}")
+
+        items.append(
+            {
+                "path": pending_item.as_posix(),
+                "parsed_run_id": parsed_run_id,
+                "latest_relation": relation,
+                "matching_run_path": matching_run_path,
+                "matching_run_state": matching_run_state,
+                "readiness_context_presence": readiness_presence,
+                "note": "; ".join(note_parts) if note_parts else None,
+            }
+        )
+
+    return {
+        "latest_run_id": latest_run_id,
+        "latest_run_path": latest_run.get("path") if latest_run else None,
+        "pending_total": len(pending_items),
+        "items": items,
+    }
+
+
 def _read_open_clarifications(root_dir: Path) -> list[str]:
     clarifications: list[str] = []
     for clarification_path in sorted((root_dir / "clarifications").glob("*/*.md")):

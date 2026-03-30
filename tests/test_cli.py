@@ -2382,6 +2382,237 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("- stale_pending_run_ids: RUN-OLD, RUN-OLD", output)
             self.assertIn(f"- stale_pending_path: {older.as_posix()}", output)
             self.assertIn(f"- stale_pending_path: {retried.as_posix()}", output)
+
+    def test_inspect_approval_queue_shows_none_when_pending_queue_is_empty(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-approval-queue", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                stdout.getvalue(),
+                "\n".join(
+                    [
+                        "Approval Queue Inspection:",
+                        "- latest_run_id: none",
+                        "- pending_total: 0",
+                        "",
+                        "Pending Approvals:",
+                        "- none",
+                    ]
+                )
+                + "\n",
+            )
+
+    def test_inspect_approval_queue_shows_one_pending_item_matching_latest_run(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "runs" / "latest" / "RUN-301"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-301",
+                        "  work_item_id: WI-301",
+                        "  pr_id: PR-301",
+                        "  state: approval_pending",
+                        "  created_at: '2026-03-29T03:00:00+00:00'",
+                        "  updated_at: '2026-03-29T03:00:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            pending = root / "approval_queue" / "pending"
+            pending.mkdir(parents=True, exist_ok=True)
+            queue_item = pending / "APR-RUN-301.yaml"
+            queue_item.write_text(
+                "\n".join(
+                    [
+                        "approval_request:",
+                        "  id: APR-RUN-301",
+                        "  readiness_context:",
+                        "    status: available",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-approval-queue", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Approval Queue Inspection:", output)
+            self.assertIn("- latest_run_id: RUN-301", output)
+            self.assertIn("- pending_total: 1", output)
+            self.assertIn("- item: 1", output)
+            self.assertIn(f"  path: {queue_item.as_posix()}", output)
+            self.assertIn("  parsed_run_id: RUN-301", output)
+            self.assertIn("  latest_relation: latest", output)
+            self.assertIn(f"  matching_run_path: {(run_dir / 'run.yaml').as_posix()}", output)
+            self.assertIn("  matching_run_state: approval_pending", output)
+            self.assertIn("  readiness_context: present", output)
+            self.assertIn("  note: none", output)
+
+    def test_inspect_approval_queue_shows_latest_and_stale_pending_items(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            latest_dir = root / "runs" / "latest" / "RUN-410"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            (latest_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-410",
+                        "  work_item_id: WI-410",
+                        "  pr_id: PR-410",
+                        "  state: approval_pending",
+                        "  created_at: '2026-03-29T04:10:00+00:00'",
+                        "  updated_at: '2026-03-29T04:10:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            stale_dir = root / "runs" / "latest" / "RUN-405"
+            stale_dir.mkdir(parents=True, exist_ok=True)
+            (stale_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-405",
+                        "  work_item_id: WI-405",
+                        "  pr_id: PR-405",
+                        "  state: in_progress",
+                        "  created_at: '2026-03-29T04:05:00+00:00'",
+                        "  updated_at: '2026-03-29T04:05:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            pending = root / "approval_queue" / "pending"
+            pending.mkdir(parents=True, exist_ok=True)
+            (pending / "APR-RUN-410.yaml").write_text("approval_request:\n  id: APR-RUN-410\n", encoding="utf-8")
+            stale_item = pending / "APR-RUN-405.yaml"
+            stale_item.write_text("approval_request:\n  id: APR-RUN-405\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-approval-queue", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- latest_run_id: RUN-410", output)
+            self.assertIn("- pending_total: 2", output)
+            self.assertIn("  latest_relation: latest", output)
+            self.assertIn(f"  path: {stale_item.as_posix()}", output)
+            self.assertIn("  parsed_run_id: RUN-405", output)
+            self.assertIn("  latest_relation: stale", output)
+            self.assertIn(f"  matching_run_path: {(stale_dir / 'run.yaml').as_posix()}", output)
+            self.assertIn("  matching_run_state: in_progress", output)
+            self.assertIn("  readiness_context: absent", output)
+
+    def test_inspect_approval_queue_reports_no_latest_run_when_pending_items_exist(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pending = root / "approval_queue" / "pending"
+            pending.mkdir(parents=True, exist_ok=True)
+            queue_item = pending / "APR-RUN-501.yaml"
+            queue_item.write_text("approval_request:\n  id: APR-RUN-501\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-approval-queue", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- latest_run_id: none", output)
+            self.assertIn(f"  path: {queue_item.as_posix()}", output)
+            self.assertIn("  parsed_run_id: RUN-501", output)
+            self.assertIn("  latest_relation: no-latest-run", output)
+            self.assertIn("  matching_run_path: none", output)
+            self.assertIn("  matching_run_state: none", output)
+            self.assertIn("matching run missing from filesystem", output)
+
+    def test_inspect_approval_queue_degrades_safely_for_unparseable_run_id(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pending = root / "approval_queue" / "pending"
+            pending.mkdir(parents=True, exist_ok=True)
+            queue_item = pending / "APR---r2.yaml"
+            queue_item.write_text("approval_request:\n  id: APR-UNKNOWN\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-approval-queue", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn(f"  path: {queue_item.as_posix()}", output)
+            self.assertIn("  parsed_run_id: unparseable", output)
+            self.assertIn("  latest_relation: unparseable", output)
+            self.assertIn("  matching_run_path: none", output)
+            self.assertIn("  matching_run_state: none", output)
+            self.assertIn("could not parse run_id from pending approval filename", output)
+
+    def test_inspect_approval_queue_degrades_safely_when_matching_run_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            latest_dir = root / "runs" / "latest" / "RUN-601"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            (latest_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-601",
+                        "  work_item_id: WI-601",
+                        "  pr_id: PR-601",
+                        "  state: approval_pending",
+                        "  created_at: '2026-03-29T06:01:00+00:00'",
+                        "  updated_at: '2026-03-29T06:01:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            pending = root / "approval_queue" / "pending"
+            pending.mkdir(parents=True, exist_ok=True)
+            queue_item = pending / "APR-RUN-600.yaml"
+            queue_item.write_text("approval_request:\n  id: APR-RUN-600\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-approval-queue", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn(f"  path: {queue_item.as_posix()}", output)
+            self.assertIn("  parsed_run_id: RUN-600", output)
+            self.assertIn("  latest_relation: stale", output)
+            self.assertIn("  matching_run_path: none", output)
+            self.assertIn("  matching_run_state: none", output)
+            self.assertIn("matching run missing from filesystem", output)
+
     def test_status_handles_missing_active_pr_run_and_approval(self) -> None:
         from pathlib import Path
 
