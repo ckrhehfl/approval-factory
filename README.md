@@ -149,6 +149,13 @@ approval queue visibility 규칙:
 - latest run과 일치하지 않는 pending queue item은 stale/non-latest visibility artifact로만 보고하며 자동 정리/숨김/해결하지 않는다.
 - latest run이 없으면 새 gate 의미를 만들지 않고 queue visibility만 안전하게 출력한다.
 
+`inspect-approval-queue` 최소 계약:
+- `factory inspect-approval-queue`는 `approval_queue/pending/APR-*.yaml`를 item 단위로 읽기 전용 inspection 출력한다.
+- latest run 선택 규칙은 `factory status`와 동일하다.
+- 항목별로 queue item path, 가능한 경우 parsed `run_id`, latest relation(`latest|stale|no-latest-run|unparseable`), matching run path/state, readiness context presence, degraded note를 보여준다.
+- stale/non-latest queue entry는 inspection output only이며 자동 blocker, cleanup, resolve 대상으로 승격하지 않는다.
+- matching run이나 source artifact가 없거나 읽기 제한이 있어도 semantics를 바꾸지 않고 degraded note로만 보여준다.
+
 operator 해석 규칙:
 - `create-pr-plan` 결과가 `archive`면 버그가 아니라 이미 다른 active PR가 있다는 뜻이다.
 - `activate-pr`는 semantics를 바꾸지 않고 active/archive 위치만 명시적으로 전환한다.
