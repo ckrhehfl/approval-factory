@@ -77,6 +77,24 @@ def _render_status(status: dict[str, object]) -> str:
     if isinstance(approval, dict) and approval.get("path"):
         lines.append(f"- path: {approval['path']}")
 
+    lines.append("")
+    lines.append("Approval Queue:")
+    approval_queue = status["approval_queue"]
+    lines.append(f"- pending_total: {approval_queue['pending_total']}")
+    lines.append(f"- latest_run_has_pending: {approval_queue['latest_run_has_pending']}")
+    lines.append(f"- stale_pending_count: {approval_queue['stale_pending_count']}")
+    stale_run_ids = approval_queue.get("stale_pending_run_ids") or []
+    if stale_run_ids:
+        lines.append(f"- stale_pending_run_ids: {', '.join(stale_run_ids)}")
+    else:
+        lines.append("- stale_pending_run_ids: none")
+    stale_paths = approval_queue.get("stale_pending_paths") or []
+    if stale_paths:
+        for stale_path in stale_paths:
+            lines.append(f"- stale_pending_path: {stale_path}")
+    else:
+        lines.append("- stale_pending_path: none")
+
     open_clarifications = status["open_clarifications"]
     if isinstance(open_clarifications, list) and open_clarifications:
         lines.append("")

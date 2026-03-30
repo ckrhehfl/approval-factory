@@ -135,8 +135,19 @@ approval artifact readiness visibility:
 - Work Item Readiness: active PR 기준 `summary`, `linked_clarifications`, 또는 제한적 unavailable reason
 - Latest Run: `run_id`, `state`, 가능하면 run path
 - Approval: `status` (`pending`, `approved`, `none`), 가능하면 관련 queue 또는 artifact path
+- Approval Queue: visibility only summary from `approval_queue/pending/APR-*.yaml`
+  - `pending_total`
+  - `latest_run_has_pending` (`True|False`, latest run이 없으면 `unavailable`)
+  - `stale_pending_count`
+  - `stale_pending_run_ids` 및 `stale_pending_path`
 - Open Clarifications: 열려 있는 clarification count와 `clarification_id`
 - `resolve-clarification`로 `resolved`, `deferred`, `escalated` 된 항목은 open clarification 목록에서 제외된다.
+
+approval queue visibility 규칙:
+- `Approval:` semantics는 그대로 유지하고, 새 `Approval Queue:` 섹션은 filesystem inspection 결과만 추가로 보여준다.
+- latest run selector, readiness semantics, queue placement, `build-approval`, `resolve-approval` 동작은 바꾸지 않는다.
+- latest run과 일치하지 않는 pending queue item은 stale/non-latest visibility artifact로만 보고하며 자동 정리/숨김/해결하지 않는다.
+- latest run이 없으면 새 gate 의미를 만들지 않고 queue visibility만 안전하게 출력한다.
 
 operator 해석 규칙:
 - `create-pr-plan` 결과가 `archive`면 버그가 아니라 이미 다른 active PR가 있다는 뜻이다.

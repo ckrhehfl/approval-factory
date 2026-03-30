@@ -446,6 +446,13 @@ class ResolveClarificationCliTest(unittest.TestCase):
                         "",
                         "Approval:",
                         "- status: none",
+                        "",
+                        "Approval Queue:",
+                        "- pending_total: 0",
+                        "- latest_run_has_pending: unavailable",
+                        "- stale_pending_count: 0",
+                        "- stale_pending_run_ids: none",
+                        "- stale_pending_path: none",
                     ]
                 )
                 + "\n",
@@ -1604,6 +1611,13 @@ class StatusCliTest(unittest.TestCase):
                         "- status: pending",
                         f"- path: {(root / 'approval_queue' / 'pending' / 'APR-RUN-013.yaml').as_posix()}",
                         "",
+                        "Approval Queue:",
+                        "- pending_total: 1",
+                        "- latest_run_has_pending: True",
+                        "- stale_pending_count: 0",
+                        "- stale_pending_run_ids: none",
+                        "- stale_pending_path: none",
+                        "",
                         "Open Clarifications (1):",
                         "- clarification_id: CLAR-001",
                     ]
@@ -1634,6 +1648,13 @@ class StatusCliTest(unittest.TestCase):
                         "",
                         "Approval:",
                         "- status: none",
+                        "",
+                        "Approval Queue:",
+                        "- pending_total: 0",
+                        "- latest_run_has_pending: unavailable",
+                        "- stale_pending_count: 0",
+                        "- stale_pending_run_ids: none",
+                        "- stale_pending_path: none",
                     ]
                 )
                 + "\n",
@@ -2199,6 +2220,13 @@ class CleanupRehearsalCliTest(unittest.TestCase):
                         "",
                         "Approval:",
                         "- status: none",
+                        "",
+                        "Approval Queue:",
+                        "- pending_total: 0",
+                        "- latest_run_has_pending: False",
+                        "- stale_pending_count: 0",
+                        "- stale_pending_run_ids: none",
+                        "- stale_pending_path: none",
                     ]
                 )
                 + "\n",
@@ -2232,10 +2260,128 @@ class CleanupRehearsalCliTest(unittest.TestCase):
                         "",
                         "Approval:",
                         "- status: none",
+                        "",
+                        "Approval Queue:",
+                        "- pending_total: 0",
+                        "- latest_run_has_pending: False",
+                        "- stale_pending_count: 0",
+                        "- stale_pending_run_ids: none",
+                        "- stale_pending_path: none",
                     ]
                 )
                 + "\n",
             )
+
+    def test_status_shows_approval_queue_visibility_when_latest_run_has_only_matching_pending_item(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "runs" / "latest" / "RUN-101").mkdir(parents=True, exist_ok=True)
+            (root / "runs" / "latest" / "RUN-101" / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-101",
+                        "  work_item_id: WI-101",
+                        "  pr_id: PR-101",
+                        "  state: approval_pending",
+                        "  created_at: '2026-03-29T01:00:00+00:00'",
+                        "  updated_at: '2026-03-29T01:00:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (root / "approval_queue" / "pending").mkdir(parents=True, exist_ok=True)
+            (root / "approval_queue" / "pending" / "APR-RUN-101.yaml").write_text(
+                "approval_request:\n  id: APR-RUN-101\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Approval Queue:", output)
+            self.assertIn("- pending_total: 1", output)
+            self.assertIn("- latest_run_has_pending: True", output)
+            self.assertIn("- stale_pending_count: 0", output)
+            self.assertIn("- stale_pending_run_ids: none", output)
+            self.assertIn("- stale_pending_path: none", output)
+            self.assertIn("Latest Run:\n- run_id: RUN-101", output)
+            self.assertIn("Approval:\n- status: pending", output)
+
+    def test_status_shows_stale_pending_visibility_without_changing_latest_approval_semantics(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "runs" / "latest" / "RUN-200").mkdir(parents=True, exist_ok=True)
+            (root / "runs" / "latest" / "RUN-200" / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-200",
+                        "  work_item_id: WI-200",
+                        "  pr_id: PR-200",
+                        "  state: approval_pending",
+                        "  created_at: '2026-03-29T02:00:00+00:00'",
+                        "  updated_at: '2026-03-29T02:00:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (root / "approval_queue" / "pending").mkdir(parents=True, exist_ok=True)
+            matching = root / "approval_queue" / "pending" / "APR-RUN-200.yaml"
+            stale = root / "approval_queue" / "pending" / "APR-RUN-150.yaml"
+            matching.write_text("approval_request:\n  id: APR-RUN-200\n", encoding="utf-8")
+            stale.write_text("approval_request:\n  id: APR-RUN-150\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- status: pending", output)
+            self.assertIn(f"- path: {matching.as_posix()}", output)
+            self.assertIn("Approval Queue:", output)
+            self.assertIn("- pending_total: 2", output)
+            self.assertIn("- latest_run_has_pending: True", output)
+            self.assertIn("- stale_pending_count: 1", output)
+            self.assertIn("- stale_pending_run_ids: RUN-150", output)
+            self.assertIn(f"- stale_pending_path: {stale.as_posix()}", output)
+
+    def test_status_reports_pending_queue_visibility_when_latest_run_is_absent(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "approval_queue" / "pending").mkdir(parents=True, exist_ok=True)
+            older = root / "approval_queue" / "pending" / "APR-RUN-OLD.yaml"
+            retried = root / "approval_queue" / "pending" / "APR-RUN-OLD--r2.yaml"
+            older.write_text("approval_request:\n  id: APR-RUN-OLD\n", encoding="utf-8")
+            retried.write_text("approval_request:\n  id: APR-RUN-OLD\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Latest Run:\n- none", output)
+            self.assertIn("Approval:\n- status: none", output)
+            self.assertIn("Approval Queue:", output)
+            self.assertIn("- pending_total: 2", output)
+            self.assertIn("- latest_run_has_pending: unavailable", output)
+            self.assertIn("- stale_pending_count: 2", output)
+            self.assertIn("- stale_pending_run_ids: RUN-OLD, RUN-OLD", output)
+            self.assertIn(f"- stale_pending_path: {older.as_posix()}", output)
+            self.assertIn(f"- stale_pending_path: {retried.as_posix()}", output)
     def test_status_handles_missing_active_pr_run_and_approval(self) -> None:
         from pathlib import Path
 
@@ -2259,6 +2405,13 @@ class CleanupRehearsalCliTest(unittest.TestCase):
                         "",
                         "Approval:",
                         "- status: none",
+                        "",
+                        "Approval Queue:",
+                        "- pending_total: 0",
+                        "- latest_run_has_pending: unavailable",
+                        "- stale_pending_count: 0",
+                        "- stale_pending_run_ids: none",
+                        "- stale_pending_path: none",
                     ]
                 )
                 + "\n",
