@@ -2863,6 +2863,249 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("approval request missing evidence bundle path", output)
             self.assertIn("approval request missing readiness_context summary", output)
 
+    def test_inspect_run_latest_successfully(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            active_pr = root / "prs" / "active" / "PR-801.md"
+            active_pr.parent.mkdir(parents=True, exist_ok=True)
+            active_pr.write_text(
+                "# PR-801\n\n## PR ID\nPR-801\n\n## Work Item ID\nWI-801\n\n## Title\ninspect run\n",
+                encoding="utf-8",
+            )
+            run_dir = root / "runs" / "latest" / "RUN-801"
+            artifacts = run_dir / "artifacts"
+            artifacts.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-801",
+                        "  work_item_id: WI-801",
+                        "  pr_id: PR-801",
+                        "  state: approval_pending",
+                        "  created_at: '2026-03-29T08:01:00+00:00'",
+                        "  updated_at: '2026-03-29T08:05:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (artifacts / "review-report.yaml").write_text("review_report:\n  status: pass\n", encoding="utf-8")
+            (artifacts / "qa-report.yaml").write_text("qa_report:\n  status: pass\n", encoding="utf-8")
+            (artifacts / "docs-sync-report.yaml").write_text("docs_sync_report:\n  status: complete\n", encoding="utf-8")
+            (artifacts / "verification-report.yaml").write_text(
+                "\n".join(
+                    [
+                        "verification_report:",
+                        "  lint: pass",
+                        "  tests: pass",
+                        "  type_check: pass",
+                        "  build: pass",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (artifacts / "gate-status.yaml").write_text("gate_status:\n  current_state: approval_pending\n", encoding="utf-8")
+            (artifacts / "approval-request.yaml").write_text("approval_request:\n  id: APR-RUN-801\n", encoding="utf-8")
+            (artifacts / "evidence-bundle.yaml").write_text("evidence_bundle:\n  status: complete\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-run", "--root", str(root), "--latest"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Run Inspection:", output)
+            self.assertIn("- run_id: RUN-801", output)
+            self.assertIn("- run_exists: True", output)
+            self.assertIn("- run_state: approval_pending", output)
+            self.assertIn("- latest_relation: latest", output)
+            self.assertIn("- active_pr_relation: linked-by-pr", output)
+            self.assertIn("- degraded_note: none", output)
+            self.assertIn("- artifact: review", output)
+            self.assertIn("  status: pass", output)
+            self.assertIn("- artifact: verification", output)
+            self.assertIn("  status: lint=pass,tests=pass,type_check=pass,build=pass", output)
+
+    def test_inspect_run_by_run_id_successfully(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            latest_run_dir = root / "runs" / "latest" / "RUN-810"
+            latest_run_dir.mkdir(parents=True, exist_ok=True)
+            (latest_run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-810",
+                        "  work_item_id: WI-810",
+                        "  pr_id: PR-810",
+                        "  state: approved",
+                        "  created_at: '2026-03-29T08:10:00+00:00'",
+                        "  updated_at: '2026-03-29T08:10:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            run_dir = root / "runs" / "latest" / "RUN-802"
+            artifacts = run_dir / "artifacts"
+            artifacts.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-802",
+                        "  work_item_id: WI-802",
+                        "  pr_id: PR-802",
+                        "  state: in_progress",
+                        "  created_at: '2026-03-29T08:02:00+00:00'",
+                        "  updated_at: '2026-03-29T08:02:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (artifacts / "review-report.yaml").write_text("review_report:\n  status: pending\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-run", "--root", str(root), "--run-id", "RUN-802"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- run_id: RUN-802", output)
+            self.assertIn("- run_state: in_progress", output)
+            self.assertIn("- latest_relation: non-latest", output)
+            self.assertIn("- artifact: review", output)
+            self.assertIn("  status: pending", output)
+
+    def test_inspect_run_degrades_safely_when_run_artifact_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            stdout = StringIO()
+
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-run", "--root", str(root), "--run-id", "RUN-803"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- run_id: RUN-803", output)
+            self.assertIn("- run_exists: False", output)
+            self.assertIn("- run_state: none", output)
+            self.assertIn("run artifact missing:", output)
+
+    def test_inspect_run_degrades_safely_when_run_related_artifacts_are_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "runs" / "latest" / "RUN-804"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-804",
+                        "  work_item_id: WI-804",
+                        "  pr_id: PR-804",
+                        "  state: in_progress",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-run", "--root", str(root), "--run-id", "RUN-804"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- artifact: review", output)
+            self.assertIn("review artifact missing:", output)
+            self.assertIn("qa artifact missing:", output)
+            self.assertIn("docs-sync artifact missing:", output)
+            self.assertIn("verification artifact missing:", output)
+            self.assertIn("gate-check artifact missing:", output)
+            self.assertIn("approval-request artifact missing:", output)
+            self.assertIn("evidence-bundle artifact missing:", output)
+
+    def test_inspect_run_latest_degrades_safely_when_no_latest_run_exists(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-run", "--root", str(root), "--latest"])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                stdout.getvalue(),
+                "\n".join(
+                    [
+                        "Run Inspection:",
+                        "- run_id: none",
+                        "- run_path: none",
+                        "- run_exists: False",
+                        "- run_state: none",
+                        "- latest_relation: no-latest-run",
+                        "- active_pr_relation: no-active-pr",
+                        "- degraded_note: no latest run found under runs/latest/*/run.yaml",
+                        "",
+                        "Artifacts:",
+                        "- none",
+                    ]
+                )
+                + "\n",
+            )
+
+    def test_inspect_run_degrades_safely_for_unreadable_or_partial_artifacts(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "runs" / "latest" / "RUN-805"
+            artifacts = run_dir / "artifacts"
+            artifacts.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text("run: [\n", encoding="utf-8")
+            (artifacts / "review-report.yaml").write_text("review_report:\n  pr_id: PR-805\n", encoding="utf-8")
+            (artifacts / "verification-report.yaml").write_text(
+                "\n".join(
+                    [
+                        "verification_report:",
+                        "  lint: weird",
+                        "  tests: pass",
+                        "  type_check: pass",
+                        "  build: pass",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (artifacts / "qa-report.yaml").write_text("qa_report: []\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-run", "--root", str(root), "--run-id", "RUN-805"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- run_exists: True", output)
+            self.assertIn("- run_state: none", output)
+            self.assertIn("run artifact unreadable:", output)
+            self.assertIn("review artifact missing review status", output)
+            self.assertIn("qa artifact missing qa_report mapping", output)
+            self.assertIn("verification artifact invalid:", output)
+
     def test_status_handles_missing_active_pr_run_and_approval(self) -> None:
         from pathlib import Path
 

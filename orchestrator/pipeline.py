@@ -31,6 +31,16 @@ ARTIFACT_FILENAMES = (
     "gate-status.yaml",
 )
 
+RUN_INSPECTION_ARTIFACTS: tuple[tuple[str, str], ...] = (
+    ("review", "review-report.yaml"),
+    ("qa", "qa-report.yaml"),
+    ("docs-sync", "docs-sync-report.yaml"),
+    ("verification", "verification-report.yaml"),
+    ("gate-check", "gate-status.yaml"),
+    ("approval-request", "approval-request.yaml"),
+    ("evidence-bundle", "evidence-bundle.yaml"),
+)
+
 PR_DOC_FILENAMES = (
     "scope.md",
     "plan.md",
@@ -542,6 +552,174 @@ def inspect_approval(*, root_dir: Path, run_id: str | None) -> dict[str, Any]:
         "evidence_bundle_path": evidence_path.as_posix() if evidence_path is not None else None,
         "evidence_bundle_exists": evidence_exists,
         "readiness_summary": readiness_summary,
+        "degraded_note": "; ".join(notes) if notes else None,
+    }
+
+
+def _inspect_run_artifact(*, root_dir: Path, run_id: str, artifact_name: str, filename: str) -> dict[str, Any]:
+    artifact_path = _artifact_path(root_dir, run_id, filename)
+    note_parts: list[str] = []
+    status: str | None = None
+    exists = artifact_path.exists()
+
+    if exists:
+        payload, payload_note = _safe_read_mapping(artifact_path, label=f"{artifact_name} artifact")
+        if payload_note:
+            note_parts.append(payload_note)
+
+        if artifact_name == "review":
+            review = payload.get("review_report", {}) if isinstance(payload, dict) else {}
+            if isinstance(review, dict) and review:
+                raw_status = review.get("status")
+                if raw_status is not None:
+                    status = str(raw_status)
+                else:
+                    note_parts.append("review artifact missing review status")
+            else:
+                note_parts.append("review artifact missing review_report mapping")
+        elif artifact_name == "qa":
+            qa = payload.get("qa_report", {}) if isinstance(payload, dict) else {}
+            if isinstance(qa, dict) and qa:
+                raw_status = qa.get("status")
+                if raw_status is not None:
+                    status = str(raw_status)
+                else:
+                    note_parts.append("qa artifact missing qa status")
+            else:
+                note_parts.append("qa artifact missing qa_report mapping")
+        elif artifact_name == "docs-sync":
+            docs_sync = payload.get("docs_sync_report", {}) if isinstance(payload, dict) else {}
+            if isinstance(docs_sync, dict) and docs_sync:
+                raw_status = docs_sync.get("status")
+                if raw_status is not None:
+                    status = str(raw_status)
+                else:
+                    note_parts.append("docs-sync artifact missing docs_sync status")
+            else:
+                note_parts.append("docs-sync artifact missing docs_sync_report mapping")
+        elif artifact_name == "verification":
+            verification = payload.get("verification_report", {}) if isinstance(payload, dict) else {}
+            if isinstance(verification, dict) and verification:
+                try:
+                    status = ",".join(
+                        [
+                            f"lint={_verification_status(verification.get('lint'))}",
+                            f"tests={_verification_status(verification.get('tests'))}",
+                            f"type_check={_verification_status(verification.get('type_check'))}",
+                            f"build={_verification_status(verification.get('build'))}",
+                        ]
+                    )
+                except ValueError as exc:
+                    note_parts.append(f"verification artifact invalid: {exc}")
+            else:
+                note_parts.append("verification artifact missing verification_report mapping")
+        elif artifact_name == "gate-check":
+            gate_status = payload.get("gate_status", {}) if isinstance(payload, dict) else {}
+            if isinstance(gate_status, dict) and gate_status:
+                raw_status = gate_status.get("current_state")
+                if raw_status is not None:
+                    status = str(raw_status)
+                else:
+                    note_parts.append("gate-check artifact missing current_state")
+            else:
+                note_parts.append("gate-check artifact missing gate_status mapping")
+        elif artifact_name == "approval-request":
+            approval_request = payload.get("approval_request", {}) if isinstance(payload, dict) else {}
+            if isinstance(approval_request, dict) and approval_request:
+                raw_status = approval_request.get("status")
+                if raw_status is not None:
+                    status = str(raw_status)
+                else:
+                    status = "none"
+            else:
+                note_parts.append("approval-request artifact missing approval_request mapping")
+        elif artifact_name == "evidence-bundle":
+            evidence_bundle = payload.get("evidence_bundle", {}) if isinstance(payload, dict) else {}
+            if isinstance(evidence_bundle, dict) and evidence_bundle:
+                raw_status = evidence_bundle.get("status")
+                if raw_status is not None:
+                    status = str(raw_status)
+                else:
+                    note_parts.append("evidence-bundle artifact missing evidence_bundle status")
+            else:
+                note_parts.append("evidence-bundle artifact missing evidence_bundle mapping")
+    else:
+        note_parts.append(f"{artifact_name} artifact missing: {artifact_path.as_posix()}")
+
+    return {
+        "artifact": artifact_name,
+        "path": artifact_path.as_posix(),
+        "exists": exists,
+        "status": status,
+        "note": "; ".join(note_parts) if note_parts else None,
+    }
+
+
+def inspect_run(*, root_dir: Path, run_id: str | None) -> dict[str, Any]:
+    notes: list[str] = []
+    latest_run_id: str | None = None
+    latest_relation = "unavailable"
+    try:
+        latest_run = _latest_run_summary(root_dir)
+    except Exception as exc:  # pragma: no cover - defensive visibility fallback
+        latest_run = None
+        notes.append(f"latest run relation unavailable: {exc}")
+    else:
+        latest_run_id = latest_run["run_id"] if latest_run else None
+        latest_relation = "no-latest-run" if latest_run_id is None else ("latest" if run_id == latest_run_id else "non-latest")
+
+    run_path = _run_root(root_dir, run_id) / "run.yaml" if run_id else None
+    run_exists = bool(run_path and run_path.exists())
+    run_state: str | None = None
+
+    if run_id is None:
+        notes.append("no latest run found under runs/latest/*/run.yaml")
+
+    run_payload: dict[str, Any] | None = None
+    if run_path is not None:
+        if run_exists:
+            run_payload, run_note = _safe_read_mapping(run_path, label="run artifact")
+            if run_note:
+                notes.append(run_note)
+            run = run_payload.get("run", {}) if isinstance(run_payload, dict) else {}
+            if isinstance(run, dict) and run:
+                run_state = str(run.get("state", "unknown"))
+            else:
+                notes.append("run artifact missing run mapping")
+        else:
+            notes.append(f"run artifact missing: {run_path.as_posix()}")
+
+    active_pr_relation = "unavailable"
+    active_pr = _read_active_pr_summary(root_dir)
+    if active_pr is None:
+        active_pr_relation = "no-active-pr"
+    elif run_payload is not None:
+        run = run_payload.get("run", {}) if isinstance(run_payload, dict) else {}
+        if isinstance(run, dict) and run:
+            run_pr_id = str(run.get("pr_id", "")).strip()
+            run_work_item_id = str(run.get("work_item_id", "")).strip()
+            active_pr_id = str(active_pr.get("pr_id", "")).strip()
+            active_work_item_id = str(active_pr.get("work_item_id", "")).strip()
+            if run_pr_id and active_pr_id and run_pr_id == active_pr_id:
+                active_pr_relation = "linked-by-pr"
+            elif run_work_item_id and active_work_item_id and run_work_item_id == active_work_item_id:
+                active_pr_relation = "linked-by-work-item"
+            else:
+                active_pr_relation = "unlinked"
+
+    artifacts = [_inspect_run_artifact(root_dir=root_dir, run_id=run_id, artifact_name=name, filename=filename) for name, filename in RUN_INSPECTION_ARTIFACTS] if run_id is not None else []
+    for artifact in artifacts:
+        if artifact.get("note"):
+            notes.append(str(artifact["note"]))
+
+    return {
+        "run_id": run_id,
+        "run_path": run_path.as_posix() if run_path is not None else None,
+        "run_exists": run_exists,
+        "run_state": run_state,
+        "latest_relation": latest_relation,
+        "active_pr_relation": active_pr_relation,
+        "artifacts": artifacts,
         "degraded_note": "; ".join(notes) if notes else None,
     }
 

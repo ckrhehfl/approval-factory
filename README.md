@@ -31,6 +31,9 @@
 
 - `bootstrap-run`
 - `status`
+- `inspect-approval-queue`
+- `inspect-approval`
+- `inspect-run`
 - `cleanup-rehearsal`
 - `start-execution`
 - `create-goal`
@@ -155,6 +158,13 @@ approval queue visibility 규칙:
 - 항목별로 queue item path, 가능한 경우 parsed `run_id`, latest relation(`latest|stale|no-latest-run|unparseable`), matching run path/state, readiness context presence, degraded note를 보여준다.
 - stale/non-latest queue entry는 inspection output only이며 자동 blocker, cleanup, resolve 대상으로 승격하지 않는다.
 - matching run이나 source artifact가 없거나 읽기 제한이 있어도 semantics를 바꾸지 않고 degraded note로만 보여준다.
+
+`inspect-run` 최소 계약:
+- `factory inspect-run`은 latest run 또는 지정된 run의 execution run 전체를 읽기 전용 inspection 출력한다.
+- 선택은 `--latest` 또는 `--run-id <id>`로 하며 latest run 선택 규칙은 `factory status`와 동일하다.
+- 출력은 operator-facing visibility only이며 queue eligibility, approval decision, gate 계산, approval lifecycle transition에 영향을 주지 않는다.
+- 최소 출력 항목: `run_id`, run path/existence/state, safely derivable latest relation 및 active PR relation, run-related operator artifact presence summary(`review`, `qa`, `docs-sync`, `verification`, `gate-check`, `approval-request`, `evidence-bundle`), degraded note.
+- 일부 artifact가 없거나 부분적으로 unreadable이어도 queue mutation, cleanup, auto-hide, auto-resolve 없이 degraded note로만 보여준다.
 
 `inspect-approval` 최소 계약:
 - `factory inspect-approval`는 latest run 또는 지정된 run의 approval package artifact를 읽기 전용으로 inspection 출력한다.
@@ -303,12 +313,12 @@ factory cleanup-rehearsal --root . --apply --include-demo
 - 실패: active PR plan이 0개이거나 2개 이상이거나, work item 연결이 불가하면 안전하게 실패한다.
 
 run-scoped 명령의 `--latest` 최소 계약:
-- 대상 명령: `record-review`, `record-qa`, `record-docs-sync`, `record-verification`, `gate-check`, `build-approval`, `resolve-approval`, `inspect-approval`
+- 대상 명령: `record-review`, `record-qa`, `record-docs-sync`, `record-verification`, `gate-check`, `build-approval`, `resolve-approval`, `inspect-approval`, `inspect-run`
 - 입력: 각 명령은 기존 `--run-id <id>`를 그대로 지원하고, 같은 위치에서 `--latest`를 대안으로 지원한다.
 - 배타성: `--run-id`와 `--latest`를 함께 주면 명확히 실패한다.
 - 기본 계약: 둘 다 없으면 기존처럼 run selector가 필요하므로 실패한다.
 - 선택 규칙: `--latest`는 `factory status`와 동일하게 `runs/latest/*/run.yaml`에서 latest run 1개를 고른다.
-- 실패: latest run이 없으면 `inspect-approval`는 degraded visibility output을 반환하고, 나머지 명령은 `start-execution` 또는 명시적 `--run-id`가 필요하다고 안내하며 실패한다.
+- 실패: latest run이 없으면 `inspect-approval`, `inspect-run`은 degraded visibility output을 반환하고, 나머지 명령은 `start-execution` 또는 명시적 `--run-id`가 필요하다고 안내하며 실패한다.
 - 주의: `--latest`는 run-id 입력을 줄이는 convenience 계층일 뿐이며, artifact prerequisite 계약을 우회하지 않는다.
 
 `build-approval` 최소 계약:

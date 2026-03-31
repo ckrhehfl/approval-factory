@@ -19,6 +19,7 @@ from orchestrator.pipeline import (
     get_work_item_readiness,
     inspect_approval,
     inspect_approval_queue,
+    inspect_run,
     record_docs_sync,
     record_qa,
     record_review,
@@ -146,6 +147,35 @@ def _render_approval_inspection(inspection: dict[str, object]) -> str:
     lines.append(f"- evidence_bundle_exists: {inspection['evidence_bundle_exists']}")
     lines.append(f"- readiness_summary: {inspection.get('readiness_summary') or 'none'}")
     lines.append(f"- degraded_note: {inspection.get('degraded_note') or 'none'}")
+    return "\n".join(lines)
+
+
+def _render_run_inspection(inspection: dict[str, object]) -> str:
+    lines = ["Run Inspection:"]
+    lines.append(f"- run_id: {inspection.get('run_id') or 'none'}")
+    lines.append(f"- run_path: {inspection.get('run_path') or 'none'}")
+    lines.append(f"- run_exists: {inspection['run_exists']}")
+    lines.append(f"- run_state: {inspection.get('run_state') or 'none'}")
+    lines.append(f"- latest_relation: {inspection.get('latest_relation') or 'none'}")
+    lines.append(f"- active_pr_relation: {inspection.get('active_pr_relation') or 'none'}")
+    lines.append(f"- degraded_note: {inspection.get('degraded_note') or 'none'}")
+
+    lines.append("")
+    lines.append("Artifacts:")
+    artifacts = inspection.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        lines.append("- none")
+        return "\n".join(lines)
+
+    for artifact in artifacts:
+        if not isinstance(artifact, dict):
+            continue
+        lines.append(f"- artifact: {artifact.get('artifact') or 'unknown'}")
+        lines.append(f"  path: {artifact.get('path') or 'none'}")
+        lines.append(f"  exists: {artifact.get('exists')}")
+        lines.append(f"  status: {artifact.get('status') or 'none'}")
+        lines.append(f"  note: {artifact.get('note') or 'none'}")
+
     return "\n".join(lines)
 
 
@@ -330,6 +360,13 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_approval_parser.add_argument("--root", default=".", help="Repository root path")
     _add_run_selector_arguments(inspect_approval_parser)
 
+    inspect_run_parser = subparsers.add_parser(
+        "inspect-run",
+        help="Inspect run-scoped execution artifacts in visibility-only mode",
+    )
+    inspect_run_parser.add_argument("--root", default=".", help="Repository root path")
+    _add_run_selector_arguments(inspect_run_parser)
+
     bootstrap_parser = subparsers.add_parser("bootstrap-run", help="Create baseline run artifacts")
     bootstrap_parser.add_argument("--root", default=".", help="Repository root path")
     bootstrap_parser.add_argument("--run-id", default=_default_run_id())
@@ -487,6 +524,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif run_id is None:
             parser.error("inspect-approval requires either --run-id <id> or --latest")
         print(_render_approval_inspection(inspect_approval(root_dir=Path(args.root), run_id=run_id)))
+        return 0
+
+    if args.command == "inspect-run":
+        run_id = str(args.run_id) if getattr(args, "run_id", None) else None
+        if getattr(args, "latest", False):
+            try:
+                run_id = resolve_latest_run_id(root_dir=Path(args.root))
+            except ValueError:
+                run_id = None
+        elif run_id is None:
+            parser.error("inspect-run requires either --run-id <id> or --latest")
+        print(_render_run_inspection(inspect_run(root_dir=Path(args.root), run_id=run_id)))
         return 0
 
     if args.command == "bootstrap-run":
