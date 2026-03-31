@@ -21,6 +21,7 @@ from orchestrator.pipeline import (
     inspect_approval_queue,
     inspect_pr_plan,
     inspect_run,
+    inspect_work_item,
     record_docs_sync,
     record_qa,
     record_review,
@@ -213,6 +214,46 @@ def _render_pr_plan_inspection(inspection: dict[str, object]) -> str:
             for entry in context:
                 if isinstance(entry, dict):
                     lines.append(f"- context: {entry.get('label') or 'unknown'} = {entry.get('value') or 'none'}")
+    else:
+        lines.append("- none")
+
+    return "\n".join(lines)
+
+
+def _render_work_item_inspection(inspection: dict[str, object]) -> str:
+    lines = ["Work Item Inspection:"]
+    lines.append(f"- work_item_id: {inspection.get('work_item_id') or 'none'}")
+    lines.append(f"- work_item_path: {inspection.get('work_item_path') or 'none'}")
+    lines.append(f"- exists: {inspection['exists']}")
+    lines.append(f"- title: {inspection.get('title') or 'none'}")
+    lines.append(f"- summary: {inspection.get('summary') or 'none'}")
+    lines.append(f"- goal_id: {inspection.get('goal_id') or 'none'}")
+    lines.append(f"- metadata_timestamp: {inspection.get('metadata_timestamp') or 'none'}")
+    lines.append(f"- degraded_note: {inspection.get('degraded_note') or 'none'}")
+
+    lines.append("")
+    lines.append("Linked Clarifications:")
+    linked_clarification_ids = inspection.get("linked_clarification_ids")
+    if isinstance(linked_clarification_ids, list) and linked_clarification_ids:
+        for clarification_id in linked_clarification_ids:
+            lines.append(f"- clarification_id: {clarification_id}")
+    else:
+        lines.append("- none")
+
+    lines.append("")
+    lines.append("Readiness Visibility:")
+    readiness_visibility = inspection.get("readiness_visibility")
+    if isinstance(readiness_visibility, dict) and readiness_visibility:
+        linked_clarification_count = readiness_visibility.get("linked_clarification_count")
+        lines.append(f"- summary: {readiness_visibility.get('summary') or 'none'}")
+        lines.append(f"- linked_clarification_count: {linked_clarification_count if linked_clarification_count is not None else 'none'}")
+        context = readiness_visibility.get("context")
+        if isinstance(context, list) and context:
+            for entry in context:
+                if isinstance(entry, dict):
+                    lines.append(
+                        f"- clarification: {entry.get('clarification_id') or 'unknown'} = {entry.get('status') or 'none'}"
+                    )
     else:
         lines.append("- none")
 
@@ -420,6 +461,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pr_plan_selector.add_argument("--pr-id", help="Inspect a PR plan by PR ID from active or archive")
 
+    inspect_work_item_parser = subparsers.add_parser(
+        "inspect-work-item",
+        help="Inspect work item artifacts in visibility-only mode",
+    )
+    inspect_work_item_parser.add_argument("--root", default=".", help="Repository root path")
+    inspect_work_item_parser.add_argument("--work-item-id", required=True)
+
     bootstrap_parser = subparsers.add_parser("bootstrap-run", help="Create baseline run artifacts")
     bootstrap_parser.add_argument("--root", default=".", help="Repository root path")
     bootstrap_parser.add_argument("--run-id", default=_default_run_id())
@@ -598,6 +646,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                     root_dir=Path(args.root),
                     pr_id=str(args.pr_id) if getattr(args, "pr_id", None) else None,
                     active=bool(getattr(args, "active", False)),
+                )
+            )
+        )
+        return 0
+
+    if args.command == "inspect-work-item":
+        print(
+            _render_work_item_inspection(
+                inspect_work_item(
+                    root_dir=Path(args.root),
+                    work_item_id=args.work_item_id,
                 )
             )
         )

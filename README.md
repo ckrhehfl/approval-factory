@@ -33,6 +33,7 @@
 - `status`
 - `inspect-approval-queue`
 - `inspect-approval`
+- `inspect-work-item`
 - `inspect-pr-plan`
 - `inspect-run`
 - `cleanup-rehearsal`
@@ -167,6 +168,13 @@ approval queue visibility 규칙:
 - 최소 출력 항목: `run_id`, run path/existence/state, safely derivable latest relation 및 active PR relation, run-related operator artifact presence summary(`review`, `qa`, `docs-sync`, `verification`, `gate-check`, `approval-request`, `evidence-bundle`), degraded note.
 - 일부 artifact가 없거나 부분적으로 unreadable이어도 queue mutation, cleanup, auto-hide, auto-resolve 없이 degraded note로만 보여준다.
 
+`inspect-work-item` 최소 계약:
+- `factory inspect-work-item`은 `docs/work-items/<work-item-id>.md` work item artifact를 읽기 전용으로 inspection 출력한다.
+- 선택은 `--work-item-id <id>`만 지원한다.
+- 출력은 operator-facing visibility only다. readiness gating, clarification resolution, planning selection, execution selection, approval decision에 영향을 주지 않는다.
+- 최소 출력 항목: `work_item_id`, work item path/existence, title/summary if present, `goal_id` if present, linked clarification identifiers if present, readiness visibility summary/context if readable, metadata timestamp if present, degraded note.
+- artifact가 없거나 부분적으로 unreadable이어도 work item mutation, clarification mutation, cleanup, auto-hide, auto-resolve, lifecycle/state transition semantics를 바꾸지 않고 degraded note로만 보여준다.
+
 `inspect-pr-plan` 최소 계약:
 - `factory inspect-pr-plan`은 PR plan artifact를 읽기 전용으로 inspection 출력한다.
 - 선택은 `--active` 또는 `--pr-id <id>`로 하며 `--active`는 기존 active PR semantics를 그대로 재사용한다.
@@ -185,6 +193,7 @@ operator 해석 규칙:
 - `create-pr-plan` 결과가 `archive`면 버그가 아니라 이미 다른 active PR가 있다는 뜻이다.
 - `activate-pr`는 semantics를 바꾸지 않고 active/archive 위치만 명시적으로 전환한다.
 - `start-execution` guardrail 실패는 lifecycle 버그가 아니라 현재 repo-local 상태를 먼저 정리하라는 안내다.
+- `inspect-work-item`은 operator-facing visibility only다. readiness gating, clarification resolution, planning selection, execution selection, approval decision을 바꾸지 않는다.
 
 `work-item-readiness` 최소 계약:
 - 입력: `--root`, `--work-item-id`
