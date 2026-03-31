@@ -30,6 +30,7 @@ from orchestrator.pipeline import (
     resolve_latest_run_id,
     resolve_approval,
     start_execution,
+    trace_lineage,
 )
 from orchestrator.yaml_io import read_yaml
 
@@ -260,6 +261,69 @@ def _render_work_item_inspection(inspection: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def _render_lineage_trace(trace: dict[str, object]) -> str:
+    lines = ["Lineage Trace:"]
+
+    run = trace["run"]
+    lines.append("Run:")
+    lines.append(f"- run_id: {run.get('run_id') or 'none'}")
+    lines.append(f"- run_path: {run.get('run_path') or 'none'}")
+    lines.append(f"- run_state: {run.get('run_state') or 'none'}")
+
+    approval = trace["approval"]
+    lines.append("")
+    lines.append("Approval:")
+    lines.append(f"- approval_request_path: {approval.get('approval_request_path') or 'none'}")
+    lines.append(f"- approval_request_status: {approval.get('approval_request_status') or 'none'}")
+    lines.append(f"- queue_path: {approval.get('queue_path') or 'none'}")
+    lines.append(f"- queue_status: {approval.get('queue_status') or 'none'}")
+
+    pr_plan = trace["pr_plan"]
+    lines.append("")
+    lines.append("PR Plan:")
+    lines.append(f"- pr_id: {pr_plan.get('pr_id') or 'none'}")
+    lines.append(f"- plan_path: {pr_plan.get('plan_path') or 'none'}")
+    lines.append(f"- active_relation: {pr_plan.get('active_relation') or 'none'}")
+
+    work_item = trace["work_item"]
+    lines.append("")
+    lines.append("Work Item:")
+    lines.append(f"- work_item_id: {work_item.get('work_item_id') or 'none'}")
+    lines.append(f"- work_item_path: {work_item.get('work_item_path') or 'none'}")
+    readiness_visibility = work_item.get("readiness_visibility")
+    if isinstance(readiness_visibility, dict) and readiness_visibility:
+        lines.append(f"- readiness_visibility: {readiness_visibility.get('summary') or 'none'}")
+    else:
+        lines.append("- readiness_visibility: none")
+
+    goal = trace["goal"]
+    lines.append("")
+    lines.append("Goal:")
+    lines.append(f"- goal_id: {goal.get('goal_id') or 'none'}")
+    lines.append(f"- goal_path: {goal.get('goal_path') or 'none'}")
+
+    clarifications = trace["clarifications"]
+    lines.append("")
+    lines.append("Clarifications:")
+    clarification_ids = clarifications.get("linked_clarification_ids")
+    if isinstance(clarification_ids, list) and clarification_ids:
+        for clarification_id in clarification_ids:
+            lines.append(f"- clarification_id: {clarification_id}")
+    else:
+        lines.append("- none")
+
+    lines.append("")
+    lines.append("Degraded Notes:")
+    degraded_notes = trace.get("degraded_notes")
+    if isinstance(degraded_notes, list) and degraded_notes:
+        for note in degraded_notes:
+            lines.append(f"- {note}")
+    else:
+        lines.append("- none")
+
+    return "\n".join(lines)
+
+
 def _render_create_pr_plan_summary(
     path: Path,
     had_active_pr: bool,
@@ -409,6 +473,16 @@ def _add_run_selector_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_trace_lineage_selector_arguments(parser: argparse.ArgumentParser) -> None:
+    selector = parser.add_mutually_exclusive_group()
+    selector.add_argument("--run-id")
+    selector.add_argument(
+        "--latest-run",
+        action="store_true",
+        help="Use the latest run selected from runs/latest/*/run.yaml",
+    )
+
+
 def _resolve_run_id_argument(parser: argparse.ArgumentParser, args: argparse.Namespace) -> str:
     if getattr(args, "run_id", None):
         return str(args.run_id)
@@ -467,6 +541,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     inspect_work_item_parser.add_argument("--root", default=".", help="Repository root path")
     inspect_work_item_parser.add_argument("--work-item-id", required=True)
+
+    trace_lineage_parser = subparsers.add_parser(
+        "trace-lineage",
+        help="Trace run-linked repo-local artifacts in visibility-only mode",
+    )
+    trace_lineage_parser.add_argument("--root", default=".", help="Repository root path")
+    _add_trace_lineage_selector_arguments(trace_lineage_parser)
 
     bootstrap_parser = subparsers.add_parser("bootstrap-run", help="Create baseline run artifacts")
     bootstrap_parser.add_argument("--root", default=".", help="Repository root path")
@@ -660,6 +741,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             )
         )
+        return 0
+
+    if args.command == "trace-lineage":
+        run_id = str(args.run_id) if getattr(args, "run_id", None) else None
+        if getattr(args, "latest_run", False):
+            try:
+                run_id = resolve_latest_run_id(root_dir=Path(args.root))
+            except ValueError:
+                run_id = None
+        elif run_id is None:
+            parser.error("trace-lineage requires either --run-id <id> or --latest-run")
+        print(_render_lineage_trace(trace_lineage(root_dir=Path(args.root), run_id=run_id)))
         return 0
 
     if args.command == "bootstrap-run":

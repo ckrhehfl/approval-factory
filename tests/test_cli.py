@@ -3548,6 +3548,367 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("qa artifact missing qa_report mapping", output)
             self.assertIn("verification artifact invalid:", output)
 
+    def test_trace_lineage_latest_run_successfully(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_trace_run(root, run_id="RUN-899", pr_id="PR-899", work_item_id="WI-899", updated_at="2026-03-29T08:59:00+00:00")
+            self._write_trace_run(root, run_id="RUN-900", pr_id="PR-900", work_item_id="WI-900", updated_at="2026-03-29T09:00:00+00:00")
+            self._write_trace_pr_plan(root, pr_id="PR-900", work_item_id="WI-900", clarification_ids=["CLAR-900A", "CLAR-900B"])
+            self._write_trace_work_item(root, work_item_id="WI-900", goal_id="GOAL-900", clarification_ids=["CLAR-900A", "CLAR-900B"])
+            self._write_trace_goal(root, goal_id="GOAL-900")
+            self._write_trace_clarification(root, goal_id="GOAL-900", clarification_id="CLAR-900A", status="resolved")
+            self._write_trace_clarification(root, goal_id="GOAL-900", clarification_id="CLAR-900B", status="open")
+            self._write_trace_approval(root, run_id="RUN-900", status="pending", queue_status="pending")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["trace-lineage", "--root", str(root), "--latest-run"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Lineage Trace:", output)
+            self.assertIn("Run:\n- run_id: RUN-900", output)
+            self.assertIn("Approval:\n- approval_request_path:", output)
+            self.assertIn("- approval_request_status: pending", output)
+            self.assertIn("- queue_status: pending", output)
+            self.assertIn("PR Plan:\n- pr_id: PR-900", output)
+            self.assertIn("- active_relation: active", output)
+            self.assertIn("Work Item:\n- work_item_id: WI-900", output)
+            self.assertIn("- readiness_visibility: attention-needed", output)
+            self.assertIn("Goal:\n- goal_id: GOAL-900", output)
+            self.assertIn("Clarifications:\n- clarification_id: CLAR-900A\n- clarification_id: CLAR-900B", output)
+            self.assertIn("Degraded Notes:\n- none", output)
+
+    def test_trace_lineage_by_run_id_successfully(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_trace_run(root, run_id="RUN-901", pr_id="PR-901", work_item_id="WI-901", updated_at="2026-03-29T09:01:00+00:00")
+            self._write_trace_pr_plan(root, pr_id="PR-901", work_item_id="WI-901", archived=True)
+            self._write_trace_work_item(root, work_item_id="WI-901", goal_id="GOAL-901")
+            self._write_trace_goal(root, goal_id="GOAL-901")
+            self._write_trace_approval(root, run_id="RUN-901", status="approved", queue_status="approved")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["trace-lineage", "--root", str(root), "--run-id", "RUN-901"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Run:\n- run_id: RUN-901", output)
+            self.assertIn("- approval_request_status: approved", output)
+            self.assertIn("- queue_status: approved", output)
+            self.assertIn("- pr_id: PR-901", output)
+            self.assertIn("- active_relation: archived", output)
+            self.assertIn("- work_item_id: WI-901", output)
+            self.assertIn("- goal_id: GOAL-901", output)
+
+    def test_trace_lineage_missing_pr_plan_link_degrades_safely(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_trace_run(root, run_id="RUN-902", pr_id="PR-902", work_item_id="WI-902", updated_at="2026-03-29T09:02:00+00:00")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["trace-lineage", "--root", str(root), "--run-id", "RUN-902"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("PR Plan:\n- pr_id: PR-902", output)
+            self.assertIn("- plan_path: none", output)
+            self.assertIn("PR plan artifact missing for pr-id 'PR-902'", output)
+
+    def test_trace_lineage_missing_work_item_link_degrades_safely(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_trace_run(root, run_id="RUN-903", pr_id="PR-903", work_item_id=None, updated_at="2026-03-29T09:03:00+00:00")
+            self._write_trace_pr_plan(root, pr_id="PR-903", work_item_id=None)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["trace-lineage", "--root", str(root), "--run-id", "RUN-903"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Work Item:\n- work_item_id: none", output)
+            self.assertIn("PR plan artifact missing Work Item ID section", output)
+            self.assertIn("work item linkage unavailable because no source work_item_id was derivable", output)
+
+    def test_trace_lineage_missing_goal_link_degrades_safely(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_trace_run(root, run_id="RUN-904", pr_id="PR-904", work_item_id="WI-904", updated_at="2026-03-29T09:04:00+00:00")
+            self._write_trace_pr_plan(root, pr_id="PR-904", work_item_id="WI-904")
+            self._write_trace_work_item(root, work_item_id="WI-904", goal_id=None)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["trace-lineage", "--root", str(root), "--run-id", "RUN-904"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Goal:\n- goal_id: none\n- goal_path: none", output)
+            self.assertIn("work item artifact missing Goal ID section", output)
+            self.assertIn("goal linkage unavailable because work item artifact did not yield goal_id", output)
+
+    def test_trace_lineage_missing_clarification_linkage_degrades_safely(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_trace_run(root, run_id="RUN-905", pr_id="PR-905", work_item_id="WI-905", updated_at="2026-03-29T09:05:00+00:00")
+            self._write_trace_pr_plan(root, pr_id="PR-905", work_item_id="WI-905")
+            self._write_trace_work_item(root, work_item_id="WI-905", goal_id="GOAL-905")
+            self._write_trace_goal(root, goal_id="GOAL-905")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["trace-lineage", "--root", str(root), "--run-id", "RUN-905"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Clarifications:\n- none", output)
+            self.assertIn("no linked clarification ids were derivable from the available artifacts", output)
+
+    def test_trace_lineage_missing_approval_artifact_degrades_safely(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_trace_run(root, run_id="RUN-906", pr_id="PR-906", work_item_id="WI-906", updated_at="2026-03-29T09:06:00+00:00")
+            self._write_trace_pr_plan(root, pr_id="PR-906", work_item_id="WI-906")
+            self._write_trace_work_item(root, work_item_id="WI-906", goal_id="GOAL-906")
+            self._write_trace_goal(root, goal_id="GOAL-906")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["trace-lineage", "--root", str(root), "--run-id", "RUN-906"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Approval:\n- approval_request_path:", output)
+            self.assertIn("- approval_request_status: none", output)
+            self.assertIn("- queue_path: none", output)
+            self.assertIn("- queue_status: none", output)
+            self.assertIn("approval request artifact missing:", output)
+
+    def test_trace_lineage_old_format_artifacts_degrade_safely(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "runs" / "latest" / "RUN-907"
+            artifacts = run_dir / "artifacts"
+            artifacts.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text("run: [\n", encoding="utf-8")
+            approval_path = artifacts / "approval-request.yaml"
+            approval_path.write_text("approval_request:\n  id: APR-RUN-907\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["trace-lineage", "--root", str(root), "--run-id", "RUN-907"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Run:\n- run_id: RUN-907", output)
+            self.assertIn("- run_state: none", output)
+            self.assertIn("run artifact unreadable:", output)
+            self.assertIn("run artifact missing pr_id linkage", output)
+            self.assertIn("PR plan linkage unavailable because run artifact did not yield pr_id", output)
+
+    def test_trace_lineage_keeps_existing_status_and_inspect_run_behavior_unchanged(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_trace_run(root, run_id="RUN-908", pr_id="PR-908", work_item_id="WI-908", updated_at="2026-03-29T09:08:00+00:00")
+            self._write_trace_pr_plan(root, pr_id="PR-908", work_item_id="WI-908")
+            self._write_trace_work_item(root, work_item_id="WI-908", goal_id="GOAL-908")
+            self._write_trace_goal(root, goal_id="GOAL-908")
+            self._write_trace_approval(root, run_id="RUN-908", status="pending", queue_status="pending")
+
+            status_before = StringIO()
+            with redirect_stdout(status_before):
+                self.assertEqual(main(["status", "--root", str(root)]), 0)
+
+            inspect_before = StringIO()
+            with redirect_stdout(inspect_before):
+                self.assertEqual(main(["inspect-run", "--root", str(root), "--run-id", "RUN-908"]), 0)
+
+            trace_stdout = StringIO()
+            with redirect_stdout(trace_stdout):
+                self.assertEqual(main(["trace-lineage", "--root", str(root), "--run-id", "RUN-908"]), 0)
+
+            status_after = StringIO()
+            with redirect_stdout(status_after):
+                self.assertEqual(main(["status", "--root", str(root)]), 0)
+
+            inspect_after = StringIO()
+            with redirect_stdout(inspect_after):
+                self.assertEqual(main(["inspect-run", "--root", str(root), "--run-id", "RUN-908"]), 0)
+
+            self.assertEqual(status_before.getvalue(), status_after.getvalue())
+            self.assertEqual(inspect_before.getvalue(), inspect_after.getvalue())
+
+    def _write_trace_run(
+        self,
+        root,
+        *,
+        run_id: str,
+        pr_id: str | None,
+        work_item_id: str | None,
+        updated_at: str,
+        state: str = "approval_pending",
+    ) -> None:
+        run_dir = root / "runs" / "latest" / run_id
+        (run_dir / "artifacts").mkdir(parents=True, exist_ok=True)
+        lines = [
+            "run:",
+            f"  run_id: {run_id}",
+            f"  state: {state}",
+            "  created_at: '2026-03-29T00:00:00+00:00'",
+            f"  updated_at: '{updated_at}'",
+        ]
+        if work_item_id is not None:
+            lines.insert(2, f"  work_item_id: {work_item_id}")
+        if pr_id is not None:
+            lines.insert(2, f"  pr_id: {pr_id}")
+        (run_dir / "run.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def _write_trace_pr_plan(
+        self,
+        root,
+        *,
+        pr_id: str,
+        work_item_id: str | None,
+        archived: bool = False,
+        clarification_ids: list[str] | None = None,
+    ) -> None:
+        plan_path = root / "prs" / ("archive" if archived else "active") / f"{pr_id}.md"
+        plan_path.parent.mkdir(parents=True, exist_ok=True)
+        lines = [
+            f"# {pr_id}: trace lineage",
+            "",
+            "## PR ID",
+            pr_id,
+            "",
+        ]
+        if work_item_id is not None:
+            lines.extend(
+                [
+                    "## Work Item ID",
+                    work_item_id,
+                    "",
+                ]
+            )
+        lines.extend(
+            [
+                "## Work Item Readiness",
+                "- summary: attention-needed" if work_item_id else "- summary: unavailable",
+                f"- linked_clarification_count: {len(clarification_ids or [])}" if work_item_id else "- linked_clarification_count: none",
+                "",
+                "## Linked Clarifications",
+            ]
+        )
+        if clarification_ids:
+            for clarification_id in clarification_ids:
+                status = "resolved" if clarification_id.endswith("A") else "open"
+                lines.append(f"- {clarification_id} ({status})")
+        else:
+            lines.append("- none")
+        lines.append("")
+        plan_path.write_text("\n".join(lines), encoding="utf-8")
+
+    def _write_trace_work_item(
+        self,
+        root,
+        *,
+        work_item_id: str,
+        goal_id: str | None,
+        clarification_ids: list[str] | None = None,
+    ) -> None:
+        work_item_path = root / "docs" / "work-items" / f"{work_item_id}.md"
+        work_item_path.parent.mkdir(parents=True, exist_ok=True)
+        lines = [
+            f"# {work_item_id}: trace lineage",
+            "",
+            "## Work Item ID",
+            work_item_id,
+            "",
+        ]
+        if goal_id is not None:
+            lines.extend(["## Goal ID", goal_id, ""])
+        lines.extend(["## Title", "trace lineage", "", "## Related Clarifications"])
+        if clarification_ids:
+            for clarification_id in clarification_ids:
+                status = "resolved" if clarification_id.endswith("A") else "open"
+                lines.append(f"- {clarification_id} ({status})")
+        else:
+            lines.append("- none")
+        lines.append("")
+        work_item_path.write_text("\n".join(lines), encoding="utf-8")
+
+    def _write_trace_goal(self, root, *, goal_id: str) -> None:
+        goal_path = root / "goals" / f"{goal_id}.md"
+        goal_path.parent.mkdir(parents=True, exist_ok=True)
+        goal_path.write_text(f"# {goal_id}: trace lineage\n", encoding="utf-8")
+
+    def _write_trace_clarification(self, root, *, goal_id: str, clarification_id: str, status: str) -> None:
+        clarification_path = root / "clarifications" / goal_id / f"{clarification_id}.md"
+        clarification_path.parent.mkdir(parents=True, exist_ok=True)
+        clarification_path.write_text(
+            "\n".join(
+                [
+                    f"# {clarification_id}: trace lineage",
+                    "",
+                    "## Clarification ID",
+                    clarification_id,
+                    "",
+                    "## Goal ID",
+                    goal_id,
+                    "",
+                    "## Status",
+                    status,
+                    "",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    def _write_trace_approval(self, root, *, run_id: str, status: str, queue_status: str) -> None:
+        artifacts = root / "runs" / "latest" / run_id / "artifacts"
+        artifacts.mkdir(parents=True, exist_ok=True)
+        evidence_path = artifacts / "evidence-bundle.yaml"
+        evidence_path.write_text("evidence_bundle:\n  status: complete\n", encoding="utf-8")
+        (artifacts / "approval-request.yaml").write_text(
+            "\n".join(
+                [
+                    "approval_request:",
+                    f"  id: APR-{run_id}",
+                    f"  status: {status}",
+                    f"  evidence_bundle: {evidence_path.as_posix()}",
+                    "  readiness_context:",
+                    "    status: available",
+                    "    readiness_summary: ready" if status == "approved" else "    readiness_summary: attention-needed",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        queue_dir = root / "approval_queue" / queue_status
+        queue_dir.mkdir(parents=True, exist_ok=True)
+        (queue_dir / f"APR-{run_id}.yaml").write_text("approval_request:\n  id: placeholder\n", encoding="utf-8")
+
     def test_status_handles_missing_active_pr_run_and_approval(self) -> None:
         from pathlib import Path
 
