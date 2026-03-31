@@ -2863,6 +2863,230 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("approval request missing evidence bundle path", output)
             self.assertIn("approval request missing readiness_context summary", output)
 
+    def test_inspect_pr_plan_active_successfully(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan_path = root / "prs" / "active" / "PR-750.md"
+            plan_path.parent.mkdir(parents=True, exist_ok=True)
+            plan_path.write_text(
+                "\n".join(
+                    [
+                        "# PR-750: inspect active plan",
+                        "",
+                        "## PR ID",
+                        "PR-750",
+                        "",
+                        "## Work Item ID",
+                        "WI-750",
+                        "",
+                        "## Title",
+                        "inspect active plan",
+                        "",
+                        "## Created At",
+                        "2026-03-30T09:15:00+00:00",
+                        "",
+                        "## Work Item Readiness",
+                        "- summary: attention-needed",
+                        "- linked_clarification_count: 2",
+                        "",
+                        "## Linked Clarifications",
+                        "- CLAR-101 (open)",
+                        "- CLAR-102 (resolved)",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-pr-plan", "--root", str(root), "--active"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("PR Plan Inspection:", output)
+            self.assertIn("- pr_id: PR-750", output)
+            self.assertIn(f"- plan_path: {plan_path.as_posix()}", output)
+            self.assertIn("- exists: True", output)
+            self.assertIn("- active_relation: active", output)
+            self.assertIn("- source_work_item_id: WI-750", output)
+            self.assertIn("- metadata_timestamp: 2026-03-30T09:15:00+00:00", output)
+            self.assertIn("- clarification_id: CLAR-101", output)
+            self.assertIn("- clarification_id: CLAR-102", output)
+            self.assertIn("- summary: attention-needed", output)
+            self.assertIn("- linked_clarification_count: 2", output)
+            self.assertIn("- context: summary = attention-needed", output)
+            self.assertIn("- degraded_note: none", output)
+
+    def test_inspect_pr_plan_by_pr_id_successfully(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan_path = root / "prs" / "archive" / "PR-751.md"
+            plan_path.parent.mkdir(parents=True, exist_ok=True)
+            plan_path.write_text(
+                "\n".join(
+                    [
+                        "# PR-751: inspect archived plan",
+                        "",
+                        "## PR ID",
+                        "PR-751",
+                        "",
+                        "## Source Goal ID",
+                        "GOAL-751",
+                        "",
+                        "## Work Item ID",
+                        "WI-751",
+                        "",
+                        "## Work Item Readiness",
+                        "- summary: ready",
+                        "- linked_clarification_count: 0",
+                        "",
+                        "## Linked Clarifications",
+                        "- none",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-pr-plan", "--root", str(root), "--pr-id", "PR-751"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- pr_id: PR-751", output)
+            self.assertIn(f"- plan_path: {plan_path.as_posix()}", output)
+            self.assertIn("- active_relation: archived", output)
+            self.assertIn("- source_goal_id: GOAL-751", output)
+            self.assertIn("- source_work_item_id: WI-751", output)
+            self.assertIn("Linked Clarifications:\n- none", output)
+            self.assertIn("- summary: ready", output)
+            self.assertIn("- linked_clarification_count: 0", output)
+
+    def test_inspect_pr_plan_active_degrades_safely_when_no_active_pr_exists(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-pr-plan", "--root", str(root), "--active"])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                stdout.getvalue(),
+                "\n".join(
+                    [
+                        "PR Plan Inspection:",
+                        "- pr_id: none",
+                        "- plan_path: none",
+                        "- exists: False",
+                        "- active_relation: no-active-pr",
+                        "- source_goal_id: none",
+                        "- source_work_item_id: none",
+                        "- metadata_timestamp: none",
+                        "- degraded_note: no active PR plan found under prs/active/*.md",
+                        "",
+                        "Linked Clarifications:",
+                        "- none",
+                        "",
+                        "Readiness Visibility:",
+                        "- none",
+                    ]
+                )
+                + "\n",
+            )
+
+    def test_inspect_pr_plan_degrades_safely_when_artifact_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-pr-plan", "--root", str(root), "--pr-id", "PR-752"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- pr_id: PR-752", output)
+            self.assertIn("- exists: False", output)
+            self.assertIn("- active_relation: not-found", output)
+            self.assertIn("PR plan artifact missing for pr-id 'PR-752'", output)
+
+    def test_inspect_pr_plan_degrades_safely_for_partial_or_unreadable_artifact(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            partial_plan = root / "prs" / "archive" / "PR-753.md"
+            partial_plan.parent.mkdir(parents=True, exist_ok=True)
+            partial_plan.write_text("# partial only\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-pr-plan", "--root", str(root), "--pr-id", "PR-753"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- exists: True", output)
+            self.assertIn("- active_relation: archived", output)
+            self.assertIn("PR plan artifact missing markdown sections", output)
+            self.assertIn("PR plan artifact missing PR ID section", output)
+            self.assertIn("PR plan artifact missing Work Item ID section", output)
+
+    def test_inspect_pr_plan_shows_readiness_as_visibility_only(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            active_plan = root / "prs" / "active" / "PR-754.md"
+            active_plan.parent.mkdir(parents=True, exist_ok=True)
+            active_plan.write_text(
+                "\n".join(
+                    [
+                        "# PR-754: visibility only",
+                        "",
+                        "## PR ID",
+                        "PR-754",
+                        "",
+                        "## Work Item ID",
+                        "WI-754",
+                        "",
+                        "## Work Item Readiness",
+                        "- summary: no-linked-clarifications",
+                        "- linked_clarification_count: 0",
+                        "",
+                        "## Linked Clarifications",
+                        "- none",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            status_stdout = StringIO()
+            with redirect_stdout(status_stdout):
+                status_exit_code = main(["status", "--root", str(root)])
+
+            inspect_stdout = StringIO()
+            with redirect_stdout(inspect_stdout):
+                inspect_exit_code = main(["inspect-pr-plan", "--root", str(root), "--active"])
+
+            self.assertEqual(status_exit_code, 0)
+            self.assertEqual(inspect_exit_code, 0)
+            self.assertIn("- summary: no-linked-clarifications", inspect_stdout.getvalue())
+            self.assertIn("Active PR:\n- pr_id: PR-754", status_stdout.getvalue())
+
     def test_inspect_run_latest_successfully(self) -> None:
         from pathlib import Path
 

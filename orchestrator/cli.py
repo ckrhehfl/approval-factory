@@ -19,6 +19,7 @@ from orchestrator.pipeline import (
     get_work_item_readiness,
     inspect_approval,
     inspect_approval_queue,
+    inspect_pr_plan,
     inspect_run,
     record_docs_sync,
     record_qa,
@@ -175,6 +176,45 @@ def _render_run_inspection(inspection: dict[str, object]) -> str:
         lines.append(f"  exists: {artifact.get('exists')}")
         lines.append(f"  status: {artifact.get('status') or 'none'}")
         lines.append(f"  note: {artifact.get('note') or 'none'}")
+
+    return "\n".join(lines)
+
+
+def _render_pr_plan_inspection(inspection: dict[str, object]) -> str:
+    lines = ["PR Plan Inspection:"]
+    lines.append(f"- pr_id: {inspection.get('pr_id') or 'none'}")
+    lines.append(f"- plan_path: {inspection.get('plan_path') or 'none'}")
+    lines.append(f"- exists: {inspection['exists']}")
+    lines.append(f"- active_relation: {inspection.get('active_relation') or 'none'}")
+    lines.append(f"- source_goal_id: {inspection.get('source_goal_id') or 'none'}")
+    lines.append(f"- source_work_item_id: {inspection.get('source_work_item_id') or 'none'}")
+    lines.append(f"- metadata_timestamp: {inspection.get('metadata_timestamp') or 'none'}")
+    lines.append(f"- degraded_note: {inspection.get('degraded_note') or 'none'}")
+
+    lines.append("")
+    lines.append("Linked Clarifications:")
+    linked_clarification_ids = inspection.get("linked_clarification_ids")
+    if isinstance(linked_clarification_ids, list) and linked_clarification_ids:
+        for clarification_id in linked_clarification_ids:
+            lines.append(f"- clarification_id: {clarification_id}")
+    else:
+        lines.append("- none")
+
+    lines.append("")
+    lines.append("Readiness Visibility:")
+    readiness_visibility = inspection.get("readiness_visibility")
+    if isinstance(readiness_visibility, dict) and readiness_visibility:
+        lines.append(f"- summary: {readiness_visibility.get('summary') or 'none'}")
+        lines.append(
+            f"- linked_clarification_count: {readiness_visibility.get('linked_clarification_count') or 'none'}"
+        )
+        context = readiness_visibility.get("context")
+        if isinstance(context, list) and context:
+            for entry in context:
+                if isinstance(entry, dict):
+                    lines.append(f"- context: {entry.get('label') or 'unknown'} = {entry.get('value') or 'none'}")
+    else:
+        lines.append("- none")
 
     return "\n".join(lines)
 
@@ -367,6 +407,19 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_run_parser.add_argument("--root", default=".", help="Repository root path")
     _add_run_selector_arguments(inspect_run_parser)
 
+    inspect_pr_plan_parser = subparsers.add_parser(
+        "inspect-pr-plan",
+        help="Inspect PR plan artifacts in visibility-only mode",
+    )
+    inspect_pr_plan_parser.add_argument("--root", default=".", help="Repository root path")
+    pr_plan_selector = inspect_pr_plan_parser.add_mutually_exclusive_group(required=True)
+    pr_plan_selector.add_argument(
+        "--active",
+        action="store_true",
+        help="Inspect the single active PR plan using existing active PR semantics",
+    )
+    pr_plan_selector.add_argument("--pr-id", help="Inspect a PR plan by PR ID from active or archive")
+
     bootstrap_parser = subparsers.add_parser("bootstrap-run", help="Create baseline run artifacts")
     bootstrap_parser.add_argument("--root", default=".", help="Repository root path")
     bootstrap_parser.add_argument("--run-id", default=_default_run_id())
@@ -536,6 +589,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif run_id is None:
             parser.error("inspect-run requires either --run-id <id> or --latest")
         print(_render_run_inspection(inspect_run(root_dir=Path(args.root), run_id=run_id)))
+        return 0
+
+    if args.command == "inspect-pr-plan":
+        print(
+            _render_pr_plan_inspection(
+                inspect_pr_plan(
+                    root_dir=Path(args.root),
+                    pr_id=str(args.pr_id) if getattr(args, "pr_id", None) else None,
+                    active=bool(getattr(args, "active", False)),
+                )
+            )
+        )
         return 0
 
     if args.command == "bootstrap-run":

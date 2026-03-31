@@ -724,6 +724,147 @@ def inspect_run(*, root_dir: Path, run_id: str | None) -> dict[str, Any]:
     }
 
 
+def _parse_pr_plan_linked_clarifications(sections: dict[str, str], notes: list[str]) -> list[str]:
+    linked = sections.get("Linked Clarifications", "").strip()
+    if not linked:
+        return []
+
+    lines = [line.strip() for line in linked.splitlines() if line.strip()]
+    if not lines or lines == ["- none"]:
+        return []
+
+    clarification_ids: list[str] = []
+    for line in lines:
+        match = re.fullmatch(r"-\s+([^\s(]+)(?:\s+\(([^)]+)\))?", line)
+        if match is None:
+            notes.append(f"linked clarifications section malformed: {line}")
+            continue
+        clarification_ids.append(match.group(1).strip())
+    return clarification_ids
+
+
+def _parse_pr_plan_readiness_visibility(sections: dict[str, str], notes: list[str]) -> dict[str, Any] | None:
+    raw_readiness = sections.get("Work Item Readiness", "").strip()
+    if not raw_readiness:
+        return None
+
+    readiness: dict[str, Any] = {"context": []}
+    for line in [item.strip() for item in raw_readiness.splitlines() if item.strip()]:
+        if not line.startswith("- "):
+            notes.append(f"work item readiness section malformed: {line}")
+            continue
+        content = line[2:]
+        if ":" not in content:
+            notes.append(f"work item readiness entry malformed: {line}")
+            continue
+        key, value = content.split(":", 1)
+        normalized_key = key.strip().replace("-", "_").replace(" ", "_")
+        normalized_value = value.strip()
+        readiness["context"].append({"label": key.strip(), "value": normalized_value})
+        if normalized_key == "summary":
+            readiness["summary"] = normalized_value
+        elif normalized_key in {"linked_clarification_count", "linked_clarifications"}:
+            readiness["linked_clarification_count"] = normalized_value
+    return readiness
+
+
+def _pr_plan_metadata_value(sections: dict[str, str]) -> str | None:
+    for key in ("Created At", "Updated At", "Recorded At", "Created", "Updated"):
+        value = sections.get(key, "").strip()
+        if value:
+            return value
+    return None
+
+
+def inspect_pr_plan(*, root_dir: Path, pr_id: str | None = None, active: bool = False) -> dict[str, Any]:
+    notes: list[str] = []
+    selected_path: Path | None = None
+    active_relation = "unknown"
+
+    if active:
+        plans = sorted(_pr_active_dir(root_dir).glob("*.md"))
+        if not plans:
+            active_relation = "no-active-pr"
+            notes.append("no active PR plan found under prs/active/*.md")
+        elif len(plans) > 1:
+            active_relation = "ambiguous-active"
+            plan_list = ", ".join(path.as_posix() for path in plans)
+            notes.append(f"prs/active/ must contain exactly one active PR plan for --active inspection; found {len(plans)}: {plan_list}")
+        else:
+            selected_path = plans[0]
+            active_relation = "active"
+            pr_id = pr_id or selected_path.stem
+    elif pr_id is not None:
+        active_path = _pr_active_dir(root_dir) / f"{pr_id}.md"
+        archive_path = _pr_archive_dir(root_dir) / f"{pr_id}.md"
+        active_exists = active_path.exists()
+        archive_exists = archive_path.exists()
+        if active_exists and archive_exists:
+            selected_path = active_path
+            active_relation = "duplicate-active-and-archive"
+            notes.append(
+                "PR plan artifact exists in both active and archive; preferring active for inspection: "
+                f"{active_path.as_posix()}, {archive_path.as_posix()}"
+            )
+        elif active_exists:
+            selected_path = active_path
+            active_relation = "active"
+        elif archive_exists:
+            selected_path = archive_path
+            active_relation = "archived"
+        else:
+            active_relation = "not-found"
+            notes.append(
+                "PR plan artifact missing for pr-id "
+                f"'{pr_id}': expected {active_path.as_posix()} or {archive_path.as_posix()}"
+            )
+
+    exists = bool(selected_path and selected_path.exists())
+    sections: dict[str, str] = {}
+    if selected_path is not None and exists:
+        try:
+            sections = _parse_markdown_sections(selected_path)
+        except Exception as exc:  # pragma: no cover - defensive visibility fallback
+            notes.append(f"PR plan artifact unreadable: {exc}")
+            sections = {}
+        else:
+            if not sections:
+                notes.append("PR plan artifact missing markdown sections")
+            if "PR ID" not in sections:
+                notes.append("PR plan artifact missing PR ID section")
+            if "Work Item ID" not in sections:
+                notes.append("PR plan artifact missing Work Item ID section")
+
+    parsed_pr_id = sections.get("PR ID", "").strip() if sections else ""
+    work_item_id = sections.get("Work Item ID", "").strip() if sections else ""
+    source_goal_id = (
+        sections.get("Source Goal ID", "").strip()
+        or sections.get("Goal ID", "").strip()
+        or sections.get("Source Goal", "").strip()
+    )
+    source_work_item_id = (
+        sections.get("Source Work Item ID", "").strip()
+        or work_item_id
+        or sections.get("Work Item ID", "").strip()
+    )
+    linked_clarification_ids = _parse_pr_plan_linked_clarifications(sections, notes) if sections else []
+    readiness_visibility = _parse_pr_plan_readiness_visibility(sections, notes) if sections else None
+    metadata_value = _pr_plan_metadata_value(sections) if sections else None
+
+    return {
+        "pr_id": parsed_pr_id or pr_id,
+        "plan_path": selected_path.as_posix() if selected_path is not None else None,
+        "exists": exists,
+        "active_relation": active_relation,
+        "source_goal_id": source_goal_id or None,
+        "source_work_item_id": source_work_item_id or None,
+        "linked_clarification_ids": linked_clarification_ids,
+        "readiness_visibility": readiness_visibility,
+        "metadata_timestamp": metadata_value,
+        "degraded_note": "; ".join(notes) if notes else None,
+    }
+
+
 def _read_open_clarifications(root_dir: Path) -> list[str]:
     clarifications: list[str] = []
     for clarification_path in sorted((root_dir / "clarifications").glob("*/*.md")):
