@@ -943,6 +943,140 @@ def inspect_pr_plan(*, root_dir: Path, pr_id: str | None = None, active: bool = 
     }
 
 
+def _collect_degraded_notes(note: str | None, sink: list[str]) -> None:
+    if not note:
+        return
+    for item in [part.strip() for part in note.split(";")]:
+        if item:
+            sink.append(item)
+
+
+def trace_lineage(*, root_dir: Path, run_id: str | None) -> dict[str, Any]:
+    notes: list[str] = []
+    approval_inspection = inspect_approval(root_dir=root_dir, run_id=run_id)
+    _collect_degraded_notes(approval_inspection.get("degraded_note"), notes)
+
+    run_pr_id: str | None = None
+    run_work_item_id: str | None = None
+    run_path = _run_root(root_dir, run_id) / "run.yaml" if run_id is not None else None
+    run_state: str | None = None
+    if run_id is not None:
+        if run_path is not None and run_path.exists():
+            run_payload, run_note = _safe_read_mapping(run_path, label="run artifact")
+            if run_note:
+                notes.append(run_note)
+            run_mapping = run_payload.get("run", {}) if isinstance(run_payload, dict) else {}
+            if isinstance(run_mapping, dict) and run_mapping:
+                raw_run_state = str(run_mapping.get("state", "")).strip()
+                raw_pr_id = str(run_mapping.get("pr_id", "")).strip()
+                raw_work_item_id = str(run_mapping.get("work_item_id", "")).strip()
+                run_state = raw_run_state or None
+                run_pr_id = raw_pr_id or None
+                run_work_item_id = raw_work_item_id or None
+            else:
+                notes.append("run artifact missing run mapping")
+            if run_pr_id is None:
+                notes.append("run artifact missing pr_id linkage")
+            if run_work_item_id is None:
+                notes.append("run artifact missing work_item_id linkage")
+        elif run_path is not None:
+            notes.append(f"run artifact missing: {run_path.as_posix()}")
+    else:
+        notes.append("no latest run found under runs/latest/*/run.yaml")
+
+    pr_plan_inspection: dict[str, Any] | None = None
+    pr_id = run_pr_id
+    if pr_id:
+        pr_plan_inspection = inspect_pr_plan(root_dir=root_dir, pr_id=pr_id)
+        _collect_degraded_notes(pr_plan_inspection.get("degraded_note"), notes)
+    elif run_id is not None:
+        notes.append("PR plan linkage unavailable because run artifact did not yield pr_id")
+
+    work_item_inspection: dict[str, Any] | None = None
+    work_item_id = run_work_item_id
+    if work_item_id is None and isinstance(pr_plan_inspection, dict):
+        derived_work_item_id = str(pr_plan_inspection.get("source_work_item_id") or "").strip()
+        work_item_id = derived_work_item_id or None
+        if work_item_id:
+            notes.append("work item linkage derived from PR plan because run artifact did not yield work_item_id")
+    if work_item_id:
+        work_item_inspection = inspect_work_item(root_dir=root_dir, work_item_id=work_item_id)
+        _collect_degraded_notes(work_item_inspection.get("degraded_note"), notes)
+    elif run_id is not None:
+        notes.append("work item linkage unavailable because no source work_item_id was derivable")
+
+    queue_path: str | None = None
+    queue_status: str | None = None
+    if run_id:
+        queue_candidates = (
+            ("pending", root_dir / "approval_queue" / "pending" / f"APR-{run_id}.yaml"),
+            ("approved", root_dir / "approval_queue" / "approved" / f"APR-{run_id}.yaml"),
+            ("rejected", root_dir / "approval_queue" / "rejected" / f"APR-{run_id}.yaml"),
+            ("exception", root_dir / "approval_queue" / "exceptions" / f"APR-{run_id}.yaml"),
+        )
+        for candidate_status, candidate_path in queue_candidates:
+            if candidate_path.exists():
+                queue_path = candidate_path.as_posix()
+                queue_status = candidate_status
+                break
+
+    goal_id = str((work_item_inspection or {}).get("goal_id") or "").strip() or None
+    goal_path: str | None = None
+    if goal_id:
+        candidate_goal_path = root_dir / "goals" / f"{goal_id}.md"
+        if candidate_goal_path.exists():
+            goal_path = candidate_goal_path.as_posix()
+        else:
+            goal_path = candidate_goal_path.as_posix()
+            notes.append(f"goal artifact missing: {candidate_goal_path.as_posix()}")
+    elif work_item_inspection is not None:
+        notes.append("goal linkage unavailable because work item artifact did not yield goal_id")
+
+    linked_clarification_ids: list[str] = []
+    if isinstance(pr_plan_inspection, dict):
+        linked_clarification_ids.extend(pr_plan_inspection.get("linked_clarification_ids") or [])
+    if isinstance(work_item_inspection, dict):
+        linked_clarification_ids.extend(work_item_inspection.get("linked_clarification_ids") or [])
+    clarification_ids = _dedupe_preserving_order([str(item) for item in linked_clarification_ids])
+    if not clarification_ids and run_id is not None:
+        if pr_plan_inspection is None and work_item_inspection is None:
+            notes.append("clarification linkage unavailable because PR plan and work item links were not derivable")
+        else:
+            notes.append("no linked clarification ids were derivable from the available artifacts")
+
+    return {
+        "run": {
+            "run_id": run_id,
+            "run_path": run_path.as_posix() if run_path is not None else None,
+            "run_state": run_state,
+        },
+        "approval": {
+            "approval_request_path": approval_inspection.get("approval_request_path"),
+            "approval_request_status": approval_inspection.get("approval_request_status"),
+            "queue_path": queue_path,
+            "queue_status": queue_status,
+        },
+        "pr_plan": {
+            "pr_id": (pr_plan_inspection or {}).get("pr_id") or pr_id,
+            "plan_path": (pr_plan_inspection or {}).get("plan_path"),
+            "active_relation": (pr_plan_inspection or {}).get("active_relation"),
+        },
+        "work_item": {
+            "work_item_id": (work_item_inspection or {}).get("work_item_id") or work_item_id,
+            "work_item_path": (work_item_inspection or {}).get("work_item_path"),
+            "readiness_visibility": (work_item_inspection or {}).get("readiness_visibility"),
+        },
+        "goal": {
+            "goal_id": goal_id,
+            "goal_path": goal_path,
+        },
+        "clarifications": {
+            "linked_clarification_ids": clarification_ids,
+        },
+        "degraded_notes": _dedupe_preserving_order(notes),
+    }
+
+
 def _read_open_clarifications(root_dir: Path) -> list[str]:
     clarifications: list[str] = []
     for clarification_path in sorted((root_dir / "clarifications").glob("*/*.md")):

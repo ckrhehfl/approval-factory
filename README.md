@@ -36,6 +36,7 @@
 - `inspect-work-item`
 - `inspect-pr-plan`
 - `inspect-run`
+- `trace-lineage`
 - `cleanup-rehearsal`
 - `start-execution`
 - `create-goal`
@@ -188,6 +189,20 @@ approval queue visibility 규칙:
 - 출력은 operator-facing visibility only이며 queue eligibility, approval decision, gate 계산, resolve semantics에 영향을 주지 않는다.
 - 최소 출력 항목: `run_id`, run artifact path/state, approval request path/existence/status, evidence bundle path/existence, readiness_context summary, degraded note.
 - approval request 또는 evidence bundle이 없거나 부분적으로 깨졌어도 자동 복구/cleanup/resolve 없이 degraded note로만 보여준다.
+
+`trace-lineage` 최소 계약:
+- `factory trace-lineage`는 지정한 run 기준으로 repo-local orchestration chain의 linked artifact lineage를 읽기 전용으로 추적 출력한다.
+- 선택은 `--latest-run` 또는 `--run-id <id>`로 하며 latest run 선택 규칙은 `factory status`와 동일하다.
+- 출력은 operator-facing visibility only다. readiness gating, active selection, execution selection, queue eligibility, approval decision, planning/work item mutation, run-state transition semantics에 영향을 주지 않는다.
+- 최소 출력 항목:
+  - Run: `run_id`, `run_path`, `run_state`
+  - Approval: approval request path/status, queue path/status if present
+  - PR Plan: `pr_id` if derivable, `plan_path`, `active_relation` if safely derivable
+  - Work Item: `work_item_id` if derivable, work item path, readiness visibility if present
+  - Goal: `goal_id` if derivable, goal path if safely derivable
+  - Clarifications: linked clarification ids if derivable
+  - Degraded Notes: missing or partial linkage explanation only
+- missing artifact나 old-format artifact가 있어도 실패 대신 degraded note로 제한적으로 설명하며, semantic inference나 lifecycle 변경은 하지 않는다.
 
 operator 해석 규칙:
 - `create-pr-plan` 결과가 `archive`면 버그가 아니라 이미 다른 active PR가 있다는 뜻이다.
