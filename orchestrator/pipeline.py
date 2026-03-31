@@ -776,6 +776,84 @@ def _pr_plan_metadata_value(sections: dict[str, str]) -> str | None:
     return None
 
 
+def _parse_work_item_linked_clarifications(sections: dict[str, str], notes: list[str]) -> list[str]:
+    raw_related = sections.get("Related Clarifications", "").strip()
+    if not raw_related:
+        return []
+
+    lines = [line.strip() for line in raw_related.splitlines() if line.strip()]
+    if not lines or lines == ["- none"]:
+        return []
+
+    clarification_ids: list[str] = []
+    for line in lines:
+        match = re.fullmatch(r"-\s+([^\s(]+)(?:\s+\(([^)]+)\))?", line)
+        if match is None:
+            notes.append(
+                "work item related clarifications section malformed: "
+                f"{line}"
+            )
+            continue
+        clarification_ids.append(match.group(1).strip())
+    return clarification_ids
+
+
+def inspect_work_item(*, root_dir: Path, work_item_id: str) -> dict[str, Any]:
+    work_item_path = root_dir / "docs" / "work-items" / f"{work_item_id}.md"
+    notes: list[str] = []
+    exists = work_item_path.exists()
+    sections: dict[str, str] = {}
+
+    if exists:
+        try:
+            sections = _parse_markdown_sections(work_item_path)
+        except Exception as exc:  # pragma: no cover - defensive visibility fallback
+            notes.append(f"work item artifact unreadable: {exc}")
+            sections = {}
+        else:
+            if not sections:
+                notes.append("work item artifact missing markdown sections")
+            if "Work Item ID" not in sections:
+                notes.append("work item artifact missing Work Item ID section")
+            if "Goal ID" not in sections:
+                notes.append("work item artifact missing Goal ID section")
+    else:
+        notes.append(f"work item artifact missing: {work_item_path.as_posix()}")
+
+    parsed_work_item_id = sections.get("Work Item ID", "").strip() if sections else ""
+    title = sections.get("Title", "").strip() if sections else ""
+    summary = sections.get("Summary", "").strip() if sections else ""
+    goal_id = sections.get("Goal ID", "").strip() if sections else ""
+    linked_clarification_ids = _parse_work_item_linked_clarifications(sections, notes) if sections else []
+    metadata_timestamp = _pr_plan_metadata_value(sections) if sections else None
+
+    readiness_visibility: dict[str, Any] | None = None
+    if exists:
+        try:
+            readiness = get_work_item_readiness(root_dir=root_dir, work_item_id=parsed_work_item_id or work_item_id)
+        except (FileNotFoundError, ValueError) as exc:
+            notes.append(str(exc))
+        else:
+            readiness_visibility = {
+                "summary": readiness["overall_readiness_summary"],
+                "linked_clarification_count": readiness["linked_clarification_count"],
+                "context": readiness["clarifications"],
+            }
+
+    return {
+        "work_item_id": parsed_work_item_id or work_item_id,
+        "work_item_path": work_item_path.as_posix(),
+        "exists": exists,
+        "title": title or None,
+        "summary": summary or None,
+        "goal_id": goal_id or None,
+        "linked_clarification_ids": linked_clarification_ids,
+        "readiness_visibility": readiness_visibility,
+        "metadata_timestamp": metadata_timestamp,
+        "degraded_note": "; ".join(notes) if notes else None,
+    }
+
+
 def inspect_pr_plan(*, root_dir: Path, pr_id: str | None = None, active: bool = False) -> dict[str, Any]:
     notes: list[str] = []
     selected_path: Path | None = None
