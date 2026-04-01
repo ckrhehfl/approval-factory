@@ -208,6 +208,9 @@ factory resolve-approval --root . --latest --decision approve --actor approver.l
 - active PR 정보는 `prs/active/*.md`에서 읽는다.
 - latest run 정보는 `runs/latest/*/run.yaml` 중 가장 최근 갱신된 run에서 읽는다.
 - approval 상태는 latest run 기준으로 `approval_queue/approved/`, `approval_queue/pending/`, `approval-decision.yaml`를 읽어 `approved`, `pending`, `none` 중 하나로 보여준다.
+- latest pending approval이 현재 approval target이다.
+- 더 오래된 pending approval은 stale artifact로 남아 보여도 된다.
+- stale pending artifact는 자동 삭제, 자동 resolve, 자동 숨김 대상이 아니다.
 - status는 가능하면 active PR path, latest run path, approval queue/artifact path도 함께 보여준다.
 - active PR가 있으면 status는 연결된 work item의 linked clarification readiness context도 함께 보여줄 수 있다.
 - readiness summary 규칙은 `factory work-item-readiness`와 동일하게 `no-linked-clarifications|ready|attention-needed` 이다.
@@ -221,6 +224,8 @@ operator 해석 팁:
 - `factory status`에서 active PR path와 latest run path를 같이 보면 "내가 어떤 PR/run을 보고 있는지"를 즉시 확인할 수 있다.
 - active PR가 있을 때 `Work Item Readiness`를 같이 보면 source work item의 clarification 맥락을 별도 명령 없이 한 번에 파악할 수 있다.
 - approval이 `pending` 또는 `approved`면 표시된 path를 기준으로 queue/artifact를 바로 열어 본다.
+- 여러 pending이 보여도 current target은 latest pending 하나다. 나머지는 stale visibility로 해석한다.
+- status에 보이는 path나 요약은 selector가 아니다. run 선택은 계속 `--run-id <id>` 또는 `--latest`로 한다.
 - `start-execution` guardrail 메시지는 bug report가 아니라 현재 active PR 흐름을 먼저 정리하라는 운영 안내로 해석한다.
 
 ## cleanup-rehearsal 최소 계약
