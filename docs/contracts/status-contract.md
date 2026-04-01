@@ -28,4 +28,9 @@
 - linked clarification count는 현재 clarification artifact를 다시 읽은 결과를 기준으로 표시할 수 있다.
 - readiness는 visibility only다. status 출력은 create-pr-plan, activate-pr, start-execution, gate, approval semantics를 바꾸지 않는다.
 - readiness artifact를 읽는 중 문제가 생기면 status 전체를 실패시키지 않고 readiness 섹션만 제한적으로 `unavailable`로 표시할 수 있다.
+- latest pending approval이 현재 approval target이다.
+- 더 오래된 pending approval은 stale artifact로 계속 보일 수 있다.
+- stale pending artifact는 자동 삭제, 자동 resolve, 자동 숨김 대상이 아니다.
+- status 출력은 operator visibility다. queue lifecycle, selector logic, readiness semantics를 바꾸지 않는다.
+- status에 보이는 path나 요약은 selector semantics가 아니다.
 - active PR, latest run, approval이 없으면 각 섹션에서 `none`으로 보여준다.
