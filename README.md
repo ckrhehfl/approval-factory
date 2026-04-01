@@ -33,6 +33,7 @@
 - `status`
 - `inspect-approval-queue`
 - `inspect-approval`
+- `inspect-goal`
 - `inspect-clarification`
 - `inspect-work-item`
 - `inspect-pr-plan`
@@ -183,6 +184,13 @@ approval queue visibility 규칙:
 - 출력은 operator-facing visibility only다. clarification resolution, readiness gating, planning selection, execution selection, queue eligibility, approval decision에 영향을 주지 않는다.
 - 최소 출력 항목: `clarification_id`, clarification path/existence, title/question/summary if present, `status` if present, linked `goal_id` if present, linked `work_item_id` 목록 if present, metadata timestamp if present, degraded note.
 - artifact가 없거나 부분적으로 unreadable이어도 clarification mutation, auto-resolve, cleanup, auto-hide, readiness-to-gate 연결, work item mutation, lifecycle/state transition semantics를 바꾸지 않고 degraded note로만 보여준다.
+
+`inspect-goal` 최소 계약:
+- `factory inspect-goal`은 `goals/<goal-id>.md` goal artifact 자체를 읽기 전용으로 inspection 출력한다.
+- 선택은 `--goal-id <id>`만 지원한다.
+- 출력은 operator-facing visibility only다. clarification resolution, readiness gating, planning selection, execution selection, queue eligibility, approval decision에 영향을 주지 않는다.
+- 최소 출력 항목: `goal_id`, goal path/existence, title/summary if present, `status` if present, linked clarification ids if derivable, linked work item ids if derivable, metadata timestamp if present, degraded note.
+- artifact가 없거나 부분적으로 unreadable이어도 goal mutation, clarification mutation, work item mutation, auto-resolve, cleanup, auto-hide, readiness-to-gate 연결, planning selection, execution selection, lifecycle/state transition semantics를 바꾸지 않고 degraded note로만 보여준다.
 
 `inspect-pr-plan` 최소 계약:
 - `factory inspect-pr-plan`은 PR plan artifact를 읽기 전용으로 inspection 출력한다.

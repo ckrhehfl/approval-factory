@@ -20,6 +20,7 @@ from orchestrator.pipeline import (
     inspect_approval,
     inspect_approval_queue,
     inspect_clarification,
+    inspect_goal,
     inspect_pr_plan,
     inspect_run,
     inspect_work_item,
@@ -274,6 +275,38 @@ def _render_clarification_inspection(inspection: dict[str, object]) -> str:
     lines.append(f"- goal_id: {inspection.get('goal_id') or 'none'}")
     lines.append(f"- metadata_timestamp: {inspection.get('metadata_timestamp') or 'none'}")
     lines.append(f"- degraded_note: {inspection.get('degraded_note') or 'none'}")
+
+    lines.append("")
+    lines.append("Linked Work Items:")
+    linked_work_item_ids = inspection.get("linked_work_item_ids")
+    if isinstance(linked_work_item_ids, list) and linked_work_item_ids:
+        for work_item_id in linked_work_item_ids:
+            lines.append(f"- work_item_id: {work_item_id}")
+    else:
+        lines.append("- none")
+
+    return "\n".join(lines)
+
+
+def _render_goal_inspection(inspection: dict[str, object]) -> str:
+    lines = ["Goal Inspection:"]
+    lines.append(f"- goal_id: {inspection.get('goal_id') or 'none'}")
+    lines.append(f"- goal_path: {inspection.get('goal_path') or 'none'}")
+    lines.append(f"- exists: {inspection['exists']}")
+    lines.append(f"- title: {inspection.get('title') or 'none'}")
+    lines.append(f"- summary: {inspection.get('summary') or 'none'}")
+    lines.append(f"- status: {inspection.get('status') or 'none'}")
+    lines.append(f"- metadata_timestamp: {inspection.get('metadata_timestamp') or 'none'}")
+    lines.append(f"- degraded_note: {inspection.get('degraded_note') or 'none'}")
+
+    lines.append("")
+    lines.append("Linked Clarifications:")
+    linked_clarification_ids = inspection.get("linked_clarification_ids")
+    if isinstance(linked_clarification_ids, list) and linked_clarification_ids:
+        for clarification_id in linked_clarification_ids:
+            lines.append(f"- clarification_id: {clarification_id}")
+    else:
+        lines.append("- none")
 
     lines.append("")
     lines.append("Linked Work Items:")
@@ -575,6 +608,13 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_clarification_parser.add_argument("--root", default=".", help="Repository root path")
     inspect_clarification_parser.add_argument("--clarification-id", required=True)
 
+    inspect_goal_parser = subparsers.add_parser(
+        "inspect-goal",
+        help="Inspect goal artifacts in visibility-only mode",
+    )
+    inspect_goal_parser.add_argument("--root", default=".", help="Repository root path")
+    inspect_goal_parser.add_argument("--goal-id", required=True)
+
     trace_lineage_parser = subparsers.add_parser(
         "trace-lineage",
         help="Trace run-linked repo-local artifacts in visibility-only mode",
@@ -782,6 +822,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                 inspect_clarification(
                     root_dir=Path(args.root),
                     clarification_id=args.clarification_id,
+                )
+            )
+        )
+        return 0
+
+    if args.command == "inspect-goal":
+        print(
+            _render_goal_inspection(
+                inspect_goal(
+                    root_dir=Path(args.root),
+                    goal_id=args.goal_id,
                 )
             )
         )
