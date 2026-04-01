@@ -857,6 +857,100 @@ def _find_linked_work_item_ids(
     return _dedupe_preserving_order(work_item_ids)
 
 
+def _find_goal_linked_clarification_ids(root_dir: Path, *, goal_id: str, notes: list[str]) -> list[str]:
+    clarification_dir = root_dir / "clarifications" / goal_id
+    if not clarification_dir.exists():
+        return []
+
+    clarification_ids: list[str] = []
+    for clarification_path in sorted(clarification_dir.glob("*.md")):
+        clarification_ids.append(clarification_path.stem)
+        try:
+            sections = _parse_markdown_sections(clarification_path)
+        except Exception as exc:  # pragma: no cover - defensive visibility fallback
+            notes.append(f"linked clarification artifact unreadable: {clarification_path.as_posix()}: {exc}")
+            continue
+
+        artifact_goal_id = sections.get("Goal ID", "").strip()
+        if sections and artifact_goal_id and artifact_goal_id != goal_id:
+            notes.append(
+                "linked clarification goal mismatch: "
+                f"{clarification_path.as_posix()} declares Goal ID '{artifact_goal_id}', expected '{goal_id}'"
+            )
+
+    return _dedupe_preserving_order(clarification_ids)
+
+
+def _find_goal_linked_work_item_ids(root_dir: Path, *, goal_id: str, notes: list[str]) -> list[str]:
+    work_item_ids: list[str] = []
+    for work_item_path in sorted((root_dir / "docs" / "work-items").glob("*.md")):
+        try:
+            sections = _parse_markdown_sections(work_item_path)
+        except Exception as exc:  # pragma: no cover - defensive visibility fallback
+            notes.append(f"linked work item artifact unreadable: {work_item_path.as_posix()}: {exc}")
+            continue
+
+        if not sections:
+            continue
+
+        work_item_goal_id = sections.get("Goal ID", "").strip()
+        if work_item_goal_id != goal_id:
+            continue
+
+        parsed_work_item_id = sections.get("Work Item ID", "").strip() or work_item_path.stem
+        work_item_ids.append(parsed_work_item_id)
+
+    return _dedupe_preserving_order(work_item_ids)
+
+
+def inspect_goal(*, root_dir: Path, goal_id: str) -> dict[str, Any]:
+    goal_path = root_dir / "goals" / f"{goal_id}.md"
+    notes: list[str] = []
+    exists = goal_path.exists()
+    sections: dict[str, str] = {}
+
+    if exists:
+        try:
+            sections = _parse_markdown_sections(goal_path)
+        except Exception as exc:  # pragma: no cover - defensive visibility fallback
+            notes.append(f"goal artifact unreadable: {exc}")
+            sections = {}
+        else:
+            if not sections:
+                notes.append("goal artifact missing markdown sections")
+            if "Goal ID" not in sections:
+                notes.append("goal artifact missing Goal ID section")
+    else:
+        notes.append(f"goal artifact missing: {goal_path.as_posix()}")
+
+    parsed_goal_id = sections.get("Goal ID", "").strip() if sections else ""
+    resolved_goal_id = parsed_goal_id or goal_id
+
+    linked_clarification_ids = (
+        _find_goal_linked_clarification_ids(root_dir, goal_id=resolved_goal_id, notes=notes)
+        if exists
+        else []
+    )
+    linked_work_item_ids = (
+        _find_goal_linked_work_item_ids(root_dir, goal_id=resolved_goal_id, notes=notes)
+        if exists
+        else []
+    )
+
+    return {
+        "goal_id": resolved_goal_id,
+        "goal_path": goal_path.as_posix(),
+        "exists": exists,
+        "title": sections.get("Title", "").strip() or None,
+        "summary": sections.get("Summary", "").strip() or None,
+        "status": sections.get("Status", "").strip() or None,
+        "linked_clarification_ids": linked_clarification_ids,
+        "linked_work_item_ids": linked_work_item_ids,
+        "metadata_timestamp": _pr_plan_metadata_value(sections) if sections else None,
+        "degraded_note": "; ".join(notes) if notes else None,
+    }
+
+
 def inspect_clarification(*, root_dir: Path, clarification_id: str) -> dict[str, Any]:
     notes: list[str] = []
     selected_path = _find_clarification_artifact(root_dir, clarification_id, notes)

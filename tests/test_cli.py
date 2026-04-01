@@ -3400,6 +3400,289 @@ class CleanupRehearsalCliTest(unittest.TestCase):
                 "Approval Queue Inspection:\n- latest_run_id: none\n- pending_total: 0\n\nPending Approvals:\n- none\n",
             )
 
+    def test_inspect_goal_successfully_by_id(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            goal_path = root / "goals" / "GOAL-751.md"
+            goal_path.parent.mkdir(parents=True, exist_ok=True)
+            goal_path.write_text(
+                "\n".join(
+                    [
+                        "# GOAL-751: inspect goal visibility",
+                        "",
+                        "## Goal ID",
+                        "GOAL-751",
+                        "",
+                        "## Title",
+                        "inspect goal visibility",
+                        "",
+                        "## Summary",
+                        "Operator-facing goal inspection only.",
+                        "",
+                        "## Status",
+                        "draft",
+                        "",
+                        "## Updated At",
+                        "2026-03-31T10:00:00+00:00",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (root / "clarifications" / "GOAL-751").mkdir(parents=True, exist_ok=True)
+            (root / "clarifications" / "GOAL-751" / "CLAR-751A.md").write_text(
+                "# CLAR-751A\n\n## Clarification ID\nCLAR-751A\n\n## Goal ID\nGOAL-751\n",
+                encoding="utf-8",
+            )
+            (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+            (root / "docs" / "work-items" / "WI-751A.md").write_text(
+                "\n".join(
+                    [
+                        "# WI-751A",
+                        "",
+                        "## Work Item ID",
+                        "WI-751A",
+                        "",
+                        "## Goal ID",
+                        "GOAL-751",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-goal", "--root", str(root), "--goal-id", "GOAL-751"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Goal Inspection:", output)
+            self.assertIn("- goal_id: GOAL-751", output)
+            self.assertIn(f"- goal_path: {goal_path.as_posix()}", output)
+            self.assertIn("- exists: True", output)
+            self.assertIn("- title: inspect goal visibility", output)
+            self.assertIn("- summary: Operator-facing goal inspection only.", output)
+            self.assertIn("- status: draft", output)
+            self.assertIn("- metadata_timestamp: 2026-03-31T10:00:00+00:00", output)
+            self.assertIn("- clarification_id: CLAR-751A", output)
+            self.assertIn("- work_item_id: WI-751A", output)
+
+    def test_inspect_goal_degrades_safely_when_artifact_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-goal", "--root", str(root), "--goal-id", "GOAL-752"])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                stdout.getvalue(),
+                "\n".join(
+                    [
+                        "Goal Inspection:",
+                        "- goal_id: GOAL-752",
+                        f"- goal_path: {(root / 'goals' / 'GOAL-752.md').as_posix()}",
+                        "- exists: False",
+                        "- title: none",
+                        "- summary: none",
+                        "- status: none",
+                        "- metadata_timestamp: none",
+                        f"- degraded_note: goal artifact missing: {(root / 'goals' / 'GOAL-752.md').as_posix()}",
+                        "",
+                        "Linked Clarifications:",
+                        "- none",
+                        "",
+                        "Linked Work Items:",
+                        "- none",
+                    ]
+                )
+                + "\n",
+            )
+
+    def test_inspect_goal_degrades_safely_for_partial_or_unreadable_artifact(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            goal_path = root / "goals" / "GOAL-753.md"
+            goal_path.parent.mkdir(parents=True, exist_ok=True)
+            goal_path.write_text("# partial only\n", encoding="utf-8")
+            (root / "clarifications" / "GOAL-753").mkdir(parents=True, exist_ok=True)
+            (root / "clarifications" / "GOAL-753" / "CLAR-753A.md").write_text("# CLAR-753A\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-goal", "--root", str(root), "--goal-id", "GOAL-753"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- exists: True", output)
+            self.assertIn("goal artifact missing markdown sections", output)
+            self.assertIn("goal artifact missing Goal ID section", output)
+            self.assertIn("- clarification_id: CLAR-753A", output)
+
+    def test_inspect_goal_shows_linked_refs_only_as_visibility(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            goal_path = root / "goals" / "GOAL-754.md"
+            goal_path.parent.mkdir(parents=True, exist_ok=True)
+            goal_path.write_text(
+                "\n".join(
+                    [
+                        "# GOAL-754: linked refs visibility",
+                        "",
+                        "## Goal ID",
+                        "GOAL-754",
+                        "",
+                        "## Title",
+                        "linked refs visibility",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (root / "clarifications" / "GOAL-754").mkdir(parents=True, exist_ok=True)
+            (root / "clarifications" / "GOAL-754" / "CLAR-754A.md").write_text(
+                "# CLAR-754A\n\n## Clarification ID\nCLAR-754A\n\n## Goal ID\nGOAL-754\n",
+                encoding="utf-8",
+            )
+            (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+            (root / "docs" / "work-items" / "WI-754A.md").write_text(
+                "\n".join(
+                    [
+                        "# WI-754A",
+                        "",
+                        "## Work Item ID",
+                        "WI-754A",
+                        "",
+                        "## Goal ID",
+                        "GOAL-754",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            status_stdout = StringIO()
+            with redirect_stdout(status_stdout):
+                status_exit_code = main(["status", "--root", str(root)])
+
+            inspect_stdout = StringIO()
+            with redirect_stdout(inspect_stdout):
+                inspect_exit_code = main(["inspect-goal", "--root", str(root), "--goal-id", "GOAL-754"])
+
+            self.assertEqual(status_exit_code, 0)
+            self.assertEqual(inspect_exit_code, 0)
+            output = inspect_stdout.getvalue()
+            self.assertIn("- clarification_id: CLAR-754A", output)
+            self.assertIn("- work_item_id: WI-754A", output)
+            self.assertNotIn("auto-resolve", output)
+            self.assertIn("Latest Run:\n- none", status_stdout.getvalue())
+
+    def test_inspect_goal_shows_status_only_as_visibility(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            goal_path = root / "goals" / "GOAL-755.md"
+            goal_path.parent.mkdir(parents=True, exist_ok=True)
+            goal_path.write_text(
+                "\n".join(
+                    [
+                        "# GOAL-755: visibility status",
+                        "",
+                        "## Goal ID",
+                        "GOAL-755",
+                        "",
+                        "## Title",
+                        "visibility status",
+                        "",
+                        "## Status",
+                        "in_review",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            inspect_stdout = StringIO()
+            with redirect_stdout(inspect_stdout):
+                inspect_exit_code = main(["inspect-goal", "--root", str(root), "--goal-id", "GOAL-755"])
+
+            queue_stdout = StringIO()
+            with redirect_stdout(queue_stdout):
+                queue_exit_code = main(["inspect-approval-queue", "--root", str(root)])
+
+            self.assertEqual(inspect_exit_code, 0)
+            self.assertEqual(queue_exit_code, 0)
+            self.assertIn("- status: in_review", inspect_stdout.getvalue())
+            self.assertEqual(
+                queue_stdout.getvalue(),
+                "Approval Queue Inspection:\n- latest_run_id: none\n- pending_total: 0\n\nPending Approvals:\n- none\n",
+            )
+
+    def test_inspect_goal_keeps_existing_visibility_commands_unchanged(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "runs" / "latest" / "RUN-756"
+            artifacts = run_dir / "artifacts"
+            artifacts.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-756",
+                        "  pr_id: PR-756",
+                        "  work_item_id: WI-756",
+                        "  state: approval_pending",
+                        "  updated_at: 2026-03-31T12:00:00+00:00",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (artifacts / "approval-request.yaml").write_text("approval_request:\n  status: pending\n", encoding="utf-8")
+            (artifacts / "evidence-bundle.yaml").write_text("evidence_bundle:\n  status: complete\n", encoding="utf-8")
+            (root / "goals").mkdir(parents=True, exist_ok=True)
+            (root / "goals" / "GOAL-756.md").write_text("# GOAL-756\n\n## Goal ID\nGOAL-756\n", encoding="utf-8")
+
+            status_before = StringIO()
+            with redirect_stdout(status_before):
+                self.assertEqual(main(["status", "--root", str(root)]), 0)
+
+            run_before = StringIO()
+            with redirect_stdout(run_before):
+                self.assertEqual(main(["inspect-run", "--root", str(root), "--run-id", "RUN-756"]), 0)
+
+            with redirect_stdout(StringIO()):
+                self.assertEqual(main(["inspect-goal", "--root", str(root), "--goal-id", "GOAL-756"]), 0)
+
+            status_after = StringIO()
+            with redirect_stdout(status_after):
+                self.assertEqual(main(["status", "--root", str(root)]), 0)
+
+            run_after = StringIO()
+            with redirect_stdout(run_after):
+                self.assertEqual(main(["inspect-run", "--root", str(root), "--run-id", "RUN-756"]), 0)
+
+            self.assertEqual(status_before.getvalue(), status_after.getvalue())
+            self.assertEqual(run_before.getvalue(), run_after.getvalue())
+
     def test_inspect_work_item_degrades_safely_when_artifact_is_missing(self) -> None:
         from pathlib import Path
 
