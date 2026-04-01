@@ -798,6 +798,115 @@ def _parse_work_item_linked_clarifications(sections: dict[str, str], notes: list
     return clarification_ids
 
 
+def _clarification_locator(root_dir: Path, clarification_id: str) -> Path:
+    return root_dir / "clarifications" / "*" / f"{clarification_id}.md"
+
+
+def _find_clarification_artifact(root_dir: Path, clarification_id: str, notes: list[str]) -> Path | None:
+    matches = sorted((root_dir / "clarifications").glob(f"*/{clarification_id}.md"))
+    if not matches:
+        expected_path = _clarification_locator(root_dir, clarification_id).as_posix()
+        notes.append(
+            "clarification artifact missing for clarification-id "
+            f"'{clarification_id}': expected {expected_path}"
+        )
+        return None
+    if len(matches) > 1:
+        match_list = ", ".join(path.as_posix() for path in matches)
+        notes.append(
+            "clarification artifact lookup is ambiguous for clarification-id "
+            f"'{clarification_id}': found {len(matches)} matches: {match_list}"
+        )
+        return None
+    return matches[0]
+
+
+def _find_linked_work_item_ids(
+    root_dir: Path,
+    *,
+    clarification_id: str,
+    goal_id: str | None,
+    notes: list[str],
+) -> list[str]:
+    work_item_ids: list[str] = []
+    for work_item_path in sorted((root_dir / "docs" / "work-items").glob("*.md")):
+        try:
+            sections = _parse_markdown_sections(work_item_path)
+        except Exception as exc:  # pragma: no cover - defensive visibility fallback
+            notes.append(f"linked work item artifact unreadable: {work_item_path.as_posix()}: {exc}")
+            continue
+
+        if not sections:
+            continue
+
+        if goal_id is not None:
+            work_item_goal_id = sections.get("Goal ID", "").strip()
+            if work_item_goal_id and work_item_goal_id != goal_id:
+                continue
+
+        related_notes: list[str] = []
+        related_clarification_ids = _parse_work_item_linked_clarifications(sections, related_notes)
+        if related_notes:
+            notes.extend(f"{work_item_path.as_posix()}: {note}" for note in related_notes)
+        if clarification_id not in related_clarification_ids:
+            continue
+
+        parsed_work_item_id = sections.get("Work Item ID", "").strip() or work_item_path.stem
+        work_item_ids.append(parsed_work_item_id)
+
+    return _dedupe_preserving_order(work_item_ids)
+
+
+def inspect_clarification(*, root_dir: Path, clarification_id: str) -> dict[str, Any]:
+    notes: list[str] = []
+    selected_path = _find_clarification_artifact(root_dir, clarification_id, notes)
+    exists = bool(selected_path and selected_path.exists())
+    sections: dict[str, str] = {}
+
+    if selected_path is not None and exists:
+        try:
+            sections = _parse_markdown_sections(selected_path)
+        except Exception as exc:  # pragma: no cover - defensive visibility fallback
+            notes.append(f"clarification artifact unreadable: {exc}")
+            sections = {}
+        else:
+            if not sections:
+                notes.append("clarification artifact missing markdown sections")
+            if "Clarification ID" not in sections:
+                notes.append("clarification artifact missing Clarification ID section")
+
+    parsed_clarification_id = sections.get("Clarification ID", "").strip() if sections else ""
+    goal_id = sections.get("Goal ID", "").strip() if sections else ""
+    linked_work_item_ids = (
+        _find_linked_work_item_ids(
+            root_dir,
+            clarification_id=parsed_clarification_id or clarification_id,
+            goal_id=goal_id or None,
+            notes=notes,
+        )
+        if selected_path is not None and exists
+        else []
+    )
+
+    return {
+        "clarification_id": parsed_clarification_id or clarification_id,
+        "clarification_path": (
+            selected_path.as_posix()
+            if selected_path is not None
+            else _clarification_locator(root_dir, clarification_id).as_posix()
+        ),
+        "exists": exists,
+        "title": sections.get("Title", "").strip() or None,
+        "question": sections.get("Question", "").strip() or None,
+        "summary": sections.get("Summary", "").strip() or None,
+        "status": sections.get("Status", "").strip() or None,
+        "goal_id": goal_id or None,
+        "linked_work_item_ids": linked_work_item_ids,
+        "metadata_timestamp": _pr_plan_metadata_value(sections) if sections else None,
+        "degraded_note": "; ".join(notes) if notes else None,
+    }
+
+
 def inspect_work_item(*, root_dir: Path, work_item_id: str) -> dict[str, Any]:
     work_item_path = root_dir / "docs" / "work-items" / f"{work_item_id}.md"
     notes: list[str] = []

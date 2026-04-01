@@ -19,6 +19,7 @@ from orchestrator.pipeline import (
     get_work_item_readiness,
     inspect_approval,
     inspect_approval_queue,
+    inspect_clarification,
     inspect_pr_plan,
     inspect_run,
     inspect_work_item,
@@ -255,6 +256,31 @@ def _render_work_item_inspection(inspection: dict[str, object]) -> str:
                     lines.append(
                         f"- clarification: {entry.get('clarification_id') or 'unknown'} = {entry.get('status') or 'none'}"
                     )
+    else:
+        lines.append("- none")
+
+    return "\n".join(lines)
+
+
+def _render_clarification_inspection(inspection: dict[str, object]) -> str:
+    lines = ["Clarification Inspection:"]
+    lines.append(f"- clarification_id: {inspection.get('clarification_id') or 'none'}")
+    lines.append(f"- clarification_path: {inspection.get('clarification_path') or 'none'}")
+    lines.append(f"- exists: {inspection['exists']}")
+    lines.append(f"- title: {inspection.get('title') or 'none'}")
+    lines.append(f"- question: {inspection.get('question') or 'none'}")
+    lines.append(f"- summary: {inspection.get('summary') or 'none'}")
+    lines.append(f"- status: {inspection.get('status') or 'none'}")
+    lines.append(f"- goal_id: {inspection.get('goal_id') or 'none'}")
+    lines.append(f"- metadata_timestamp: {inspection.get('metadata_timestamp') or 'none'}")
+    lines.append(f"- degraded_note: {inspection.get('degraded_note') or 'none'}")
+
+    lines.append("")
+    lines.append("Linked Work Items:")
+    linked_work_item_ids = inspection.get("linked_work_item_ids")
+    if isinstance(linked_work_item_ids, list) and linked_work_item_ids:
+        for work_item_id in linked_work_item_ids:
+            lines.append(f"- work_item_id: {work_item_id}")
     else:
         lines.append("- none")
 
@@ -542,6 +568,13 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_work_item_parser.add_argument("--root", default=".", help="Repository root path")
     inspect_work_item_parser.add_argument("--work-item-id", required=True)
 
+    inspect_clarification_parser = subparsers.add_parser(
+        "inspect-clarification",
+        help="Inspect clarification artifacts in visibility-only mode",
+    )
+    inspect_clarification_parser.add_argument("--root", default=".", help="Repository root path")
+    inspect_clarification_parser.add_argument("--clarification-id", required=True)
+
     trace_lineage_parser = subparsers.add_parser(
         "trace-lineage",
         help="Trace run-linked repo-local artifacts in visibility-only mode",
@@ -738,6 +771,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                 inspect_work_item(
                     root_dir=Path(args.root),
                     work_item_id=args.work_item_id,
+                )
+            )
+        )
+        return 0
+
+    if args.command == "inspect-clarification":
+        print(
+            _render_clarification_inspection(
+                inspect_clarification(
+                    root_dir=Path(args.root),
+                    clarification_id=args.clarification_id,
                 )
             )
         )
