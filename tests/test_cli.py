@@ -3149,6 +3149,257 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("- linked_clarification_count: 2", output)
             self.assertIn("- degraded_note: none", output)
 
+    def test_inspect_clarification_successfully_by_id(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            clarification_path = root / "clarifications" / "GOAL-770" / "CLAR-770.md"
+            clarification_path.parent.mkdir(parents=True, exist_ok=True)
+            clarification_path.write_text(
+                "\n".join(
+                    [
+                        "# CLAR-770: inspect clarification",
+                        "",
+                        "## Clarification ID",
+                        "CLAR-770",
+                        "",
+                        "## Goal ID",
+                        "GOAL-770",
+                        "",
+                        "## Title",
+                        "inspect clarification",
+                        "",
+                        "## Status",
+                        "open",
+                        "",
+                        "## Question",
+                        "What contract must remain visibility-only?",
+                        "",
+                        "## Summary",
+                        "Operator wants direct clarification inspection.",
+                        "",
+                        "## Created At",
+                        "2026-03-30T11:00:00+00:00",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+            (root / "docs" / "work-items" / "WI-770.md").write_text(
+                "\n".join(
+                    [
+                        "# WI-770: linked clarification",
+                        "",
+                        "## Work Item ID",
+                        "WI-770",
+                        "",
+                        "## Goal ID",
+                        "GOAL-770",
+                        "",
+                        "## Related Clarifications",
+                        "- CLAR-770 (open)",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-clarification", "--root", str(root), "--clarification-id", "CLAR-770"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Clarification Inspection:", output)
+            self.assertIn("- clarification_id: CLAR-770", output)
+            self.assertIn(f"- clarification_path: {clarification_path.as_posix()}", output)
+            self.assertIn("- exists: True", output)
+            self.assertIn("- title: inspect clarification", output)
+            self.assertIn("- question: What contract must remain visibility-only?", output)
+            self.assertIn("- summary: Operator wants direct clarification inspection.", output)
+            self.assertIn("- status: open", output)
+            self.assertIn("- goal_id: GOAL-770", output)
+            self.assertIn("- metadata_timestamp: 2026-03-30T11:00:00+00:00", output)
+            self.assertIn("- work_item_id: WI-770", output)
+            self.assertIn("- degraded_note: none", output)
+
+    def test_inspect_clarification_degrades_safely_when_artifact_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-clarification", "--root", str(root), "--clarification-id", "CLAR-771"])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                stdout.getvalue(),
+                "\n".join(
+                    [
+                        "Clarification Inspection:",
+                        "- clarification_id: CLAR-771",
+                        f"- clarification_path: {(root / 'clarifications' / '*' / 'CLAR-771.md').as_posix()}",
+                        "- exists: False",
+                        "- title: none",
+                        "- question: none",
+                        "- summary: none",
+                        "- status: none",
+                        "- goal_id: none",
+                        "- metadata_timestamp: none",
+                        (
+                            "- degraded_note: clarification artifact missing for clarification-id 'CLAR-771': "
+                            f"expected {(root / 'clarifications' / '*' / 'CLAR-771.md').as_posix()}"
+                        ),
+                        "",
+                        "Linked Work Items:",
+                        "- none",
+                    ]
+                )
+                + "\n",
+            )
+
+    def test_inspect_clarification_degrades_safely_for_partial_or_unreadable_artifact(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            clarification_path = root / "clarifications" / "GOAL-772" / "CLAR-772.md"
+            clarification_path.parent.mkdir(parents=True, exist_ok=True)
+            clarification_path.write_bytes(b"\xff\xfe")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-clarification", "--root", str(root), "--clarification-id", "CLAR-772"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- exists: True", output)
+            self.assertIn(f"- clarification_path: {clarification_path.as_posix()}", output)
+            self.assertIn("clarification artifact unreadable:", output)
+            self.assertIn("- status: none", output)
+            self.assertIn("Linked Work Items:\n- none", output)
+
+    def test_inspect_clarification_shows_linked_references_only_as_visibility(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            clarification_path = root / "clarifications" / "GOAL-773" / "CLAR-773.md"
+            clarification_path.parent.mkdir(parents=True, exist_ok=True)
+            clarification_path.write_text(
+                "\n".join(
+                    [
+                        "# CLAR-773: linked refs only",
+                        "",
+                        "## Clarification ID",
+                        "CLAR-773",
+                        "",
+                        "## Goal ID",
+                        "GOAL-773",
+                        "",
+                        "## Title",
+                        "linked refs only",
+                        "",
+                        "## Status",
+                        "resolved",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+            (root / "docs" / "work-items" / "WI-773A.md").write_text(
+                "\n".join(
+                    [
+                        "# WI-773A",
+                        "",
+                        "## Work Item ID",
+                        "WI-773A",
+                        "",
+                        "## Goal ID",
+                        "GOAL-773",
+                        "",
+                        "## Related Clarifications",
+                        "- CLAR-773 (resolved)",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            status_before = StringIO()
+            with redirect_stdout(status_before):
+                before_exit_code = main(["status", "--root", str(root)])
+
+            inspect_stdout = StringIO()
+            with redirect_stdout(inspect_stdout):
+                inspect_exit_code = main(["inspect-clarification", "--root", str(root), "--clarification-id", "CLAR-773"])
+
+            status_after = StringIO()
+            with redirect_stdout(status_after):
+                after_exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(before_exit_code, 0)
+            self.assertEqual(inspect_exit_code, 0)
+            self.assertEqual(after_exit_code, 0)
+            self.assertIn("- goal_id: GOAL-773", inspect_stdout.getvalue())
+            self.assertIn("- work_item_id: WI-773A", inspect_stdout.getvalue())
+            self.assertEqual(status_before.getvalue(), status_after.getvalue())
+
+    def test_inspect_clarification_shows_status_only_as_visibility(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            clarification_path = root / "clarifications" / "GOAL-774" / "CLAR-774.md"
+            clarification_path.parent.mkdir(parents=True, exist_ok=True)
+            clarification_path.write_text(
+                "\n".join(
+                    [
+                        "# CLAR-774: visibility status",
+                        "",
+                        "## Clarification ID",
+                        "CLAR-774",
+                        "",
+                        "## Goal ID",
+                        "GOAL-774",
+                        "",
+                        "## Title",
+                        "visibility status",
+                        "",
+                        "## Status",
+                        "deferred",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            inspect_stdout = StringIO()
+            with redirect_stdout(inspect_stdout):
+                inspect_exit_code = main(["inspect-clarification", "--root", str(root), "--clarification-id", "CLAR-774"])
+
+            queue_stdout = StringIO()
+            with redirect_stdout(queue_stdout):
+                queue_exit_code = main(["inspect-approval-queue", "--root", str(root)])
+
+            self.assertEqual(inspect_exit_code, 0)
+            self.assertEqual(queue_exit_code, 0)
+            self.assertIn("- status: deferred", inspect_stdout.getvalue())
+            self.assertEqual(
+                queue_stdout.getvalue(),
+                "Approval Queue Inspection:\n- latest_run_id: none\n- pending_total: 0\n\nPending Approvals:\n- none\n",
+            )
+
     def test_inspect_work_item_degrades_safely_when_artifact_is_missing(self) -> None:
         from pathlib import Path
 
