@@ -15,6 +15,7 @@
 - clarification draft minimum
 - clarification queue minimum
 - work item draft minimum
+- PR plan draft minimum
 - Work Item artifact minimum
 - active PR plan minimum
 
@@ -74,7 +75,14 @@
 - readiness summary도 visibility only이며 create-pr-plan, start-execution, gate, approval semantics를 바꾸지 않는다.
 - 현재 단계는 artifact 생성과 수동 관리까지만 제공하며 auto decomposition, work item draft auto-promotion, bulk promotion, clarification auto-link recommendation, 강제 gating은 다음 PR 범위다.
 
-6. Active PR 계획
+6. PR plan draft
+- `factory draft-pr-plan`으로 `pr_plan_drafts/<work-item-id>.md`를 생성한다.
+- draft는 official work item artifact `docs/work-items/<work-item-id>.md`만 읽는 deterministic rule-based artifact다.
+- source of truth는 official work item artifact이며 `work_item_drafts/`는 입력으로 읽지 않는다.
+- draft는 `prs/active/`, `prs/archive/` official artifact를 만들지 않고, readiness/gate/approval/queue/selector/active PR/lifecycle semantics도 바꾸지 않는다.
+- official PR plan 생성은 자동이 아니라 operator가 `factory create-pr-plan`을 별도로 실행할 때만 일어난다.
+
+7. Active PR 계획
 - `factory create-pr-plan`로 PR plan 후보를 생성한다.
 - active PR plan은 Work Item을 현재 실행 중인 단 하나의 PR로 연결하는 수동 Markdown artifact다.
 - 기본 섹션은 PR ID, Work Item ID, Title, Status, Summary, Work Item Readiness, Linked Clarifications, Scope, Out of Scope, Implementation Notes, Risks, Open Questions다.
@@ -90,7 +98,7 @@
 - `factory status`는 active PR가 있을 때 source work item readiness summary를 같은 규칙으로 read-only 노출할 수 있다.
 - 이 status readiness는 visibility only이며 start-execution, gate, approval semantics를 바꾸지 않는다.
 
-7. Run 부트스트랩
+8. Run 부트스트랩
 - `factory start-execution`으로 `prs/active/`의 단일 active PR plan을 읽어 `runs/latest/<run-id>/` 및 기본 artifact를 만든다.
 - active PR가 사용자의 의도와 다르면 먼저 `activate-pr`로 전환한 뒤 실행한다.
 - active PR plan의 `Work Item ID`가 실제 `docs/work-items/` artifact와 연결되지 않으면 시작하지 않는다.
@@ -108,17 +116,17 @@
 - 이 명령은 전체 reset이 아니라 partial cleanup만 허용하며, `docs/prs/` 이력 문서는 유지한다.
 - 실제 운영 이력과 non-rehearsal artifact는 기본적으로 보존한다.
 
-8. 역할별 결과 기록
+9. 역할별 결과 기록
 - Implementer/Reviewer/QA/Docs Sync/Verification 결과를 해당 record 명령으로 artifact에 반영한다.
 - 같은 세션에서 방금 시작한 run에 계속 기록할 때는 `--run-id <id>` 대신 `--latest`를 사용할 수 있다.
 - `--latest`는 `factory status`와 같은 latest-run 규칙을 사용하므로 operator가 상태 화면에서 본 latest run과 같은 대상을 고른다.
 - 과거 run 재작업이나 명시성이 필요한 상황에서는 기존 `--run-id <id>`를 유지한다.
 
-9. 게이트 판정
+10. 게이트 판정
 - `factory gate-check`로 `gate-status.yaml`을 갱신한다.
  - 이 단계는 gate 판정 확인용이며, 최종 승인 요청 산출물 최신화 단계는 아니다.
 
-10. 승인 패키지 생성
+11. 승인 패키지 생성
 - `factory build-approval`로 `evidence-bundle.yaml`, `approval-request.yaml`를 최신 상태로 만든다.
 - 이 단계는 가능하면 source work item readiness context를 approval artifact에 함께 남겨 approver가 evidence와 readiness 맥락을 같이 볼 수 있게 한다.
 - 이 단계는 `record-review`, `record-qa`, `record-docs-sync`, `record-verification`이 모두 실제로 기록된 뒤에만 허용된다.
@@ -127,7 +135,7 @@
 - latest run에는 placeholder artifact가 남아 있어도 prerequisite를 충족한 것이 아니므로, 에러가 나면 안내된 `record-*` 명령을 먼저 수행한다.
 - readiness는 informational only이며 queue 적재, gate 계산, resolve-approval semantics를 바꾸지 않는다.
 
-11. 승인자 결정
+12. 승인자 결정
 - 승인자는 queue 파일과 evidence를 보고 `approve/reject/exception`을 결정한다.
 - `factory resolve-approval`로 승인 결정을 `approval-decision.yaml`에 기록한다.
 - 이 단계는 populated `approval-request.yaml`와 pending queue item이 모두 있을 때만 허용된다.

@@ -13,23 +13,24 @@
 8. 필요 시 `factory promote-work-item-draft`로 `work_item_drafts/<goal-id>.md`의 단일 후보를 `docs/work-items/<work-item-id>.md`로 승격
 9. 또는 `factory create-work-item`로 `docs/work-items/<work-item-id>.md` 생성
 10. 필요 시 `factory work-item-readiness`로 linked clarification 기준 최소 readiness visibility 확인
-11. `factory create-pr-plan`로 PR plan 후보 생성
-12. active PR가 없으면 `prs/active/<pr-id>.md`, 이미 있으면 `prs/archive/<pr-id>.md`에 저장
-13. 생성된 PR plan에는 source work item readiness summary와 linked clarification 목록을 함께 기록
-14. 필요 시 `factory activate-pr`로 기존 active PR을 `prs/archive/`로 옮기고 의도한 PR을 active로 전환
-15. `factory start-execution`로 active PR plan에서 `runs/latest/<run-id>/` 시작
-16. Scope 승인
-17. 설계 초안 생성
-18. Architecture 승인 필요 여부 판정
-19. PR별 구현
-20. Verification 기록(lint/tests/type_check/build)
-21. Review
-22. QA
-23. Docs Sync 완료
-24. `gate-check`로 gate 판정 확인
-25. `build-approval`로 Evidence Bundle + Approval Request 생성
-26. `resolve-approval`로 승인자 결정 기록 및 queue 정리
-27. Merge
+11. 필요 시 `factory draft-pr-plan`로 `pr_plan_drafts/<work-item-id>.md` 생성
+12. `factory create-pr-plan`로 PR plan 후보 생성
+13. active PR가 없으면 `prs/active/<pr-id>.md`, 이미 있으면 `prs/archive/<pr-id>.md`에 저장
+14. 생성된 PR plan에는 source work item readiness summary와 linked clarification 목록을 함께 기록
+15. 필요 시 `factory activate-pr`로 기존 active PR을 `prs/archive/`로 옮기고 의도한 PR을 active로 전환
+16. `factory start-execution`로 active PR plan에서 `runs/latest/<run-id>/` 시작
+17. Scope 승인
+18. 설계 초안 생성
+19. Architecture 승인 필요 여부 판정
+20. PR별 구현
+21. Verification 기록(lint/tests/type_check/build)
+22. Review
+23. QA
+24. Docs Sync 완료
+25. `gate-check`로 gate 판정 확인
+26. `build-approval`로 Evidence Bundle + Approval Request 생성
+27. `resolve-approval`로 승인자 결정 기록 및 queue 정리
+28. Merge
 
 run convenience:
 - `start-execution` 직후 이어지는 run-scoped 명령은 `--run-id <id>` 대신 `--latest`를 사용할 수 있다.
@@ -144,6 +145,19 @@ run convenience:
 - 이번 PR 범위에서 Work Item은 artifact 생성과 수동 관리까지만 제공한다.
 - unresolved clarification을 자동 차단하지 않으며 사람이 status를 보고 판단한다.
 - Goal to Work Item 자동 분해, work item draft auto-promotion, bulk promotion, clarification 자동 추천/해결, planner 자동화, LLM 연결은 아직 없다.
+
+## pr plan draft 최소 계약
+
+- PR plan draft artifact는 `pr_plan_drafts/<work-item-id>.md`에 저장한다.
+- draft 명령은 `factory draft-pr-plan --root <repo> --work-item-id <work-item-id>` 이다.
+- draft는 official work item artifact `docs/work-items/<work-item-id>.md`만 읽어 deterministic rule-based markdown만 생성한다.
+- official work item artifact가 PR plan draft generation의 source of truth다.
+- draft는 `work_item_drafts/`를 입력으로 읽지 않는다.
+- draft는 operator-facing local aid다. `prs/active/` 또는 `prs/archive/` official PR plan artifact를 만들지 않는다.
+- draft는 readiness, approval, queue, selector, active PR, lifecycle semantics를 바꾸지 않는다.
+- 같은 `work-item-id` draft가 이미 있거나 official work item artifact가 없으면 안전하게 실패한다.
+- 이번 PR 범위에서 PR plan draft는 artifact-only drafting step까지만 제공한다.
+- official PR plan 생성은 계속 `factory create-pr-plan`으로만 수행한다.
 
 ## active pr plan 최소 계약
 

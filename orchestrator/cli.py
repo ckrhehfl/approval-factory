@@ -12,6 +12,7 @@ from orchestrator.pipeline import (
     cleanup_rehearsal_artifacts,
     create_clarification,
     draft_clarifications,
+    draft_pr_plan,
     draft_work_items,
     create_goal,
     create_pr_plan,
@@ -407,6 +408,14 @@ def _render_create_pr_plan_summary(
     return "\n".join(lines)
 
 
+def _render_draft_pr_plan_summary(path: Path, work_item_id: str) -> str:
+    lines = ["PR Plan Draft Created:"]
+    lines.append(f"- work_item_id: {work_item_id}")
+    lines.append(f"- path: {path.as_posix()}")
+    lines.append("- next: review the draft, then create the official PR plan with factory create-pr-plan")
+    return "\n".join(lines)
+
+
 def _render_activate_pr_summary(pr_id: str, active_path: Path, archived_paths: list[Path]) -> str:
     lines = ["Active PR Updated:"]
     lines.append(f"- active_pr_id: {pr_id}")
@@ -689,6 +698,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     draft_work_items_parser.add_argument("--root", default=".", help="Repository root path")
     draft_work_items_parser.add_argument("--goal-id", required=True)
+
+    draft_pr_plan_parser = subparsers.add_parser(
+        "draft-pr-plan",
+        help="Draft a PR plan artifact from an official work item without PR lifecycle mutation",
+    )
+    draft_pr_plan_parser.add_argument("--root", default=".", help="Repository root path")
+    draft_pr_plan_parser.add_argument("--work-item-id", required=True)
 
     promote_clarification_draft_parser = subparsers.add_parser(
         "promote-clarification-draft",
@@ -993,6 +1009,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         except (FileNotFoundError, FileExistsError) as exc:
             parser.error(str(exc))
         print(path.as_posix())
+        return 0
+
+    if args.command == "draft-pr-plan":
+        try:
+            path = draft_pr_plan(
+                root_dir=Path(args.root),
+                work_item_id=args.work_item_id,
+            )
+        except (FileNotFoundError, FileExistsError) as exc:
+            parser.error(str(exc))
+        print(_render_draft_pr_plan_summary(path, args.work_item_id))
         return 0
 
     if args.command == "create-clarification":
