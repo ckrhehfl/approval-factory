@@ -2024,6 +2024,144 @@ class CreatePrPlanCliTest(unittest.TestCase):
             self.assertIn((root / "docs" / "work-items" / "WI-404.md").as_posix(), error_output)
 
 
+class DraftPrPlanCliTest(unittest.TestCase):
+    def _write_work_item(self, root, *, work_item_id: str, goal_id: str) -> None:
+        (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+        lines = [
+            f"# {work_item_id}: official draft source",
+            "",
+            "## Work Item ID",
+            work_item_id,
+            "",
+            "## Goal ID",
+            goal_id,
+            "",
+            "## Title",
+            "official draft source",
+            "",
+            "## Status",
+            "draft",
+            "",
+            "## Description",
+            "Use the official work item as the PR draft source of truth.",
+            "",
+            "## Related Clarifications",
+            "- CLAR-038 (resolved)",
+            "",
+            "## Scope",
+            "- add CLI entrypoint",
+            "",
+            "## Out of Scope",
+            "- mutate active PR lifecycle",
+            "",
+            "## Acceptance Criteria",
+            "- artifact is written under pr_plan_drafts/",
+            "",
+            "## Dependencies",
+            "- docs sync",
+            "",
+            "## Risks",
+            "- operator may confuse draft with official PR plan",
+            "",
+            "## Notes",
+            "- keep create-pr-plan semantics unchanged",
+            "",
+        ]
+        (root / "docs" / "work-items" / f"{work_item_id}.md").write_text("\n".join(lines), encoding="utf-8")
+
+    def test_draft_pr_plan_creates_artifact_only_draft_from_official_work_item(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_work_item(root, work_item_id="WI-038", goal_id="GOAL-038")
+            (root / "work_item_drafts").mkdir(parents=True, exist_ok=True)
+            (root / "work_item_drafts" / "GOAL-038.md").write_text(
+                "# misleading draft\n\n## Candidate Work Items\n\n### Candidate 01\n- title: do not read me\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "draft-pr-plan",
+                        "--root",
+                        str(root),
+                        "--work-item-id",
+                        "WI-038",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+
+            draft_path = root / "pr_plan_drafts" / "WI-038.md"
+            self.assertTrue(draft_path.exists())
+            self.assertFalse((root / "prs" / "active").exists())
+            self.assertFalse((root / "prs" / "archive").exists())
+
+            content = draft_path.read_text(encoding="utf-8")
+            self.assertIn("# PR Plan Draft: WI-038", content)
+            self.assertIn("## Work Item ID\nWI-038", content)
+            self.assertIn("## Goal ID\nGOAL-038", content)
+            self.assertIn("## Work Item Title\nofficial draft source", content)
+            self.assertIn("## Source Work Item\n" + (root / "docs" / "work-items" / "WI-038.md").as_posix(), content)
+            self.assertIn("## Draft Status\ndraft-only", content)
+            self.assertIn("## Draft Method\ndeterministic-rule-based", content)
+            self.assertIn("## Suggested PR Title\nofficial draft source", content)
+            self.assertIn("## Source Description\nUse the official work item as the PR draft source of truth.", content)
+            self.assertIn("## Linked Clarifications\n- CLAR-038 (resolved)", content)
+            self.assertIn("## Scope Seed\n- add CLI entrypoint", content)
+            self.assertIn("## Out of Scope Seed\n- mutate active PR lifecycle", content)
+            self.assertIn("## Acceptance Seed\n- artifact is written under pr_plan_drafts/", content)
+            self.assertIn("## Dependency Seed\n- docs sync", content)
+            self.assertIn("## Risk Seed\n- operator may confuse draft with official PR plan", content)
+            self.assertIn("## Note Seed\n- keep create-pr-plan semantics unchanged", content)
+            self.assertIn("never reads `work_item_drafts/`", content)
+            self.assertNotIn("do not read me", content)
+
+            output = stdout.getvalue()
+            self.assertIn("PR Plan Draft Created:", output)
+            self.assertIn("- work_item_id: WI-038", output)
+            self.assertIn(draft_path.as_posix(), output)
+
+    def test_draft_pr_plan_fails_when_work_item_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(["draft-pr-plan", "--root", str(root), "--work-item-id", "WI-404"])
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("official work item artifact was not found", error_output)
+            self.assertIn((root / "docs" / "work-items" / "WI-404.md").as_posix(), error_output)
+
+    def test_draft_pr_plan_fails_when_draft_artifact_already_exists(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_work_item(root, work_item_id="WI-038", goal_id="GOAL-038")
+            (root / "pr_plan_drafts").mkdir(parents=True, exist_ok=True)
+            existing_path = root / "pr_plan_drafts" / "WI-038.md"
+            existing_path.write_text("# existing draft\n", encoding="utf-8")
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(["draft-pr-plan", "--root", str(root), "--work-item-id", "WI-038"])
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("PR plan draft artifact already exists", error_output)
+            self.assertIn(existing_path.as_posix(), error_output)
+
+
 class StartExecutionCliTest(unittest.TestCase):
     def test_start_execution_bootstraps_run_from_active_pr_plan(self) -> None:
         from pathlib import Path

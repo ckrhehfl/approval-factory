@@ -56,6 +56,7 @@ CLARIFICATION_DRAFT_STATUS = "draft-only"
 CLARIFICATION_STATUS = "open"
 WORK_ITEM_STATUS = "draft"
 WORK_ITEM_DRAFT_STATUS = "draft-only"
+PR_PLAN_DRAFT_STATUS = "draft-only"
 PR_PLAN_STATUS = "planned"
 VALID_CLARIFICATION_CATEGORIES = {
     "scope",
@@ -142,6 +143,10 @@ def _normalize_markdown_section_text(value: str | None, *, default: str = "- TBD
     if not text:
         return [default]
     return text.splitlines()
+
+
+def _normalize_markdown_section_lines(value: str | None, *, default: str = "- TBD") -> list[str]:
+    return [line.rstrip() for line in _normalize_markdown_section_text(value, default=default)]
 
 
 def _normalize_section_lines(value: str | None) -> list[str]:
@@ -2151,6 +2156,106 @@ def draft_work_items(*, root_dir: Path, goal_id: str) -> Path:
             "",
         ]
     )
+
+    draft_path.parent.mkdir(parents=True, exist_ok=True)
+    draft_path.write_text("\n".join(lines), encoding="utf-8")
+    return draft_path
+
+
+def draft_pr_plan(*, root_dir: Path, work_item_id: str) -> Path:
+    work_item_path = root_dir / "docs" / "work-items" / f"{work_item_id}.md"
+    if not work_item_path.exists():
+        raise FileNotFoundError(
+            "cannot draft PR plan because the official work item artifact was not found "
+            f"at {work_item_path.as_posix()} for work-item-id '{work_item_id}'. "
+            f"Next action: create it first with `factory create-work-item --root {root_dir.as_posix()} --work-item-id {work_item_id} ...`"
+        )
+
+    draft_path = root_dir / "pr_plan_drafts" / f"{work_item_id}.md"
+    if draft_path.exists():
+        raise FileExistsError(
+            "PR plan draft artifact already exists "
+            f"for work-item-id '{work_item_id}': {draft_path.as_posix()}"
+        )
+
+    sections = _parse_markdown_sections(work_item_path)
+    goal_id = sections.get("Goal ID", "").strip() or "unknown"
+    title = sections.get("Title", "").strip() or work_item_id
+    description_lines = _normalize_markdown_section_lines(sections.get("Description"))
+    related_clarification_lines = _normalize_markdown_section_lines(
+        sections.get("Related Clarifications"),
+        default="- none",
+    )
+    scope_lines = _normalize_markdown_section_lines(sections.get("Scope"))
+    out_of_scope_lines = _normalize_markdown_section_lines(sections.get("Out of Scope"))
+    acceptance_lines = _normalize_markdown_section_lines(sections.get("Acceptance Criteria"), default="TBD")
+    dependency_lines = _normalize_markdown_section_lines(sections.get("Dependencies"))
+    risk_lines = _normalize_markdown_section_lines(sections.get("Risks"))
+    note_lines = _normalize_markdown_section_lines(sections.get("Notes"))
+
+    lines = [
+        f"# PR Plan Draft: {work_item_id}",
+        "",
+        "## Work Item ID",
+        work_item_id,
+        "",
+        "## Goal ID",
+        goal_id,
+        "",
+        "## Work Item Title",
+        title,
+        "",
+        "## Source Work Item",
+        work_item_path.as_posix(),
+        "",
+        "## Draft Status",
+        PR_PLAN_DRAFT_STATUS,
+        "",
+        "## Draft Method",
+        "deterministic-rule-based",
+        "",
+        "## Operator Notes",
+        "- This file is a local drafting aid only.",
+        "- The official work item artifact under `docs/work-items/` is the source of truth for draft generation.",
+        "- This command never reads `work_item_drafts/`.",
+        "- It does not create or update `prs/active/` or `prs/archive/`.",
+        "",
+        "## Suggested PR Title",
+        title,
+        "",
+        "## Suggested PR Summary",
+        f"Implement {work_item_id} using the official work item artifact as the source of truth.",
+        "",
+        "## Source Description",
+        *description_lines,
+        "",
+        "## Linked Clarifications",
+        *related_clarification_lines,
+        "",
+        "## Scope Seed",
+        *scope_lines,
+        "",
+        "## Out of Scope Seed",
+        *out_of_scope_lines,
+        "",
+        "## Acceptance Seed",
+        *acceptance_lines,
+        "",
+        "## Dependency Seed",
+        *dependency_lines,
+        "",
+        "## Risk Seed",
+        *risk_lines,
+        "",
+        "## Note Seed",
+        *note_lines,
+        "",
+        "## Promotion Guidance",
+        "- Review this draft manually.",
+        "- Create the official PR plan only with `factory create-pr-plan`.",
+        "- This draft file never changes readiness, approval, queue, selector, active PR, or lifecycle semantics.",
+        "",
+    ]
 
     draft_path.parent.mkdir(parents=True, exist_ok=True)
     draft_path.write_text("\n".join(lines), encoding="utf-8")
