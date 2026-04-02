@@ -2408,19 +2408,26 @@ class StartExecutionCliTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            exit_code = main(
-                [
-                    "start-execution",
-                    "--root",
-                    str(root),
-                    "--run-id",
-                    "RUN-011",
-                ]
-            )
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "start-execution",
+                        "--root",
+                        str(root),
+                        "--run-id",
+                        "RUN-011",
+                    ]
+                )
 
             self.assertEqual(exit_code, 0)
             run_root = root / "runs" / "latest" / "RUN-011"
             self.assertTrue((run_root / "run.yaml").exists())
+            output = stdout.getvalue()
+            self.assertIn("Execution Started:", output)
+            self.assertIn("- run_id: RUN-011", output)
+            self.assertIn(f"- run_path: {run_root.as_posix()}", output)
+            self.assertIn("- next: factory inspect-run --root . --run-id RUN-011", output)
 
             run_payload = read_yaml(run_root / "run.yaml")
             self.assertEqual(run_payload["run"]["run_id"], "RUN-011")

@@ -458,6 +458,14 @@ def _render_activate_pr_summary(pr_id: str, active_path: Path, archived_paths: l
     return "\n".join(lines)
 
 
+def _render_start_execution_summary(run_root: Path, run_id: str) -> str:
+    lines = ["Execution Started:"]
+    lines.append(f"- run_id: {run_id}")
+    lines.append(f"- run_path: {run_root.as_posix()}")
+    lines.append(f"- next: factory inspect-run --root . --run-id {run_id}")
+    return "\n".join(lines)
+
+
 def _render_start_execution_error(root_dir: Path, run_id: str) -> str:
     active_dir = root_dir / "prs" / "active"
     active_plans = sorted(active_dir.glob("*.md"))
@@ -1203,7 +1211,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             run_root = start_execution(root_dir=root_dir, run_id=args.run_id)
         except ValueError as exc:
             parser.error(_render_start_execution_error(root_dir, args.run_id))
-        print(run_root.as_posix())
+        print(_render_start_execution_summary(run_root, args.run_id))
         return 0
 
     if args.command == "resolve-approval":
