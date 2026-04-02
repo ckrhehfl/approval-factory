@@ -8,6 +8,7 @@
 - repo-local, file-based Goal intake minimum (`goals/*.md`)
 - repo-local, file-based clarification draft minimum (`clarification_drafts/*.md`)
 - repo-local, file-based clarification queue minimum (`clarifications/*/*.md`)
+- repo-local, file-based work item draft minimum (`work_item_drafts/*.md`)
 - repo-local, file-based Work Item minimum (`docs/work-items/*.md`)
 - repo-local, file-based single active PR plan minimum (`prs/active/*.md`)
 - repo-local, file-based 운영 (`runs/latest`, `approval_queue/*`)
@@ -44,6 +45,7 @@
 - `start-execution`
 - `create-goal`
 - `draft-clarifications`
+- `draft-work-items`
 - `promote-clarification-draft`
 - `create-clarification`
 - `resolve-clarification`
@@ -72,18 +74,19 @@ factory <command> --help
 2. 필요 시 `draft-clarifications`로 `clarification_drafts/<goal-id>.md`에 deterministic draft-only artifact 생성
 3. 필요한 항목만 `promote-clarification-draft` 또는 `create-clarification`로 Goal 기준 official clarification queue artifact로 수동 생성
 4. 필요 시 `resolve-clarification`로 clarification artifact를 `resolved|deferred|escalated` 중 하나로 공식 종결
-5. `create-work-item`으로 Goal을 실행 가능한 Work Item Markdown artifact로 연결한다. 필요하면 관련 clarification id를 함께 남긴다.
-6. 필요하면 `work-item-readiness`로 linked clarification 기준 최소 readiness visibility를 읽기 전용으로 확인한다.
-7. `create-pr-plan`으로 Work Item 기준 PR plan 후보를 생성한다. active PR이 없으면 `prs/active/`에, 이미 있으면 `prs/archive/`에 만든다. 이때 source work item readiness context도 함께 기록한다.
-8. 필요 시 `activate-pr`로 기존 active PR을 `prs/archive/`로 이동하고 의도한 PR plan 후보를 active로 전환
-9. `start-execution`으로 `prs/active/`의 단일 active PR plan에서 run을 시작
-10. `record-verification`으로 lint/tests/type-check/build 상태 기록
-11. `record-review` 기록
-12. `record-qa` 기록
-13. `record-docs-sync` 기록
-14. `gate-check`로 merge/exception gate 판정
-15. `build-approval`로 evidence/approval-request 생성 및 조건 충족 시 queue 적재
-16. `resolve-approval`로 승인자 결정을 기록하고 queue를 pending에서 최종 queue로 이동
+5. 필요 시 `draft-work-items`로 `work_item_drafts/<goal-id>.md`에 official clarification 기반 deterministic draft-only artifact를 생성한다.
+6. `create-work-item`으로 Goal을 실행 가능한 Work Item Markdown artifact로 연결한다. 필요하면 관련 clarification id를 함께 남긴다.
+7. 필요하면 `work-item-readiness`로 linked clarification 기준 최소 readiness visibility를 읽기 전용으로 확인한다.
+8. `create-pr-plan`으로 Work Item 기준 PR plan 후보를 생성한다. active PR이 없으면 `prs/active/`에, 이미 있으면 `prs/archive/`에 만든다. 이때 source work item readiness context도 함께 기록한다.
+9. 필요 시 `activate-pr`로 기존 active PR을 `prs/archive/`로 이동하고 의도한 PR plan 후보를 active로 전환
+10. `start-execution`으로 `prs/active/`의 단일 active PR plan에서 run을 시작
+11. `record-verification`으로 lint/tests/type-check/build 상태 기록
+12. `record-review` 기록
+13. `record-qa` 기록
+14. `record-docs-sync` 기록
+15. `gate-check`로 merge/exception gate 판정
+16. `build-approval`로 evidence/approval-request 생성 및 조건 충족 시 queue 적재
+17. `resolve-approval`로 승인자 결정을 기록하고 queue를 pending에서 최종 queue로 이동
 
 조건 요약:
 - review/qa 실패 시 `merge_approval=blocked`
@@ -195,6 +198,17 @@ approval queue visibility 규칙:
 - 출력은 operator-facing visibility only다. clarification resolution, readiness gating, planning selection, execution selection, queue eligibility, approval decision에 영향을 주지 않는다.
 - 최소 출력 항목: `goal_id`, goal path/existence, title/summary if present, `status` if present, linked clarification ids if derivable, linked work item ids if derivable, metadata timestamp if present, degraded note.
 - artifact가 없거나 부분적으로 unreadable이어도 goal mutation, clarification mutation, work item mutation, auto-resolve, cleanup, auto-hide, readiness-to-gate 연결, planning selection, execution selection, lifecycle/state transition semantics를 바꾸지 않고 degraded note로만 보여준다.
+
+`draft-work-items` 최소 계약:
+- 입력: `--root`, `--goal-id`
+- 입력 소스: `goals/<goal-id>.md`, official clarification artifacts `clarifications/<goal-id>/*.md`
+- 출력 경로: `work_item_drafts/<goal-id>.md`
+- draft generation은 deterministic rule-based only다.
+- source of truth는 official clarification artifacts이며 `clarification_drafts/`는 입력으로 읽지 않는다.
+- official clarification이 없어도 zero-candidate draft artifact는 생성한다.
+- 같은 `goal-id` draft artifact가 이미 있거나 goal artifact가 없으면 안전하게 실패한다.
+- command는 `docs/work-items/` 아래 official work item artifact를 만들거나 갱신하지 않는다.
+- draft는 readiness, approval, queue, selector, active PR, lifecycle semantics를 바꾸지 않는다.
 
 `inspect-pr-plan` 최소 계약:
 - `factory inspect-pr-plan`은 PR plan artifact를 읽기 전용으로 inspection 출력한다.

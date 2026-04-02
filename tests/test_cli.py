@@ -451,6 +451,185 @@ class DraftClarificationsCliTest(unittest.TestCase):
             self.assertIn(existing_path.as_posix(), error_output)
 
 
+class DraftWorkItemsCliTest(unittest.TestCase):
+    def _write_goal(self, root, *, goal_id: str = "GOAL-036") -> None:
+        DraftClarificationsCliTest()._write_goal(root, goal_id=goal_id)
+
+    def _write_official_clarification(
+        self,
+        root,
+        *,
+        goal_id: str = "GOAL-036",
+        clarification_id: str = "CLAR-036",
+        title: str = "Define manual promotion boundary",
+        status: str = "resolved",
+        question: str = "What manual boundary must remain in place for work item drafting?",
+    ) -> None:
+        (root / "clarifications" / goal_id).mkdir(parents=True, exist_ok=True)
+        (root / "clarifications" / goal_id / f"{clarification_id}.md").write_text(
+            "\n".join(
+                [
+                    f"# {clarification_id}: {title}",
+                    "",
+                    "## Clarification ID",
+                    clarification_id,
+                    "",
+                    "## Goal ID",
+                    goal_id,
+                    "",
+                    "## Title",
+                    title,
+                    "",
+                    "## Status",
+                    status,
+                    "",
+                    "## Category",
+                    "scope",
+                    "",
+                    "## Question",
+                    question,
+                    "",
+                    "## Suggested Resolution",
+                    "Keep work item drafting artifact-only.",
+                    "",
+                    "## Escalation Required",
+                    "no",
+                    "",
+                    "## Resolution Notes",
+                    "Operator keeps manual control.",
+                    "",
+                    "## Next Action",
+                    "Use the clarification as the source of truth for drafting.",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    def test_draft_work_items_creates_artifact_only_draft_from_official_clarifications(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            goal_id = "GOAL-036"
+            self._write_goal(root, goal_id=goal_id)
+            self._write_official_clarification(root, goal_id=goal_id)
+            (root / "clarification_drafts").mkdir(parents=True, exist_ok=True)
+            (root / "clarification_drafts" / f"{goal_id}.md").write_text("# ignored draft\n", encoding="utf-8")
+
+            exit_code = main(
+                [
+                    "draft-work-items",
+                    "--root",
+                    str(root),
+                    "--goal-id",
+                    goal_id,
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+
+            draft_path = root / "work_item_drafts" / f"{goal_id}.md"
+            self.assertTrue(draft_path.exists())
+            self.assertFalse((root / "docs" / "work-items").exists())
+
+            content = draft_path.read_text(encoding="utf-8")
+            self.assertIn(f"# Work Item Draft: {goal_id}", content)
+            self.assertIn(f"## Goal ID\n{goal_id}", content)
+            self.assertIn("## Draft Status\ndraft-only", content)
+            self.assertIn("## Draft Method\ndeterministic-rule-based", content)
+            self.assertIn("- CLAR-036 (resolved):", content)
+            self.assertIn("This command never reads `clarification_drafts/`.", content)
+            self.assertIn("It does not create or update official work item artifacts under `docs/work-items/`.", content)
+            self.assertIn("### Candidate 01", content)
+            self.assertIn("- source_clarification_id: CLAR-036", content)
+            self.assertIn("- source_clarification_status: resolved", content)
+            self.assertIn("Create official work item artifacts only with `factory create-work-item`.", content)
+            self.assertIn("never changes readiness, approval, queue, selector, active PR, or lifecycle semantics", content)
+
+    def test_draft_work_items_creates_zero_candidate_artifact_without_official_clarifications(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            goal_id = "GOAL-036-ZERO"
+            self._write_goal(root, goal_id=goal_id)
+
+            exit_code = main(
+                [
+                    "draft-work-items",
+                    "--root",
+                    str(root),
+                    "--goal-id",
+                    goal_id,
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+
+            content = (root / "work_item_drafts" / f"{goal_id}.md").read_text(encoding="utf-8")
+            self.assertIn("## Source Clarifications\n- none", content)
+            self.assertIn(
+                "No work item candidates were derived from official clarification artifacts for this goal.",
+                content,
+            )
+            self.assertNotIn("### Candidate", content)
+
+    def test_draft_work_items_fails_when_goal_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "draft-work-items",
+                            "--root",
+                            str(root),
+                            "--goal-id",
+                            "GOAL-404",
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("cannot draft work items because the goal artifact was not found", error_output)
+            self.assertIn((root / "goals" / "GOAL-404.md").as_posix(), error_output)
+            self.assertIn("factory create-goal", error_output)
+
+    def test_draft_work_items_fails_when_draft_already_exists(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            goal_id = "GOAL-036"
+            self._write_goal(root, goal_id=goal_id)
+            (root / "work_item_drafts").mkdir(parents=True, exist_ok=True)
+            existing_path = root / "work_item_drafts" / f"{goal_id}.md"
+            existing_path.write_text("# existing work item draft\n", encoding="utf-8")
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "draft-work-items",
+                            "--root",
+                            str(root),
+                            "--goal-id",
+                            goal_id,
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("work item draft artifact already exists", error_output)
+            self.assertIn(existing_path.as_posix(), error_output)
+
+
 class PromoteClarificationDraftCliTest(unittest.TestCase):
     def _write_goal_and_draft(self, root, *, goal_id: str = "GOAL-035") -> None:
         DraftClarificationsCliTest()._write_goal(root, goal_id=goal_id)
