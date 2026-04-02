@@ -9,6 +9,7 @@ PR Plan Draft는 official Work Item artifact를 바탕으로 operator가 수동 
 ## 생성 명령
 
 - `factory draft-pr-plan --root <repo> --work-item-id <work-item-id>`
+- `factory promote-pr-plan-draft --root <repo> --work-item-id <work-item-id>`
 
 ## 입력
 
@@ -47,4 +48,9 @@ PR Plan Draft는 official Work Item artifact를 바탕으로 operator가 수동 
 - draft는 `prs/active/` 또는 `prs/archive/` official artifact를 만들거나 갱신하지 않는다.
 - draft는 readiness, approval, queue, selector, active PR, lifecycle semantics를 바꾸지 않는다.
 - draft output은 operator-facing markdown이며 official work item artifact의 내용을 deterministic seed로 재배열한다.
-- operator는 draft를 검토한 뒤 필요한 경우에만 `factory create-pr-plan`으로 official PR plan artifact를 수동 생성한다.
+- operator는 draft를 검토한 뒤 필요한 경우에만 `factory promote-pr-plan-draft` 또는 `factory create-pr-plan`으로 official PR plan artifact를 수동 생성한다.
+- `promote-pr-plan-draft`는 draft file을 삭제하거나 다시 쓰지 않는다.
+- `promote-pr-plan-draft`는 official artifact shape와 conflict checks를 새로 만들지 않고 기존 `create-pr-plan` 경로를 재사용한다.
+- `promote-pr-plan-draft`의 target PR id는 work item id에서 deterministic 하게 파생되며 `WI-039 -> PR-039` 같은 대응을 사용한다.
+- `promote-pr-plan-draft`는 linked work item id를 유지하고 draft의 summary/scope/validation intent를 가능한 범위에서 official `Summary`/`Scope`/`Implementation Notes`에 보존한다.
+- `promote-pr-plan-draft`는 draft artifact missing 또는 기존 `create-pr-plan` 제약과의 충돌에서 안전하게 실패한다.

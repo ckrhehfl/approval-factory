@@ -50,6 +50,7 @@
 - `draft-pr-plan`
 - `promote-clarification-draft`
 - `promote-work-item-draft`
+- `promote-pr-plan-draft`
 - `create-clarification`
 - `resolve-clarification`
 - `create-work-item`
@@ -82,16 +83,17 @@ factory <command> --help
 7. 또는 `create-work-item`으로 Goal을 실행 가능한 Work Item Markdown artifact로 직접 연결한다. 필요하면 관련 clarification id를 함께 남긴다.
 8. 필요하면 `work-item-readiness`로 linked clarification 기준 최소 readiness visibility를 읽기 전용으로 확인한다.
 9. 필요 시 `draft-pr-plan`으로 `pr_plan_drafts/<work-item-id>.md`에 official work item 기반 deterministic draft-only artifact를 생성한다.
-10. `create-pr-plan`으로 Work Item 기준 PR plan 후보를 생성한다. active PR이 없으면 `prs/active/`에, 이미 있으면 `prs/archive/`에 만든다. 이때 source work item readiness context도 함께 기록한다.
-11. 필요 시 `activate-pr`로 기존 active PR을 `prs/archive/`로 이동하고 의도한 PR plan 후보를 active로 전환
-12. `start-execution`으로 `prs/active/`의 단일 active PR plan에서 run을 시작
-13. `record-verification`으로 lint/tests/type-check/build 상태 기록
-14. `record-review` 기록
-15. `record-qa` 기록
-16. `record-docs-sync` 기록
-17. `gate-check`로 merge/exception gate 판정
-18. `build-approval`로 evidence/approval-request 생성 및 조건 충족 시 queue 적재
-19. `resolve-approval`로 승인자 결정을 기록하고 queue를 pending에서 최종 queue로 이동
+10. 필요 시 `promote-pr-plan-draft`로 `pr_plan_drafts/<work-item-id>.md`를 단일 official PR plan artifact로 수동 승격한다. 이때 기존 `create-pr-plan` 제약과 active/archive 배치 규칙을 그대로 재사용한다.
+11. 또는 `create-pr-plan`으로 Work Item 기준 PR plan 후보를 직접 생성한다. active PR이 없으면 `prs/active/`에, 이미 있으면 `prs/archive/`에 만든다. 이때 source work item readiness context도 함께 기록한다.
+12. 필요 시 `activate-pr`로 기존 active PR을 `prs/archive/`로 이동하고 의도한 PR plan 후보를 active로 전환
+13. `start-execution`으로 `prs/active/`의 단일 active PR plan에서 run을 시작
+14. `record-verification`으로 lint/tests/type-check/build 상태 기록
+15. `record-review` 기록
+16. `record-qa` 기록
+17. `record-docs-sync` 기록
+18. `gate-check`로 merge/exception gate 판정
+19. `build-approval`로 evidence/approval-request 생성 및 조건 충족 시 queue 적재
+20. `resolve-approval`로 승인자 결정을 기록하고 queue를 pending에서 최종 queue로 이동
 
 조건 요약:
 - review/qa 실패 시 `merge_approval=blocked`
@@ -234,6 +236,16 @@ approval queue visibility 규칙:
 - 같은 `work-item-id` draft artifact가 이미 있거나 official work item artifact가 없으면 안전하게 실패한다.
 - command는 `prs/active/` 또는 `prs/archive/` 아래 아무것도 만들거나 갱신하지 않는다.
 - draft는 readiness, approval, queue, selector, active PR, lifecycle semantics를 바꾸지 않는다.
+
+`promote-pr-plan-draft` 최소 계약:
+- 입력: `--root`, `--work-item-id <id>`
+- 전제: `pr_plan_drafts/<work-item-id>.md`가 존재해야 한다.
+- 동작: draft의 `Suggested PR Title`, `Suggested PR Summary`, `Scope Seed`, `Out of Scope Seed`, `Acceptance Seed`를 가능한 범위에서 읽어 official PR plan artifact 하나를 생성한다.
+- 재사용: official artifact 형상과 conflict checks는 새로 정의하지 않고 기존 `create-pr-plan` 경로를 그대로 재사용한다.
+- id 규칙: target PR id는 work item id에서 deterministic 하게 파생되며 `WI-039 -> PR-039` 같은 대응을 사용한다.
+- 보존: linked work item id는 그대로 유지하고, draft summary/scope/validation intent는 official PR plan의 `Summary`/`Scope`/`Implementation Notes`에 가능한 범위에서 보존한다.
+- 범위: draft file은 삭제하거나 다시 쓰지 않으며 auto-activation, auto-promotion, readiness, approval, queue, selector, active/archive, lifecycle semantics를 바꾸지 않는다.
+- 실패: draft artifact가 없거나, promote 결과가 기존 `create-pr-plan` 제약과 충돌하면 안전하게 실패한다.
 
 `inspect-pr-plan` 최소 계약:
 - `factory inspect-pr-plan`은 PR plan artifact를 읽기 전용으로 inspection 출력한다.
@@ -405,6 +417,15 @@ factory cleanup-rehearsal --root . --apply --include-demo
 - 범위: `prs/active/`, `prs/archive/`, readiness/approval/queue/selector/active PR/lifecycle semantics는 바꾸지 않는다.
 - 실패: official work item artifact가 없거나 같은 work item id draft artifact가 이미 존재하면 안전하게 실패한다.
 
+`promote-pr-plan-draft` 최소 계약:
+- 입력: `--root`, `--work-item-id <id>`
+- 전제: `pr_plan_drafts/<work-item-id>.md`가 존재해야 한다.
+- 동작: draft seed를 읽어 기존 `create-pr-plan` 경로로 official PR plan artifact 하나를 생성한다.
+- 보존: linked work item id를 유지하고 draft의 summary/scope/validation intent를 가능한 범위에서 official PR plan에 반영한다.
+- id 규칙: target pr id는 work item id에서 deterministic 하게 파생되며 `WI-*`는 대응하는 `PR-*`로 승격한다.
+- 범위: draft file은 삭제하거나 다시 쓰지 않으며 auto-activation, auto-promotion, readiness/approval/queue/selector/active PR/lifecycle semantics를 바꾸지 않는다.
+- 실패: draft artifact가 없거나, target pr id 충돌/linked clarification missing 등 `create-pr-plan` 제약과 충돌하면 안전하게 실패한다.
+
 `resolve-clarification` 최소 계약:
 - 입력: `--root`, `--goal-id`, `--clarification-id`, `--decision <resolved|deferred|escalated>`, `--resolution-notes`, `--next-action`, 선택적 `--suggested-resolution`
 - 전제: `clarifications/<goal-id>/<clarification-id>.md`가 존재하고 `Status=open` 이어야 한다.
@@ -479,6 +500,7 @@ factory draft-work-items --root . --goal-id GOAL-LOCAL
 factory promote-work-item-draft --root . --goal-id GOAL-LOCAL --draft-index 1 --work-item-id WI-LOCAL
 factory create-work-item --root . --work-item-id WI-LOCAL-MANUAL --title "local work item" --goal-id GOAL-LOCAL --description "Create a minimal work item artifact" --clarification-id CLAR-001 --acceptance-criteria $'- docs/work-items/WI-LOCAL-MANUAL.md exists\n- Duplicate IDs fail safely'
 factory draft-pr-plan --root . --work-item-id WI-LOCAL
+factory promote-pr-plan-draft --root . --work-item-id WI-LOCAL
 factory create-pr-plan --root . --pr-id PR-LOCAL --work-item-id WI-LOCAL --title "local PR plan" --summary "Track the single active PR plan as a repo-local Markdown artifact"
 factory activate-pr --root . --pr-id PR-LOCAL
 factory start-execution --root . --run-id RUN-LOCAL

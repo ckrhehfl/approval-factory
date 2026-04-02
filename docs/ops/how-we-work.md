@@ -80,15 +80,19 @@
 - draft는 official work item artifact `docs/work-items/<work-item-id>.md`만 읽는 deterministic rule-based artifact다.
 - source of truth는 official work item artifact이며 `work_item_drafts/`는 입력으로 읽지 않는다.
 - draft는 `prs/active/`, `prs/archive/` official artifact를 만들지 않고, readiness/gate/approval/queue/selector/active PR/lifecycle semantics도 바꾸지 않는다.
-- official PR plan 생성은 자동이 아니라 operator가 `factory create-pr-plan`을 별도로 실행할 때만 일어난다.
+- draft에서 official PR plan으로의 승격도 자동이 아니라 operator가 `factory promote-pr-plan-draft` 또는 `factory create-pr-plan`을 별도로 실행할 때만 일어난다.
 
 7. Active PR 계획
 - `factory create-pr-plan`로 PR plan 후보를 생성한다.
+- draft seed를 최대한 재사용해 official PR plan 하나를 만들 때는 `factory promote-pr-plan-draft --root <repo> --work-item-id <id>`를 사용한다.
 - active PR plan은 Work Item을 현재 실행 중인 단 하나의 PR로 연결하는 수동 Markdown artifact다.
 - 기본 섹션은 PR ID, Work Item ID, Title, Status, Summary, Work Item Readiness, Linked Clarifications, Scope, Out of Scope, Implementation Notes, Risks, Open Questions다.
 - `prs/active/`는 항상 0 또는 1개의 PR만 가져야 한다.
 - active PR가 없으면 `create-pr-plan`은 `prs/active/<pr-id>.md`를 만든다.
 - active PR가 이미 있으면 `create-pr-plan`은 `prs/archive/<pr-id>.md`에 후보를 만든다.
+- promotion 명령도 기존 `create-pr-plan` 경로를 재사용하므로 같은 active/archive 배치 규칙과 conflict checks를 그대로 따른다.
+- promotion 명령의 target PR id는 work item id에서 deterministic 하게 파생되며 `WI-039 -> PR-039` 같은 대응을 사용한다.
+- promotion 명령은 draft file을 건드리지 않고 linked work item id와 draft summary/scope/validation intent를 가능한 범위에서 official plan에 보존한다.
 - `create-pr-plan`은 source work item readiness를 read-only로 다시 계산해 plan 문서에 함께 남긴다.
 - readiness summary 규칙은 `work-item-readiness`와 동일하며 `no-linked-clarifications|ready|attention-needed` 중 하나다.
 - 이 정보는 operator auditability를 위한 visibility layer이며 `attention-needed`여도 생성 자체를 자동 차단하지 않는다.
