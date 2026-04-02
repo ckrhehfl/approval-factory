@@ -9,25 +9,26 @@
 4. draft 항목을 official clarification으로 올릴 때는 `factory promote-clarification-draft`로 `clarifications/<goal-id>/<clarification-id>.md` 생성
 5. draft를 거치지 않는 수동 clarification이 필요하면 `factory create-clarification`로 `clarifications/<goal-id>/<clarification-id>.md` 생성
 6. clarification을 공식 종결해야 하면 `factory resolve-clarification`로 `resolved|deferred|escalated` 중 하나를 기록
-7. `factory create-work-item`로 `docs/work-items/<work-item-id>.md` 생성
-8. 필요 시 `factory work-item-readiness`로 linked clarification 기준 최소 readiness visibility 확인
-9. `factory create-pr-plan`로 PR plan 후보 생성
-10. active PR가 없으면 `prs/active/<pr-id>.md`, 이미 있으면 `prs/archive/<pr-id>.md`에 저장
-11. 생성된 PR plan에는 source work item readiness summary와 linked clarification 목록을 함께 기록
-12. 필요 시 `factory activate-pr`로 기존 active PR을 `prs/archive/`로 옮기고 의도한 PR을 active로 전환
-13. `factory start-execution`로 active PR plan에서 `runs/latest/<run-id>/` 시작
-14. Scope 승인
-15. 설계 초안 생성
-16. Architecture 승인 필요 여부 판정
-17. PR별 구현
-18. Verification 기록(lint/tests/type_check/build)
-19. Review
-20. QA
-21. Docs Sync 완료
-22. `gate-check`로 gate 판정 확인
-23. `build-approval`로 Evidence Bundle + Approval Request 생성
-24. `resolve-approval`로 승인자 결정 기록 및 queue 정리
-25. Merge
+7. 필요 시 `factory draft-work-items`로 `work_item_drafts/<goal-id>.md` 생성
+8. `factory create-work-item`로 `docs/work-items/<work-item-id>.md` 생성
+9. 필요 시 `factory work-item-readiness`로 linked clarification 기준 최소 readiness visibility 확인
+10. `factory create-pr-plan`로 PR plan 후보 생성
+11. active PR가 없으면 `prs/active/<pr-id>.md`, 이미 있으면 `prs/archive/<pr-id>.md`에 저장
+12. 생성된 PR plan에는 source work item readiness summary와 linked clarification 목록을 함께 기록
+13. 필요 시 `factory activate-pr`로 기존 active PR을 `prs/archive/`로 옮기고 의도한 PR을 active로 전환
+14. `factory start-execution`로 active PR plan에서 `runs/latest/<run-id>/` 시작
+15. Scope 승인
+16. 설계 초안 생성
+17. Architecture 승인 필요 여부 판정
+18. PR별 구현
+19. Verification 기록(lint/tests/type_check/build)
+20. Review
+21. QA
+22. Docs Sync 완료
+23. `gate-check`로 gate 판정 확인
+24. `build-approval`로 Evidence Bundle + Approval Request 생성
+25. `resolve-approval`로 승인자 결정 기록 및 queue 정리
+26. Merge
 
 run convenience:
 - `start-execution` 직후 이어지는 run-scoped 명령은 `--run-id <id>` 대신 `--latest`를 사용할 수 있다.
@@ -96,6 +97,15 @@ run convenience:
 
 ## work item 최소 계약
 
+- work item draft artifact는 `work_item_drafts/<goal-id>.md`에 저장한다.
+- draft 명령은 `factory draft-work-items --root <repo> --goal-id <goal-id>` 이다.
+- draft는 `goals/<goal-id>.md`와 official clarification artifacts `clarifications/<goal-id>/*.md`를 읽어 deterministic rule-based markdown만 생성한다.
+- official clarification artifacts가 work item candidate generation의 source of truth다.
+- draft는 `clarification_drafts/`를 입력으로 읽지 않는다.
+- official clarification이 없어도 zero-candidate draft artifact는 생성한다.
+- draft는 operator-facing local aid다. `docs/work-items/` official artifact를 만들지 않는다.
+- draft는 readiness, approval, queue, selector, active PR, lifecycle semantics를 바꾸지 않는다.
+- 같은 `goal-id` draft가 이미 있거나 goal artifact가 없으면 안전하게 실패한다.
 - Work Item artifact는 `docs/work-items/<work-item-id>.md`에 저장한다.
 - 생성 명령은 `factory create-work-item --root <repo> --work-item-id <id> --title <title> --goal-id <goal-id> --description <text> [--acceptance-criteria <text>] [--clarification-id <id> ...]` 이다.
 - Work Item은 Goal/clarification을 실제 PR 실행 단위로 연결하는 최소 수동 계층이다.

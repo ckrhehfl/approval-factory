@@ -55,6 +55,7 @@ GOAL_STATUS = "draft"
 CLARIFICATION_DRAFT_STATUS = "draft-only"
 CLARIFICATION_STATUS = "open"
 WORK_ITEM_STATUS = "draft"
+WORK_ITEM_DRAFT_STATUS = "draft-only"
 PR_PLAN_STATUS = "planned"
 VALID_CLARIFICATION_CATEGORIES = {
     "scope",
@@ -1874,6 +1875,74 @@ def _derive_clarification_draft_items(goal_sections: dict[str, str]) -> list[dic
     return deduped
 
 
+def _normalize_inline_markdown_value(value: str | None, *, default: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return default
+    first_line = next((line.strip() for line in text.splitlines() if line.strip()), "")
+    return first_line or default
+
+
+def _load_official_clarification_draft_sources(root_dir: Path, goal_id: str) -> list[dict[str, str]]:
+    clarifications_dir = root_dir / "clarifications" / goal_id
+    sources: list[dict[str, str]] = []
+    for clarification_path in sorted(clarifications_dir.glob("*.md")):
+        sections = _parse_markdown_sections(clarification_path)
+        clarification_id = sections.get("Clarification ID", "").strip() or clarification_path.stem
+        status = sections.get("Status", "").strip() or "unknown"
+        title = _normalize_inline_markdown_value(sections.get("Title"), default=clarification_id)
+        question = _normalize_inline_markdown_value(
+            sections.get("Question"),
+            default=f"Review official clarification {clarification_id}.",
+        )
+        sources.append(
+            {
+                "clarification_id": clarification_id,
+                "status": status,
+                "title": title,
+                "question": question,
+                "path": clarification_path.as_posix(),
+            }
+        )
+    return sources
+
+
+def _derive_work_item_draft_candidates(
+    goal_sections: dict[str, str],
+    clarification_sources: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    goal_title = _normalize_inline_markdown_value(goal_sections.get("Title"), default="goal")
+    candidates: list[dict[str, str]] = []
+    for source in clarification_sources:
+        clarification_id = source["clarification_id"]
+        clarification_status = source["status"]
+        title = f"{source['title']} implementation"
+        summary = (
+            f"Prepare the smallest work item for {clarification_id} under goal '{goal_title}' "
+            f"using the official clarification as the source of truth."
+        )
+        acceptance_focus = (
+            f"Operator can create one official work item linked to {clarification_id} "
+            f"without changing readiness, approval, queue, selector, active PR, or lifecycle semantics."
+        )
+        source_rule = (
+            "Derived from official clarification Title/Question/Status. "
+            f"Current clarification status: {clarification_status}."
+        )
+        candidates.append(
+            {
+                "title": title,
+                "summary": summary,
+                "acceptance_focus": acceptance_focus,
+                "source_clarification_id": clarification_id,
+                "source_clarification_status": clarification_status,
+                "source_clarification_path": source["path"],
+                "source_rule": source_rule,
+            }
+        )
+    return candidates
+
+
 def draft_clarifications(*, root_dir: Path, goal_id: str) -> Path:
     goal_path = root_dir / "goals" / f"{goal_id}.md"
     if not goal_path.exists():
@@ -1943,6 +2012,101 @@ def draft_clarifications(*, root_dir: Path, goal_id: str) -> Path:
             "- Review each draft item manually.",
             "- Create official clarification artifacts only with `factory create-clarification`.",
             "- This draft file never changes readiness, approval, queue, selector, or lifecycle semantics.",
+            "",
+        ]
+    )
+
+    draft_path.parent.mkdir(parents=True, exist_ok=True)
+    draft_path.write_text("\n".join(lines), encoding="utf-8")
+    return draft_path
+
+
+def draft_work_items(*, root_dir: Path, goal_id: str) -> Path:
+    goal_path = root_dir / "goals" / f"{goal_id}.md"
+    if not goal_path.exists():
+        raise FileNotFoundError(
+            "cannot draft work items because the goal artifact was not found "
+            f"at {goal_path.as_posix()} for goal-id '{goal_id}'. "
+            f"Next action: create it first with `factory create-goal --root {root_dir.as_posix()} --goal-id {goal_id} ...`"
+        )
+
+    draft_path = root_dir / "work_item_drafts" / f"{goal_id}.md"
+    if draft_path.exists():
+        raise FileExistsError(
+            "work item draft artifact already exists "
+            f"for goal-id '{goal_id}': {draft_path.as_posix()}"
+        )
+
+    sections = _parse_markdown_sections(goal_path)
+    goal_title = sections.get("Title", "").strip() or goal_id
+    clarification_sources = _load_official_clarification_draft_sources(root_dir, goal_id)
+    draft_candidates = _derive_work_item_draft_candidates(sections, clarification_sources)
+
+    lines = [
+        f"# Work Item Draft: {goal_id}",
+        "",
+        "## Goal ID",
+        goal_id,
+        "",
+        "## Goal Title",
+        goal_title,
+        "",
+        "## Source Goal",
+        goal_path.as_posix(),
+        "",
+        "## Source Clarifications",
+    ]
+
+    if clarification_sources:
+        for source in clarification_sources:
+            lines.append(f"- {source['clarification_id']} ({source['status']}): {source['path']}")
+    else:
+        lines.append("- none")
+
+    lines.extend(
+        [
+            "",
+            "## Draft Status",
+            WORK_ITEM_DRAFT_STATUS,
+            "",
+            "## Draft Method",
+            "deterministic-rule-based",
+            "",
+            "## Operator Notes",
+            "- This file is a local drafting aid only.",
+            "- Official clarification artifacts under `clarifications/<goal-id>/` are the source of truth for candidate generation.",
+            "- This command never reads `clarification_drafts/`.",
+            "- It does not create or update official work item artifacts under `docs/work-items/`.",
+            "",
+            "## Candidate Work Items",
+        ]
+    )
+
+    if draft_candidates:
+        for index, item in enumerate(draft_candidates, start=1):
+            lines.extend(
+                [
+                    "",
+                    f"### Candidate {index:02d}",
+                    f"- title: {item['title']}",
+                    f"- source_clarification_id: {item['source_clarification_id']}",
+                    f"- source_clarification_status: {item['source_clarification_status']}",
+                    f"- source_clarification_path: {item['source_clarification_path']}",
+                    f"- summary: {item['summary']}",
+                    f"- acceptance_focus: {item['acceptance_focus']}",
+                    f"- source_rule: {item['source_rule']}",
+                ]
+            )
+    else:
+        lines.extend(["", "- No work item candidates were derived from official clarification artifacts for this goal."])
+
+    lines.extend(
+        [
+            "",
+            "## Promotion Guidance",
+            "- Review each candidate manually.",
+            "- Create official work item artifacts only with `factory create-work-item`.",
+            "- This draft file never changes readiness, approval, queue, selector, active PR, or lifecycle semantics.",
             "",
         ]
     )

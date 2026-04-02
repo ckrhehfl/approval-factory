@@ -12,6 +12,7 @@ from orchestrator.pipeline import (
     cleanup_rehearsal_artifacts,
     create_clarification,
     draft_clarifications,
+    draft_work_items,
     create_goal,
     create_pr_plan,
     create_work_item,
@@ -681,6 +682,13 @@ def build_parser() -> argparse.ArgumentParser:
     draft_clarifications_parser.add_argument("--root", default=".", help="Repository root path")
     draft_clarifications_parser.add_argument("--goal-id", required=True)
 
+    draft_work_items_parser = subparsers.add_parser(
+        "draft-work-items",
+        help="Draft work item candidates from official clarification artifacts",
+    )
+    draft_work_items_parser.add_argument("--root", default=".", help="Repository root path")
+    draft_work_items_parser.add_argument("--goal-id", required=True)
+
     promote_clarification_draft_parser = subparsers.add_parser(
         "promote-clarification-draft",
         help="Promote one draft item into an official clarification artifact",
@@ -958,6 +966,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "draft-clarifications":
         try:
             path = draft_clarifications(
+                root_dir=Path(args.root),
+                goal_id=args.goal_id,
+            )
+        except (FileNotFoundError, FileExistsError) as exc:
+            parser.error(str(exc))
+        print(path.as_posix())
+        return 0
+
+    if args.command == "draft-work-items":
+        try:
+            path = draft_work_items(
                 root_dir=Path(args.root),
                 goal_id=args.goal_id,
             )
