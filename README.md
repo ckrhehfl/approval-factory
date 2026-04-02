@@ -6,6 +6,7 @@
 
 포함:
 - repo-local, file-based Goal intake minimum (`goals/*.md`)
+- repo-local, file-based clarification draft minimum (`clarification_drafts/*.md`)
 - repo-local, file-based clarification queue minimum (`clarifications/*/*.md`)
 - repo-local, file-based Work Item minimum (`docs/work-items/*.md`)
 - repo-local, file-based single active PR plan minimum (`prs/active/*.md`)
@@ -42,6 +43,7 @@
 - `cleanup-rehearsal`
 - `start-execution`
 - `create-goal`
+- `draft-clarifications`
 - `create-clarification`
 - `resolve-clarification`
 - `create-work-item`
@@ -66,20 +68,21 @@ factory <command> --help
 ## 기본 실행 흐름
 
 1. `create-goal`로 repo-local Goal artifact 생성
-2. `create-clarification`로 Goal 기준 clarification queue artifact 생성
-3. 필요 시 `resolve-clarification`로 clarification artifact를 `resolved|deferred|escalated` 중 하나로 공식 종결
-4. `create-work-item`으로 Goal을 실행 가능한 Work Item Markdown artifact로 연결한다. 필요하면 관련 clarification id를 함께 남긴다.
-5. 필요하면 `work-item-readiness`로 linked clarification 기준 최소 readiness visibility를 읽기 전용으로 확인한다.
-6. `create-pr-plan`으로 Work Item 기준 PR plan 후보를 생성한다. active PR이 없으면 `prs/active/`에, 이미 있으면 `prs/archive/`에 만든다. 이때 source work item readiness context도 함께 기록한다.
-7. 필요 시 `activate-pr`로 기존 active PR을 `prs/archive/`로 이동하고 의도한 PR plan 후보를 active로 전환
-8. `start-execution`으로 `prs/active/`의 단일 active PR plan에서 run을 시작
-9. `record-verification`으로 lint/tests/type-check/build 상태 기록
-10. `record-review` 기록
-11. `record-qa` 기록
-12. `record-docs-sync` 기록
-13. `gate-check`로 merge/exception gate 판정
-14. `build-approval`로 evidence/approval-request 생성 및 조건 충족 시 queue 적재
-15. `resolve-approval`로 승인자 결정을 기록하고 queue를 pending에서 최종 queue로 이동
+2. 필요 시 `draft-clarifications`로 `clarification_drafts/<goal-id>.md`에 deterministic draft-only artifact 생성
+3. 필요한 항목만 `create-clarification`로 Goal 기준 official clarification queue artifact로 수동 승격
+4. 필요 시 `resolve-clarification`로 clarification artifact를 `resolved|deferred|escalated` 중 하나로 공식 종결
+5. `create-work-item`으로 Goal을 실행 가능한 Work Item Markdown artifact로 연결한다. 필요하면 관련 clarification id를 함께 남긴다.
+6. 필요하면 `work-item-readiness`로 linked clarification 기준 최소 readiness visibility를 읽기 전용으로 확인한다.
+7. `create-pr-plan`으로 Work Item 기준 PR plan 후보를 생성한다. active PR이 없으면 `prs/active/`에, 이미 있으면 `prs/archive/`에 만든다. 이때 source work item readiness context도 함께 기록한다.
+8. 필요 시 `activate-pr`로 기존 active PR을 `prs/archive/`로 이동하고 의도한 PR plan 후보를 active로 전환
+9. `start-execution`으로 `prs/active/`의 단일 active PR plan에서 run을 시작
+10. `record-verification`으로 lint/tests/type-check/build 상태 기록
+11. `record-review` 기록
+12. `record-qa` 기록
+13. `record-docs-sync` 기록
+14. `gate-check`로 merge/exception gate 판정
+15. `build-approval`로 evidence/approval-request 생성 및 조건 충족 시 queue 적재
+16. `resolve-approval`로 승인자 결정을 기록하고 queue를 pending에서 최종 queue로 이동
 
 조건 요약:
 - review/qa 실패 시 `merge_approval=blocked`
@@ -300,6 +303,7 @@ factory cleanup-rehearsal --root . --apply --include-demo
 - 오케스트레이터: `orchestrator/`
 - Goal artifact: `goals/<goal-id>.md`
 - Clarification artifact: `clarifications/<goal-id>/<clarification-id>.md`
+- Clarification draft artifact: `clarification_drafts/<goal-id>.md`
 - Work Item artifact: `docs/work-items/<work-item-id>.md`
 - Active PR plan artifact: `prs/active/<pr-id>.md`
 - Archived PR plan artifact: `prs/archive/<pr-id>.md`
@@ -326,6 +330,15 @@ factory cleanup-rehearsal --root . --apply --include-demo
 - readiness는 visibility only다. `attention-needed`여도 PR plan 생성은 허용되며 activation/start-execution/gate/approval semantics를 바꾸지 않는다.
 - linked clarification artifact가 누락된 work item이면 `work-item-readiness`와 같은 안전한 실패 규칙을 따른다.
 - 성공 출력은 기존 CLI tone을 유지하면서 readiness summary와 linked clarification count를 짧게 함께 보여준다.
+
+`draft-clarifications` 최소 계약:
+- 입력: `goals/<goal-id>.md`
+- 출력: `clarification_drafts/<goal-id>.md`
+- 명령: `factory draft-clarifications --root <repo> --goal-id <goal-id>`
+- 방식: deterministic rule-based markdown generation only
+- 실패: goal artifact가 없거나 같은 goal-id draft artifact가 이미 있으면 안전하게 실패한다.
+- 의미론: official clarification queue artifact는 만들지 않고, readiness/approval/queue/selector/lifecycle semantics도 바꾸지 않는다.
+- 승격: operator가 필요하다고 판단한 항목만 `factory create-clarification`으로 수동 생성한다.
 
 `resolve-clarification` 최소 계약:
 - 입력: `--root`, `--goal-id`, `--clarification-id`, `--decision <resolved|deferred|escalated>`, `--resolution-notes`, `--next-action`, 선택적 `--suggested-resolution`
@@ -393,6 +406,7 @@ run-scoped 명령의 `--latest` 최소 계약:
 ```bash
 pip install -e ".[dev]"
 factory create-goal --root . --goal-id GOAL-LOCAL --title "local intake" --problem "Need a formal goal artifact" --outcome "A readable goal file exists" --constraints "repo-local only"
+factory draft-clarifications --root . --goal-id GOAL-LOCAL
 factory create-clarification --root . --goal-id GOAL-LOCAL --clarification-id CLAR-001 --title "scope boundary" --category scope --question "What must stay out of scope for this goal?"
 factory resolve-clarification --root . --goal-id GOAL-LOCAL --clarification-id CLAR-001 --decision resolved --resolution-notes "Scope boundary confirmed by operator review" --next-action "Proceed to work item drafting"
 factory create-work-item --root . --work-item-id WI-LOCAL --title "local work item" --goal-id GOAL-LOCAL --description "Create a minimal work item artifact" --clarification-id CLAR-001 --acceptance-criteria $'- docs/work-items/WI-LOCAL.md exists\n- Duplicate IDs fail safely'
