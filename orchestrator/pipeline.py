@@ -76,6 +76,10 @@ CLARIFICATION_SECTION_ORDER = (
     "Resolution Notes",
     "Next Action",
 )
+CLARIFICATION_OPTIONAL_SECTION_ORDER = (
+    "Rationale",
+    "Source Provenance",
+)
 
 CLEANUP_REHEARSAL_SPECS: tuple[tuple[str, str], ...] = (
     ("runs", "runs/latest/RUN-RH-*"),
@@ -304,6 +308,47 @@ def _parse_markdown_sections(path: Path) -> dict[str, str]:
         sections[current_heading].append(raw_line)
 
     return {heading: "\n".join(lines).strip() for heading, lines in sections.items()}
+
+
+def _parse_clarification_draft_items(path: Path) -> list[dict[str, str]]:
+    items: list[dict[str, str]] = []
+    current: dict[str, str] | None = None
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        if raw_line.startswith("### Draft "):
+            if current is not None:
+                items.append(current)
+            match = re.fullmatch(r"### Draft (\d+)", raw_line.strip())
+            current = {"draft_index": str(int(match.group(1))) if match else ""}
+            continue
+
+        if current is None:
+            continue
+
+        if raw_line.startswith("## "):
+            items.append(current)
+            current = None
+            continue
+
+        if not raw_line.startswith("- "):
+            continue
+
+        key, separator, value = raw_line[2:].partition(":")
+        if separator:
+            current[key.strip()] = value.strip()
+
+    if current is not None:
+        items.append(current)
+
+    return [
+        item
+        for item in items
+        if item.get("draft_index")
+        and item.get("category")
+        and item.get("title")
+        and item.get("question")
+        and item.get("source_rule")
+    ]
 
 
 def _parse_iso_for_sort(value: Any) -> datetime:
@@ -1949,6 +1994,63 @@ def create_clarification(
     return clarification_path
 
 
+def promote_clarification_draft(
+    *,
+    root_dir: Path,
+    goal_id: str,
+    draft_index: int,
+    clarification_id: str,
+) -> Path:
+    draft_path = root_dir / "clarification_drafts" / f"{goal_id}.md"
+    if not draft_path.exists():
+        raise FileNotFoundError(
+            "cannot promote clarification draft because the draft artifact was not found "
+            f"at {draft_path.as_posix()} for goal-id '{goal_id}'. "
+            f"Next action: create it first with `factory draft-clarifications --root {root_dir.as_posix()} --goal-id {goal_id}`"
+        )
+
+    draft_items = _parse_clarification_draft_items(draft_path)
+    selected_item = next((item for item in draft_items if int(item["draft_index"]) == draft_index), None)
+    if selected_item is None:
+        available_indexes = ", ".join(item["draft_index"] for item in draft_items) or "none"
+        raise IndexError(
+            "cannot promote clarification draft because the requested draft index was not found "
+            f"in {draft_path.as_posix()} for goal-id '{goal_id}': draft-index '{draft_index}'. "
+            f"Available indexes: {available_indexes}"
+        )
+
+    clarification_path = root_dir / "clarifications" / goal_id / f"{clarification_id}.md"
+    if clarification_path.exists():
+        raise FileExistsError(
+            "Clarification artifact already exists "
+            f"for goal-id '{goal_id}' and clarification-id '{clarification_id}': "
+            f"{clarification_path.as_posix()}"
+        )
+
+    lines = _render_clarification_lines(
+        clarification_id=clarification_id,
+        goal_id=goal_id,
+        title=selected_item["title"],
+        status=CLARIFICATION_STATUS,
+        category=selected_item["category"],
+        question=selected_item["question"],
+        suggested_resolution=None,
+        escalation_required=selected_item.get("escalation_required", "no"),
+        resolution_notes=None,
+        next_action=None,
+        rationale=selected_item["source_rule"],
+        source_provenance="\n".join(
+            [
+                f"- draft_path: {draft_path.as_posix()}",
+                f"- draft_index: {draft_index}",
+            ]
+        ),
+    )
+    clarification_path.parent.mkdir(parents=True, exist_ok=True)
+    clarification_path.write_text("\n".join(lines), encoding="utf-8")
+    return clarification_path
+
+
 def _render_clarification_lines(
     *,
     clarification_id: str,
@@ -1961,6 +2063,8 @@ def _render_clarification_lines(
     escalation_required: str,
     resolution_notes: str | None,
     next_action: str | None,
+    rationale: str | None = None,
+    source_provenance: str | None = None,
 ) -> list[str]:
     section_values = {
         "Clarification ID": clarification_id,
@@ -1974,11 +2078,22 @@ def _render_clarification_lines(
         "Resolution Notes": resolution_notes,
         "Next Action": next_action,
     }
+    optional_section_values = {
+        "Rationale": rationale,
+        "Source Provenance": source_provenance,
+    }
 
     lines = [f"# {clarification_id}: {title}", ""]
     for heading in CLARIFICATION_SECTION_ORDER:
         lines.append(f"## {heading}")
         lines.extend(_normalize_markdown_section_text(section_values.get(heading)))
+        lines.append("")
+    for heading in CLARIFICATION_OPTIONAL_SECTION_ORDER:
+        value = optional_section_values.get(heading)
+        if value is None or not str(value).strip():
+            continue
+        lines.append(f"## {heading}")
+        lines.extend(_normalize_markdown_section_text(value))
         lines.append("")
     return lines
 
@@ -2028,6 +2143,8 @@ def resolve_clarification(
         escalation_required="yes" if normalized_decision == "escalated" else "no",
         resolution_notes=resolution_notes,
         next_action=next_action,
+        rationale=sections.get("Rationale"),
+        source_provenance=sections.get("Source Provenance"),
     )
     clarification_path.write_text("\n".join(updated_lines), encoding="utf-8")
     return clarification_path

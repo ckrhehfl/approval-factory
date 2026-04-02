@@ -39,15 +39,17 @@
 - `factory draft-clarifications`로 `clarification_drafts/<goal-id>.md`를 생성한다.
 - draft는 `goals/<goal-id>.md`에서 deterministic rule-based prompt만 뽑아내는 operator-facing artifact다.
 - draft는 official clarification queue artifact를 만들지 않고, readiness/gate/approval/queue/selector/lifecycle semantics도 바꾸지 않는다.
-- draft에서 official clarification으로의 승격은 자동이 아니라 operator가 `factory create-clarification`를 별도로 실행할 때만 일어난다.
+- draft에서 official clarification으로의 승격은 자동이 아니라 operator가 `factory promote-clarification-draft` 또는 `factory create-clarification`를 별도로 실행할 때만 일어난다.
 
 3. Clarification queue
 - `factory create-clarification`로 `clarifications/<goal-id>/<clarification-id>.md`를 생성한다.
+- draft 항목을 그대로 official clarification으로 승격할 때는 `factory promote-clarification-draft --root <repo> --goal-id <goal-id> --draft-index <n> --clarification-id <id>`를 사용한다.
 - clarification은 Goal intake 다음 단계의 최소 질문 관리 계층이다.
+- promotion 명령은 draft file을 건드리지 않고 official artifact 하나만 만들며, draft의 question/category/rationale과 draft path/index provenance를 함께 남긴다.
 - clarification queue는 생성만 가능하면 운영이 막히므로 `factory resolve-clarification`로 사람이 `resolved|deferred|escalated`를 명시적으로 기록할 수 있어야 한다.
 - 이 명령은 기존 Markdown 형식을 유지한 채 `Status`, `Resolution Notes`, `Next Action`, `Escalation Required`를 갱신한다.
 - `Status=open`인 artifact만 종결할 수 있고, 종결된 clarification은 `factory status`의 open clarification 목록에서 빠진다.
-- 현재 단계는 draft artifact 생성, 질문 artifact 수동 생성, 최소 수동 종결까지만 제공하며, auto-promotion/auto-resolution은 다음 구조 확장 범위다.
+- 현재 단계는 draft artifact 생성, 질문 artifact 수동 생성/수동 승격, 최소 수동 종결까지만 제공하며, auto-promotion/auto-resolution은 다음 구조 확장 범위다.
 
 4. Work Item 정의
 - `factory create-work-item`로 `docs/work-items/<work-item-id>.md`를 생성한다.
