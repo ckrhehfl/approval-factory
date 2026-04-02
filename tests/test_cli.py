@@ -5927,6 +5927,30 @@ class LatestRunCliTest(unittest.TestCase):
             )
             self.assertIn("- next: factory inspect-run --root . --run-id RUN-NEW", output)
 
+    def test_record_qa_success_output_guides_to_inspect_run_with_resolved_run_id(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._prepare_gates_config(root)
+            self._bootstrap_run(root, "RUN-NEW", "2026-03-29T01:00:00+00:00")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    ["record-qa", "--root", str(root), "--run-id", "RUN-NEW", "--status", "pass", "--summary", "qa ok"]
+                )
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("QA Recorded:", output)
+            self.assertIn("- run_id: RUN-NEW", output)
+            self.assertIn(
+                f"- qa_report_path: {(root / 'runs' / 'latest' / 'RUN-NEW' / 'artifacts' / 'qa-report.yaml').as_posix()}",
+                output,
+            )
+            self.assertIn("- next: factory inspect-run --root . --run-id RUN-NEW", output)
+
     def test_latest_requires_existing_run(self) -> None:
         from pathlib import Path
 
