@@ -27,6 +27,7 @@ from orchestrator.pipeline import (
     inspect_run,
     inspect_work_item,
     promote_clarification_draft,
+    promote_work_item_draft,
     record_docs_sync,
     record_qa,
     record_review,
@@ -698,6 +699,15 @@ def build_parser() -> argparse.ArgumentParser:
     promote_clarification_draft_parser.add_argument("--draft-index", type=int, required=True)
     promote_clarification_draft_parser.add_argument("--clarification-id", required=True)
 
+    promote_work_item_draft_parser = subparsers.add_parser(
+        "promote-work-item-draft",
+        help="Promote one work item draft candidate into an official work item artifact",
+    )
+    promote_work_item_draft_parser.add_argument("--root", default=".", help="Repository root path")
+    promote_work_item_draft_parser.add_argument("--goal-id", required=True)
+    promote_work_item_draft_parser.add_argument("--draft-index", type=int, required=True)
+    promote_work_item_draft_parser.add_argument("--work-item-id", required=True)
+
     create_clarification_parser = subparsers.add_parser(
         "create-clarification",
         help="Create a clarification artifact for a goal",
@@ -1010,6 +1020,19 @@ def main(argv: Sequence[str] | None = None) -> int:
                 clarification_id=args.clarification_id,
             )
         except (FileNotFoundError, FileExistsError, IndexError) as exc:
+            parser.error(str(exc))
+        print(path.as_posix())
+        return 0
+
+    if args.command == "promote-work-item-draft":
+        try:
+            path = promote_work_item_draft(
+                root_dir=Path(args.root),
+                goal_id=args.goal_id,
+                draft_index=args.draft_index,
+                work_item_id=args.work_item_id,
+            )
+        except (FileNotFoundError, FileExistsError, IndexError, ValueError) as exc:
             parser.error(str(exc))
         print(path.as_posix())
         return 0

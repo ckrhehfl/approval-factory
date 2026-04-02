@@ -58,17 +58,21 @@
 - source of truth는 official clarification artifacts이며 `clarification_drafts/`는 입력으로 읽지 않는다.
 - official clarification이 없어도 zero-candidate draft artifact는 남긴다.
 - draft는 `docs/work-items/` official artifact를 만들지 않고, readiness/gate/approval/queue/selector/active PR/lifecycle semantics도 바꾸지 않는다.
+- draft에서 official work item으로의 승격은 자동이 아니라 operator가 `factory promote-work-item-draft` 또는 `factory create-work-item`를 별도로 실행할 때만 일어난다.
 
 5. Work Item 정의
 - `factory create-work-item`로 `docs/work-items/<work-item-id>.md`를 생성한다.
+- draft 후보를 그대로 official work item으로 올릴 때는 `factory promote-work-item-draft --root <repo> --goal-id <goal-id> --draft-index <n> --work-item-id <id>`를 사용한다.
 - Work Item은 Goal/clarification을 PR 실행 단위로 연결하는 수동 Markdown artifact다.
+- promotion 명령은 draft file을 건드리지 않고 official artifact 하나만 만들며, draft candidate의 title/summary와 source clarification linkage를 그대로 넘긴다.
+- promotion 명령은 새 artifact shape를 만들지 않고 기존 `create-work-item` 경로를 재사용한다.
 - 필요하면 반복 가능한 `--clarification-id`로 같은 goal 아래 clarification linkage를 함께 기록할 수 있다.
 - 기본 섹션은 Work Item ID, Goal ID, Title, Status, Description, Related Clarifications, Scope, Out of Scope, Acceptance Criteria, Dependencies, Risks, Notes다.
 - `Related Clarifications`는 `clarification_id (status)`를 보여주며, 없으면 `- none`으로 남긴다.
 - `factory work-item-readiness --root <repo> --work-item-id <id>`는 linked clarification의 현재 상태를 다시 읽어 `no-linked-clarifications|ready|attention-needed` 중 하나로 짧게 요약한다.
 - clarification status는 가시성 목적이며 생성 허용 여부를 자동 판정하지 않는다.
 - readiness summary도 visibility only이며 create-pr-plan, start-execution, gate, approval semantics를 바꾸지 않는다.
-- 현재 단계는 artifact 생성과 수동 관리까지만 제공하며 auto decomposition, clarification auto-link recommendation, 강제 gating은 다음 PR 범위다.
+- 현재 단계는 artifact 생성과 수동 관리까지만 제공하며 auto decomposition, work item draft auto-promotion, bulk promotion, clarification auto-link recommendation, 강제 gating은 다음 PR 범위다.
 
 6. Active PR 계획
 - `factory create-pr-plan`로 PR plan 후보를 생성한다.
