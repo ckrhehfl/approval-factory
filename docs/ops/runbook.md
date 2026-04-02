@@ -197,6 +197,7 @@ run convenience:
 - linked clarification이 없으면 `Linked Clarifications`는 `- none`으로 기록한다.
 - linked clarification artifact가 누락되면 `work-item-readiness`와 같은 안전한 실패 규칙으로 명확히 실패한다.
 - CLI 출력은 생성 위치가 active인지 archive인지와 artifact path를 함께 보여주고, readiness summary와 linked clarification count도 짧게 포함한다.
+- active 생성이면 다음 단계로 `factory start-execution --root .` 예시를 함께 보여준다.
 - archive 생성이면 이유가 "이미 active PR 존재"로 명시되고, 다음에 실행할 `factory activate-pr --root . --pr-id <id>` 예시가 같이 나온다.
 - active PR 전환은 `factory activate-pr --root <repo> --pr-id <id>`로 수행한다.
 - `activate-pr`는 기존 active PR을 `prs/archive/`로 이동시키고, 지정한 PR plan을 active로 이동시켜 `prs/active/`에 정확히 하나의 PR만 남긴다.

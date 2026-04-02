@@ -403,9 +403,9 @@ def _render_create_pr_plan_summary(
     lines.append(f"- linked_clarifications: {readiness['linked_clarification_count']}")
     if had_active_pr:
         lines.append("- reason: active PR already exists, so the new plan was created in archive")
-        lines.append(f"- next: factory activate-pr --root . --pr-id {pr_id}")
     else:
         lines.append("- reason: no active PR existed, so the new plan became active")
+    lines.append(_render_pr_plan_next_step(had_active_pr=had_active_pr, pr_id=pr_id))
     return "\n".join(lines)
 
 
@@ -433,10 +433,16 @@ def _render_promote_pr_plan_draft_summary(
     lines.append(f"- linked_clarifications: {readiness['linked_clarification_count']}")
     if had_active_pr:
         lines.append("- reason: active PR already exists, so the promoted plan was created in archive")
-        lines.append(f"- next: factory activate-pr --root . --pr-id {pr_id}")
     else:
         lines.append("- reason: no active PR existed, so the promoted plan became active")
+    lines.append(_render_pr_plan_next_step(had_active_pr=had_active_pr, pr_id=pr_id))
     return "\n".join(lines)
+
+
+def _render_pr_plan_next_step(*, had_active_pr: bool, pr_id: str) -> str:
+    if had_active_pr:
+        return f"- next: factory activate-pr --root . --pr-id {pr_id}"
+    return "- next: factory start-execution --root ."
 
 
 def _render_activate_pr_summary(pr_id: str, active_path: Path, archived_paths: list[Path]) -> str:

@@ -2273,6 +2273,7 @@ class PromotePrPlanDraftCliTest(unittest.TestCase):
             self.assertIn("- pr_id: PR-039", output)
             self.assertIn("- location: active", output)
             self.assertIn(pr_plan_path.as_posix(), output)
+            self.assertIn("factory start-execution --root .", output)
 
     def test_promote_pr_plan_draft_respects_existing_active_archive_semantics(self) -> None:
         from pathlib import Path
@@ -2299,7 +2300,9 @@ class PromotePrPlanDraftCliTest(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertTrue((root / "prs" / "archive" / "PR-039.md").exists())
             self.assertFalse((root / "prs" / "active" / "PR-039.md").exists())
-            self.assertIn("- location: archive", stdout.getvalue())
+            output = stdout.getvalue()
+            self.assertIn("- location: archive", output)
+            self.assertIn("factory activate-pr --root . --pr-id PR-039", output)
 
     def test_promote_pr_plan_draft_fails_when_draft_is_missing(self) -> None:
         from pathlib import Path
@@ -5525,6 +5528,7 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertEqual(first_exit_code, 0)
             self.assertIn("- location: active", stdout.getvalue())
             self.assertIn((root / "prs" / "active" / "PR-010.md").as_posix(), stdout.getvalue())
+            self.assertIn("factory start-execution --root .", stdout.getvalue())
 
             stderr = StringIO()
             with redirect_stderr(stderr):
