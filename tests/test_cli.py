@@ -451,6 +451,156 @@ class DraftClarificationsCliTest(unittest.TestCase):
             self.assertIn(existing_path.as_posix(), error_output)
 
 
+class PromoteClarificationDraftCliTest(unittest.TestCase):
+    def _write_goal_and_draft(self, root, *, goal_id: str = "GOAL-035") -> None:
+        DraftClarificationsCliTest()._write_goal(root, goal_id=goal_id)
+        exit_code = main(
+            [
+                "draft-clarifications",
+                "--root",
+                str(root),
+                "--goal-id",
+                goal_id,
+            ]
+        )
+        self.assertEqual(exit_code, 0)
+
+    def test_promote_clarification_draft_creates_one_official_artifact_with_provenance(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            goal_id = "GOAL-035"
+            self._write_goal_and_draft(root, goal_id=goal_id)
+
+            draft_path = root / "clarification_drafts" / f"{goal_id}.md"
+            original_draft_content = draft_path.read_text(encoding="utf-8")
+
+            exit_code = main(
+                [
+                    "promote-clarification-draft",
+                    "--root",
+                    str(root),
+                    "--goal-id",
+                    goal_id,
+                    "--draft-index",
+                    "1",
+                    "--clarification-id",
+                    "CLAR-035",
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+
+            clarification_path = root / "clarifications" / goal_id / "CLAR-035.md"
+            self.assertTrue(clarification_path.exists())
+            self.assertEqual(draft_path.read_text(encoding="utf-8"), original_draft_content)
+
+            content = clarification_path.read_text(encoding="utf-8")
+            self.assertIn("# CLAR-035: Clarify explicit non-goals", content)
+            self.assertIn("## Clarification ID\nCLAR-035", content)
+            self.assertIn(f"## Goal ID\n{goal_id}", content)
+            self.assertIn("## Status\nopen", content)
+            self.assertIn("## Category\nscope", content)
+            self.assertIn("## Question\nWhat is explicitly out of scope for this goal?", content)
+            self.assertIn("## Rationale\nNon-Goals section is missing or still TBD.", content)
+            self.assertIn("## Source Provenance", content)
+            self.assertIn(f"- draft_path: {draft_path.as_posix()}", content)
+            self.assertIn("- draft_index: 1", content)
+
+    def test_promote_clarification_draft_fails_when_draft_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "promote-clarification-draft",
+                            "--root",
+                            str(root),
+                            "--goal-id",
+                            "GOAL-404",
+                            "--draft-index",
+                            "1",
+                            "--clarification-id",
+                            "CLAR-404",
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("draft artifact was not found", error_output)
+            self.assertIn((root / "clarification_drafts" / "GOAL-404.md").as_posix(), error_output)
+            self.assertIn("factory draft-clarifications", error_output)
+
+    def test_promote_clarification_draft_fails_when_index_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_goal_and_draft(root)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "promote-clarification-draft",
+                            "--root",
+                            str(root),
+                            "--goal-id",
+                            "GOAL-035",
+                            "--draft-index",
+                            "99",
+                            "--clarification-id",
+                            "CLAR-099",
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("requested draft index was not found", error_output)
+            self.assertIn("Available indexes:", error_output)
+
+    def test_promote_clarification_draft_fails_when_target_exists(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            goal_id = "GOAL-035"
+            clarification_id = "CLAR-035"
+            self._write_goal_and_draft(root, goal_id=goal_id)
+            (root / "clarifications" / goal_id).mkdir(parents=True, exist_ok=True)
+            existing_path = root / "clarifications" / goal_id / f"{clarification_id}.md"
+            existing_path.write_text("# existing clarification\n", encoding="utf-8")
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "promote-clarification-draft",
+                            "--root",
+                            str(root),
+                            "--goal-id",
+                            goal_id,
+                            "--draft-index",
+                            "1",
+                            "--clarification-id",
+                            clarification_id,
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("Clarification artifact already exists", error_output)
+            self.assertIn(existing_path.as_posix(), error_output)
+
+
 class ResolveClarificationCliTest(unittest.TestCase):
     def _write_open_clarification(self, root, *, goal_id: str = "GOAL-018", clarification_id: str = "CLAR-001") -> None:
         (root / "clarifications" / goal_id).mkdir(parents=True, exist_ok=True)

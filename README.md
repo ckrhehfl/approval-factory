@@ -44,6 +44,7 @@
 - `start-execution`
 - `create-goal`
 - `draft-clarifications`
+- `promote-clarification-draft`
 - `create-clarification`
 - `resolve-clarification`
 - `create-work-item`
@@ -69,7 +70,7 @@ factory <command> --help
 
 1. `create-goal`로 repo-local Goal artifact 생성
 2. 필요 시 `draft-clarifications`로 `clarification_drafts/<goal-id>.md`에 deterministic draft-only artifact 생성
-3. 필요한 항목만 `create-clarification`로 Goal 기준 official clarification queue artifact로 수동 승격
+3. 필요한 항목만 `promote-clarification-draft` 또는 `create-clarification`로 Goal 기준 official clarification queue artifact로 수동 생성
 4. 필요 시 `resolve-clarification`로 clarification artifact를 `resolved|deferred|escalated` 중 하나로 공식 종결
 5. `create-work-item`으로 Goal을 실행 가능한 Work Item Markdown artifact로 연결한다. 필요하면 관련 clarification id를 함께 남긴다.
 6. 필요하면 `work-item-readiness`로 linked clarification 기준 최소 readiness visibility를 읽기 전용으로 확인한다.
@@ -338,7 +339,15 @@ factory cleanup-rehearsal --root . --apply --include-demo
 - 방식: deterministic rule-based markdown generation only
 - 실패: goal artifact가 없거나 같은 goal-id draft artifact가 이미 있으면 안전하게 실패한다.
 - 의미론: official clarification queue artifact는 만들지 않고, readiness/approval/queue/selector/lifecycle semantics도 바꾸지 않는다.
-- 승격: operator가 필요하다고 판단한 항목만 `factory create-clarification`으로 수동 생성한다.
+- 승격: operator가 필요하다고 판단한 항목만 `factory promote-clarification-draft` 또는 `factory create-clarification`으로 수동 생성한다.
+
+`promote-clarification-draft` 최소 계약:
+- 입력: `--root`, `--goal-id`, `--draft-index <n>`, `--clarification-id <id>`
+- 전제: `clarification_drafts/<goal-id>.md`가 존재하고 지정한 draft index가 정확히 하나 존재해야 한다.
+- 동작: draft의 question/category/title/escalation을 읽어 `clarifications/<goal-id>/<clarification-id>.md`를 정확히 하나 생성한다.
+- 보존: official artifact는 draft의 question, category, rationale(`source_rule`)를 보존하고 draft file path와 draft index provenance를 함께 기록한다.
+- 범위: draft file은 삭제하거나 다시 쓰지 않으며, readiness/approval/queue/selector/lifecycle semantics를 바꾸지 않는다.
+- 실패: draft artifact가 없거나, draft index가 없거나, target clarification id가 이미 존재하면 안전하게 실패한다.
 
 `resolve-clarification` 최소 계약:
 - 입력: `--root`, `--goal-id`, `--clarification-id`, `--decision <resolved|deferred|escalated>`, `--resolution-notes`, `--next-action`, 선택적 `--suggested-resolution`
@@ -407,6 +416,7 @@ run-scoped 명령의 `--latest` 최소 계약:
 pip install -e ".[dev]"
 factory create-goal --root . --goal-id GOAL-LOCAL --title "local intake" --problem "Need a formal goal artifact" --outcome "A readable goal file exists" --constraints "repo-local only"
 factory draft-clarifications --root . --goal-id GOAL-LOCAL
+factory promote-clarification-draft --root . --goal-id GOAL-LOCAL --draft-index 1 --clarification-id CLAR-001
 factory create-clarification --root . --goal-id GOAL-LOCAL --clarification-id CLAR-001 --title "scope boundary" --category scope --question "What must stay out of scope for this goal?"
 factory resolve-clarification --root . --goal-id GOAL-LOCAL --clarification-id CLAR-001 --decision resolved --resolution-notes "Scope boundary confirmed by operator review" --next-action "Proceed to work item drafting"
 factory create-work-item --root . --work-item-id WI-LOCAL --title "local work item" --goal-id GOAL-LOCAL --description "Create a minimal work item artifact" --clarification-id CLAR-001 --acceptance-criteria $'- docs/work-items/WI-LOCAL.md exists\n- Duplicate IDs fail safely'
