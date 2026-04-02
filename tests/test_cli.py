@@ -6016,6 +6016,73 @@ class LatestRunCliTest(unittest.TestCase):
             )
             self.assertIn("- next: factory inspect-run --root . --run-id RUN-NEW", output)
 
+    def test_gate_check_success_output_guides_to_inspect_run_with_resolved_run_id(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._prepare_gates_config(root)
+            self._bootstrap_run(root, "RUN-OLD", "2026-03-29T00:00:00+00:00")
+            self._bootstrap_run(root, "RUN-NEW", "2026-03-29T01:00:00+00:00")
+            self.assertEqual(
+                main(["record-review", "--root", str(root), "--latest", "--status", "pass", "--summary", "review ok"]),
+                0,
+            )
+            self.assertEqual(
+                main(["record-qa", "--root", str(root), "--latest", "--status", "pass", "--summary", "qa ok"]),
+                0,
+            )
+            self.assertEqual(
+                main(
+                    [
+                        "record-docs-sync",
+                        "--root",
+                        str(root),
+                        "--latest",
+                        "--status",
+                        "complete",
+                        "--summary",
+                        "docs ok",
+                    ]
+                ),
+                0,
+            )
+            self.assertEqual(
+                main(
+                    [
+                        "record-verification",
+                        "--root",
+                        str(root),
+                        "--latest",
+                        "--lint",
+                        "pass",
+                        "--tests",
+                        "pass",
+                        "--type-check",
+                        "pass",
+                        "--build",
+                        "pass",
+                        "--summary",
+                        "all checks green",
+                    ]
+                ),
+                0,
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["gate-check", "--root", str(root), "--latest"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Gate Check Complete:", output)
+            self.assertIn("- run_id: RUN-NEW", output)
+            self.assertIn(
+                f"- gate_status_path: {(root / 'runs' / 'latest' / 'RUN-NEW' / 'artifacts' / 'gate-status.yaml').as_posix()}",
+                output,
+            )
+            self.assertIn("- next: factory inspect-run --root . --run-id RUN-NEW", output)
+
     def test_latest_requires_existing_run(self) -> None:
         from pathlib import Path
 
