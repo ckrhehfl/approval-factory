@@ -2124,6 +2124,10 @@ class DraftPrPlanCliTest(unittest.TestCase):
             self.assertIn("PR Plan Draft Created:", output)
             self.assertIn("- work_item_id: WI-038", output)
             self.assertIn(draft_path.as_posix(), output)
+            self.assertIn(
+                "- next: review the draft, then promote it with factory promote-pr-plan-draft --root . --work-item-id WI-038",
+                output,
+            )
 
     def test_draft_pr_plan_fails_when_work_item_is_missing(self) -> None:
         from pathlib import Path

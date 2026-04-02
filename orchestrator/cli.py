@@ -413,7 +413,9 @@ def _render_draft_pr_plan_summary(path: Path, work_item_id: str) -> str:
     lines = ["PR Plan Draft Created:"]
     lines.append(f"- work_item_id: {work_item_id}")
     lines.append(f"- path: {path.as_posix()}")
-    lines.append("- next: review the draft, then create the official PR plan with factory create-pr-plan")
+    lines.append(
+        f"- next: review the draft, then promote it with factory promote-pr-plan-draft --root . --work-item-id {work_item_id}"
+    )
     return "\n".join(lines)
 
 
