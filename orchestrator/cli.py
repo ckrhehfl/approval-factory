@@ -498,6 +498,14 @@ def _render_record_verification_summary(path: Path, run_id: str) -> str:
     return "\n".join(lines)
 
 
+def _render_gate_check_summary(path: Path, run_id: str) -> str:
+    lines = ["Gate Check Complete:"]
+    lines.append(f"- run_id: {run_id}")
+    lines.append(f"- gate_status_path: {path.as_posix()}")
+    lines.append(f"- next: factory inspect-run --root . --run-id {run_id}")
+    return "\n".join(lines)
+
+
 def _render_start_execution_error(root_dir: Path, run_id: str) -> str:
     active_dir = root_dir / "prs" / "active"
     active_plans = sorted(active_dir.glob("*.md"))
@@ -1040,7 +1048,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "gate-check":
         run_id = _resolve_run_id_argument(parser, args)
         path = evaluate_gates(root_dir=Path(args.root), run_id=run_id)
-        print(path.as_posix())
+        print(_render_gate_check_summary(path, run_id))
         return 0
 
     if args.command == "build-approval":
