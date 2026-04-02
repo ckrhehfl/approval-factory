@@ -454,6 +454,7 @@ def _render_activate_pr_summary(pr_id: str, active_path: Path, archived_paths: l
             lines.append(f"- archived_previous_active: {archived_path.as_posix()}")
     else:
         lines.append("- archived_previous_active: none")
+    lines.append("- next: factory start-execution --root .")
     return "\n".join(lines)
 
 

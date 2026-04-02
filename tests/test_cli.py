@@ -5656,6 +5656,7 @@ class ActivatePrCliTest(unittest.TestCase):
             self.assertTrue((archive_dir / "PR-010.md").exists())
             self.assertIn(f"- active_path: {(active_dir / 'PR-011.md').as_posix()}", stdout.getvalue())
             self.assertIn(f"- archived_previous_active: {(archive_dir / 'PR-010.md').as_posix()}", stdout.getvalue())
+            self.assertIn("- next: factory start-execution --root .", stdout.getvalue())
 
     def test_activate_pr_missing_target_reports_active_and_archive_paths(self) -> None:
         from pathlib import Path
