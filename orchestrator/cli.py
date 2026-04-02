@@ -482,6 +482,14 @@ def _render_record_qa_summary(path: Path, run_id: str) -> str:
     return "\n".join(lines)
 
 
+def _render_record_docs_sync_summary(path: Path, run_id: str) -> str:
+    lines = ["Docs Sync Recorded:"]
+    lines.append(f"- run_id: {run_id}")
+    lines.append(f"- docs_sync_report_path: {path.as_posix()}")
+    lines.append(f"- next: factory inspect-run --root . --run-id {run_id}")
+    return "\n".join(lines)
+
+
 def _render_start_execution_error(root_dir: Path, run_id: str) -> str:
     active_dir = root_dir / "prs" / "active"
     active_plans = sorted(active_dir.glob("*.md"))
@@ -1018,7 +1026,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             status=args.status,
             summary=args.summary,
         )
-        print(path.as_posix())
+        print(_render_record_docs_sync_summary(path, run_id))
         return 0
 
     if args.command == "gate-check":
