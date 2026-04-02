@@ -314,6 +314,143 @@ class CreateClarificationCliTest(unittest.TestCase):
             self.assertEqual(exc_info.exception.code, 2)
 
 
+class DraftClarificationsCliTest(unittest.TestCase):
+    def _write_goal(self, root, *, goal_id: str = "GOAL-034") -> None:
+        (root / "goals").mkdir(parents=True, exist_ok=True)
+        (root / "goals" / f"{goal_id}.md").write_text(
+            "\n".join(
+                [
+                    f"# {goal_id}: clarification drafting",
+                    "",
+                    "## Goal ID",
+                    goal_id,
+                    "",
+                    "## Title",
+                    "clarification drafting",
+                    "",
+                    "## Status",
+                    "draft",
+                    "",
+                    "## Problem",
+                    "Operators need a minimum deterministic drafting step.",
+                    "",
+                    "## Desired Outcome",
+                    "A repo-local draft artifact exists before manual clarification creation.",
+                    "",
+                    "## Non-Goals",
+                    "- TBD",
+                    "",
+                    "## Constraints",
+                    "- repo-local only",
+                    "- deterministic",
+                    "",
+                    "## Risks",
+                    "- Users may confuse drafts with official queue items.",
+                    "",
+                    "## Open Questions",
+                    "- Which operator workflow should create official clarification artifacts?",
+                    "- What must stay out of scope for the first draft step?",
+                    "",
+                    "## Approval-Required Decisions",
+                    "- Whether draft artifacts can ever auto-promote into clarifications",
+                    "",
+                    "## Success Criteria",
+                    "- TBD",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    def test_draft_clarifications_creates_repo_local_draft_only_artifact(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_goal(root)
+
+            exit_code = main(
+                [
+                    "draft-clarifications",
+                    "--root",
+                    str(root),
+                    "--goal-id",
+                    "GOAL-034",
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+
+            draft_path = root / "clarification_drafts" / "GOAL-034.md"
+            self.assertTrue(draft_path.exists())
+            self.assertFalse((root / "clarifications").exists())
+            self.assertFalse((root / "approval_queue").exists())
+
+            content = draft_path.read_text(encoding="utf-8")
+            self.assertIn("# Clarification Draft: GOAL-034", content)
+            self.assertIn("## Goal ID\nGOAL-034", content)
+            self.assertIn("## Draft Status\ndraft-only", content)
+            self.assertIn("## Draft Method\ndeterministic-rule-based", content)
+            self.assertIn("- category: scope", content)
+            self.assertIn("- category: approval-required", content)
+            self.assertIn("- escalation_required: yes", content)
+            self.assertIn("Create official clarification artifacts only with `factory create-clarification`.", content)
+            self.assertIn("never changes readiness, approval, queue, selector, or lifecycle semantics", content)
+
+    def test_draft_clarifications_fails_when_goal_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "draft-clarifications",
+                            "--root",
+                            str(root),
+                            "--goal-id",
+                            "GOAL-404",
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("goal artifact was not found", error_output)
+            self.assertIn((root / "goals" / "GOAL-404.md").as_posix(), error_output)
+            self.assertIn("factory create-goal", error_output)
+
+    def test_draft_clarifications_fails_when_draft_already_exists(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_goal(root)
+            (root / "clarification_drafts").mkdir(parents=True, exist_ok=True)
+            existing_path = root / "clarification_drafts" / "GOAL-034.md"
+            existing_path.write_text("# existing draft\n", encoding="utf-8")
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "draft-clarifications",
+                            "--root",
+                            str(root),
+                            "--goal-id",
+                            "GOAL-034",
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("clarification draft artifact already exists", error_output)
+            self.assertIn(existing_path.as_posix(), error_output)
+
+
 class ResolveClarificationCliTest(unittest.TestCase):
     def _write_open_clarification(self, root, *, goal_id: str = "GOAL-018", clarification_id: str = "CLAR-001") -> None:
         (root / "clarifications" / goal_id).mkdir(parents=True, exist_ok=True)

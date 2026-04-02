@@ -11,6 +11,7 @@ from orchestrator.pipeline import (
     build_approval_request,
     cleanup_rehearsal_artifacts,
     create_clarification,
+    draft_clarifications,
     create_goal,
     create_pr_plan,
     create_work_item,
@@ -672,6 +673,13 @@ def build_parser() -> argparse.ArgumentParser:
     create_goal_parser.add_argument("--outcome", required=True)
     create_goal_parser.add_argument("--constraints")
 
+    draft_clarifications_parser = subparsers.add_parser(
+        "draft-clarifications",
+        help="Create a deterministic clarification draft artifact without queue mutation",
+    )
+    draft_clarifications_parser.add_argument("--root", default=".", help="Repository root path")
+    draft_clarifications_parser.add_argument("--goal-id", required=True)
+
     create_clarification_parser = subparsers.add_parser(
         "create-clarification",
         help="Create a clarification artifact for a goal",
@@ -933,6 +941,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                 constraints=args.constraints,
             )
         except FileExistsError as exc:
+            parser.error(str(exc))
+        print(path.as_posix())
+        return 0
+
+    if args.command == "draft-clarifications":
+        try:
+            path = draft_clarifications(
+                root_dir=Path(args.root),
+                goal_id=args.goal_id,
+            )
+        except (FileNotFoundError, FileExistsError) as exc:
             parser.error(str(exc))
         print(path.as_posix())
         return 0

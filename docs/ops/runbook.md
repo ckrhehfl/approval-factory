@@ -5,27 +5,28 @@
 0. 현재 상태 확인이 필요하면 `factory status`로 active PR, latest run, approval 상태, open clarification을 한 번에 본다.
 1. Work Item 생성
 2. Goal intake 필요 시 `factory create-goal`로 `goals/<goal-id>.md` 생성
-3. Goal 기준 clarification 필요 시 `factory create-clarification`로 `clarifications/<goal-id>/<clarification-id>.md` 생성
-4. clarification을 공식 종결해야 하면 `factory resolve-clarification`로 `resolved|deferred|escalated` 중 하나를 기록
-5. `factory create-work-item`로 `docs/work-items/<work-item-id>.md` 생성
-6. 필요 시 `factory work-item-readiness`로 linked clarification 기준 최소 readiness visibility 확인
-7. `factory create-pr-plan`로 PR plan 후보 생성
-8. active PR가 없으면 `prs/active/<pr-id>.md`, 이미 있으면 `prs/archive/<pr-id>.md`에 저장
-9. 생성된 PR plan에는 source work item readiness summary와 linked clarification 목록을 함께 기록
-10. 필요 시 `factory activate-pr`로 기존 active PR을 `prs/archive/`로 옮기고 의도한 PR을 active로 전환
-11. `factory start-execution`로 active PR plan에서 `runs/latest/<run-id>/` 시작
-12. Scope 승인
-13. 설계 초안 생성
-14. Architecture 승인 필요 여부 판정
-15. PR별 구현
-16. Verification 기록(lint/tests/type_check/build)
-17. Review
-18. QA
-19. Docs Sync 완료
-20. `gate-check`로 gate 판정 확인
-21. `build-approval`로 Evidence Bundle + Approval Request 생성
-22. `resolve-approval`로 승인자 결정 기록 및 queue 정리
-23. Merge
+3. clarification 초안이 필요하면 `factory draft-clarifications`로 `clarification_drafts/<goal-id>.md` 생성
+4. Goal 기준 official clarification 필요 시 `factory create-clarification`로 `clarifications/<goal-id>/<clarification-id>.md` 생성
+5. clarification을 공식 종결해야 하면 `factory resolve-clarification`로 `resolved|deferred|escalated` 중 하나를 기록
+6. `factory create-work-item`로 `docs/work-items/<work-item-id>.md` 생성
+7. 필요 시 `factory work-item-readiness`로 linked clarification 기준 최소 readiness visibility 확인
+8. `factory create-pr-plan`로 PR plan 후보 생성
+9. active PR가 없으면 `prs/active/<pr-id>.md`, 이미 있으면 `prs/archive/<pr-id>.md`에 저장
+10. 생성된 PR plan에는 source work item readiness summary와 linked clarification 목록을 함께 기록
+11. 필요 시 `factory activate-pr`로 기존 active PR을 `prs/archive/`로 옮기고 의도한 PR을 active로 전환
+12. `factory start-execution`로 active PR plan에서 `runs/latest/<run-id>/` 시작
+13. Scope 승인
+14. 설계 초안 생성
+15. Architecture 승인 필요 여부 판정
+16. PR별 구현
+17. Verification 기록(lint/tests/type_check/build)
+18. Review
+19. QA
+20. Docs Sync 완료
+21. `gate-check`로 gate 판정 확인
+22. `build-approval`로 Evidence Bundle + Approval Request 생성
+23. `resolve-approval`로 승인자 결정 기록 및 queue 정리
+24. Merge
 
 run convenience:
 - `start-execution` 직후 이어지는 run-scoped 명령은 `--run-id <id>` 대신 `--latest`를 사용할 수 있다.
@@ -54,10 +55,17 @@ run convenience:
 
 ## clarification queue 최소 계약
 
+- clarification draft artifact는 `clarification_drafts/<goal-id>.md`에 저장한다.
+- draft 명령은 `factory draft-clarifications --root <repo> --goal-id <goal-id>` 이다.
+- draft는 `goals/<goal-id>.md`를 읽어 deterministic rule-based markdown만 생성한다.
+- draft는 operator-facing local aid다. official clarification queue artifact를 만들지 않는다.
+- draft는 `clarifications/`, readiness, approval, queue, selector, lifecycle semantics를 바꾸지 않는다.
+- 같은 `goal-id` draft가 이미 있거나 goal artifact가 없으면 안전하게 실패한다.
 - clarification artifact는 `clarifications/<goal-id>/<clarification-id>.md`에 저장한다.
 - 생성 명령은 `factory create-clarification --root <repo> --goal-id <goal-id> --clarification-id <id> --title <title> --category <scope|design|dependency|constraint|approval-required> --question <text> [--escalation]` 이다.
 - 종결 명령은 `factory resolve-clarification --root <repo> --goal-id <goal-id> --clarification-id <id> --decision <resolved|deferred|escalated> --resolution-notes <text> --next-action <text> [--suggested-resolution <text>]` 이다.
 - clarification은 Goal intake 다음 단계의 최소 질문 관리 계층이다.
+- draft artifact에서 official clarification queue로의 승격은 자동이 아니라 operator의 수동 판단과 `factory create-clarification` 명령으로만 수행한다.
 - clarification queue는 생성만 가능하면 운영이 막히므로, 이번 단계는 사람이 artifact를 명시적으로 닫는 최소 수동 계약까지 포함한다.
 - 생성되는 문서는 사람 검토용 Markdown이며 다음 섹션을 항상 포함한다:
   - Clarification ID
@@ -77,8 +85,8 @@ run convenience:
 - clarification 종결은 artifact 상태 업데이트까지만 수행하며 goal/work-item/pr/run/approval queue 상태를 자동 변경하지 않는다.
 - 동일 `goal-id` 아래 동일 `clarification-id`가 이미 존재하면 명령은 실패한다.
 - status는 계속 open clarification만 보여주며, `resolved|deferred|escalated` 된 항목은 open clarification 목록에서 제거된다.
-- 이번 PR 범위에서 clarification queue는 artifact 생성과 수동 종결까지만 제공한다.
-- 질문 자동 생성, 질문 자동 해결, goal-to-WI 자동 분해, resolver/planner 구현, LLM 연결은 아직 없다.
+- 이번 PR 범위에서 clarification queue는 draft artifact 생성, official artifact 수동 생성, 수동 종결까지만 제공한다.
+- 질문 자동 승격, 질문 자동 해결, goal-to-WI 자동 분해, resolver/planner 구현, LLM 연결은 아직 없다.
 
 ## work item 최소 계약
 

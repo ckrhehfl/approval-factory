@@ -52,6 +52,7 @@ PR_DOC_FILENAMES = (
 )
 
 GOAL_STATUS = "draft"
+CLARIFICATION_DRAFT_STATUS = "draft-only"
 CLARIFICATION_STATUS = "open"
 WORK_ITEM_STATUS = "draft"
 PR_PLAN_STATUS = "planned"
@@ -136,6 +137,24 @@ def _normalize_markdown_section_text(value: str | None, *, default: str = "- TBD
     if not text:
         return [default]
     return text.splitlines()
+
+
+def _normalize_section_lines(value: str | None) -> list[str]:
+    text = (value or "").strip()
+    if not text:
+        return []
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
+def _meaningful_goal_lines(value: str | None) -> list[str]:
+    meaningful: list[str] = []
+    for line in _normalize_section_lines(value):
+        normalized = line.removeprefix("-").strip()
+        lowered = normalized.lower()
+        if lowered in {"tbd", "none", "n/a"}:
+            continue
+        meaningful.append(normalized)
+    return meaningful
 
 
 def _run_root(root_dir: Path, run_id: str) -> Path:
@@ -1709,6 +1728,183 @@ def create_goal(
     goal_path.parent.mkdir(parents=True, exist_ok=True)
     goal_path.write_text("\n".join(lines), encoding="utf-8")
     return goal_path
+
+
+def _classify_clarification_category(question: str) -> str:
+    lowered = question.lower()
+    if any(token in lowered for token in ("approve", "approval", "sign-off", "exception", "decision")):
+        return "approval-required"
+    if any(token in lowered for token in ("dependency", "dependencies", "external", "vendor", "integration", "api")):
+        return "dependency"
+    if any(token in lowered for token in ("design", "architecture", "schema", "interface", "model")):
+        return "design"
+    if any(token in lowered for token in ("constraint", "limit", "budget", "cost", "latency", "security")):
+        return "constraint"
+    return "scope"
+
+
+def _draft_title_from_question(question: str) -> str:
+    text = question.strip().rstrip("?.!").strip()
+    if not text:
+        return "Clarification needed"
+    if len(text) <= 72:
+        return text[0].upper() + text[1:]
+    truncated = text[:69].rstrip()
+    if " " in truncated:
+        truncated = truncated.rsplit(" ", 1)[0]
+    return (truncated or text[:69]).rstrip(" -") + "..."
+
+
+def _derive_clarification_draft_items(goal_sections: dict[str, str]) -> list[dict[str, str]]:
+    items: list[dict[str, str]] = []
+
+    if not _meaningful_goal_lines(goal_sections.get("Non-Goals")):
+        question = "What is explicitly out of scope for this goal?"
+        items.append(
+            {
+                "category": "scope",
+                "title": "Clarify explicit non-goals",
+                "question": question,
+                "source": "Non-Goals section is missing or still TBD.",
+                "escalation_required": "no",
+            }
+        )
+
+    if not _meaningful_goal_lines(goal_sections.get("Constraints")):
+        question = "Which constraints are fixed for this goal and cannot be relaxed?"
+        items.append(
+            {
+                "category": "constraint",
+                "title": "Clarify fixed constraints",
+                "question": question,
+                "source": "Constraints section is missing or still TBD.",
+                "escalation_required": "no",
+            }
+        )
+
+    if not _meaningful_goal_lines(goal_sections.get("Success Criteria")):
+        question = "What observable success criteria define done for this goal?"
+        items.append(
+            {
+                "category": "scope",
+                "title": "Clarify success criteria",
+                "question": question,
+                "source": "Success Criteria section is missing or still TBD.",
+                "escalation_required": "no",
+            }
+        )
+
+    for entry in _meaningful_goal_lines(goal_sections.get("Open Questions")):
+        normalized_question = entry if entry.endswith("?") else f"{entry}?"
+        items.append(
+            {
+                "category": _classify_clarification_category(normalized_question),
+                "title": _draft_title_from_question(normalized_question),
+                "question": normalized_question,
+                "source": "Derived from Goal/Open Questions.",
+                "escalation_required": "no",
+            }
+        )
+
+    for entry in _meaningful_goal_lines(goal_sections.get("Approval-Required Decisions")):
+        normalized_question = f"What approval decision is required for: {entry}?"
+        items.append(
+            {
+                "category": "approval-required",
+                "title": _draft_title_from_question(entry),
+                "question": normalized_question,
+                "source": "Derived from Goal/Approval-Required Decisions.",
+                "escalation_required": "yes",
+            }
+        )
+
+    deduped: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for item in items:
+        key = (item["category"], item["question"])
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+    return deduped
+
+
+def draft_clarifications(*, root_dir: Path, goal_id: str) -> Path:
+    goal_path = root_dir / "goals" / f"{goal_id}.md"
+    if not goal_path.exists():
+        raise FileNotFoundError(
+            "cannot draft clarifications because the goal artifact was not found "
+            f"at {goal_path.as_posix()} for goal-id '{goal_id}'. "
+            f"Next action: create it first with `factory create-goal --root {root_dir.as_posix()} --goal-id {goal_id} ...`"
+        )
+
+    draft_path = root_dir / "clarification_drafts" / f"{goal_id}.md"
+    if draft_path.exists():
+        raise FileExistsError(
+            "clarification draft artifact already exists "
+            f"for goal-id '{goal_id}': {draft_path.as_posix()}"
+        )
+
+    sections = _parse_markdown_sections(goal_path)
+    goal_title = sections.get("Title", "").strip() or goal_id
+    draft_items = _derive_clarification_draft_items(sections)
+
+    lines = [
+        f"# Clarification Draft: {goal_id}",
+        "",
+        "## Goal ID",
+        goal_id,
+        "",
+        "## Goal Title",
+        goal_title,
+        "",
+        "## Source Goal",
+        goal_path.as_posix(),
+        "",
+        "## Draft Status",
+        CLARIFICATION_DRAFT_STATUS,
+        "",
+        "## Draft Method",
+        "deterministic-rule-based",
+        "",
+        "## Operator Notes",
+        "- This file is a local drafting aid only.",
+        "- It does not create or update official clarification queue artifacts.",
+        "- Promote items manually into `clarifications/<goal-id>/` only when the operator decides to do so.",
+        "",
+        "## Suggested Clarifications",
+    ]
+
+    if draft_items:
+        for index, item in enumerate(draft_items, start=1):
+            lines.extend(
+                [
+                    "",
+                    f"### Draft {index:02d}",
+                    f"- category: {item['category']}",
+                    f"- title: {item['title']}",
+                    f"- question: {item['question']}",
+                    f"- escalation_required: {item['escalation_required']}",
+                    f"- source_rule: {item['source']}",
+                ]
+            )
+    else:
+        lines.extend(["", "- No clarification prompts were derived from the current goal artifact."])
+
+    lines.extend(
+        [
+            "",
+            "## Promotion Guidance",
+            "- Review each draft item manually.",
+            "- Create official clarification artifacts only with `factory create-clarification`.",
+            "- This draft file never changes readiness, approval, queue, selector, or lifecycle semantics.",
+            "",
+        ]
+    )
+
+    draft_path.parent.mkdir(parents=True, exist_ok=True)
+    draft_path.write_text("\n".join(lines), encoding="utf-8")
+    return draft_path
 
 
 def create_clarification(

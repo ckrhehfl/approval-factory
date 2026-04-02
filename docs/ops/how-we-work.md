@@ -12,6 +12,7 @@
 - approval-first
 - one-PR-at-a-time
 - Goal intake minimum
+- clarification draft minimum
 - clarification queue minimum
 - Work Item artifact minimum
 - active PR plan minimum
@@ -34,15 +35,21 @@
 - Goal은 사람이 읽고 수정 가능한 Markdown artifact다.
 - 현재 단계는 intake 저장 계약만 제공하며, planner/resolver는 다음 PR 범위다.
 
-2. Clarification queue
+2. Clarification draft
+- `factory draft-clarifications`로 `clarification_drafts/<goal-id>.md`를 생성한다.
+- draft는 `goals/<goal-id>.md`에서 deterministic rule-based prompt만 뽑아내는 operator-facing artifact다.
+- draft는 official clarification queue artifact를 만들지 않고, readiness/gate/approval/queue/selector/lifecycle semantics도 바꾸지 않는다.
+- draft에서 official clarification으로의 승격은 자동이 아니라 operator가 `factory create-clarification`를 별도로 실행할 때만 일어난다.
+
+3. Clarification queue
 - `factory create-clarification`로 `clarifications/<goal-id>/<clarification-id>.md`를 생성한다.
 - clarification은 Goal intake 다음 단계의 최소 질문 관리 계층이다.
 - clarification queue는 생성만 가능하면 운영이 막히므로 `factory resolve-clarification`로 사람이 `resolved|deferred|escalated`를 명시적으로 기록할 수 있어야 한다.
 - 이 명령은 기존 Markdown 형식을 유지한 채 `Status`, `Resolution Notes`, `Next Action`, `Escalation Required`를 갱신한다.
 - `Status=open`인 artifact만 종결할 수 있고, 종결된 clarification은 `factory status`의 open clarification 목록에서 빠진다.
-- 현재 단계는 질문 artifact 생성과 최소 수동 종결까지만 제공하며, auto-generation/resolution은 다음 구조 확장 범위다.
+- 현재 단계는 draft artifact 생성, 질문 artifact 수동 생성, 최소 수동 종결까지만 제공하며, auto-promotion/auto-resolution은 다음 구조 확장 범위다.
 
-3. Work Item 정의
+4. Work Item 정의
 - `factory create-work-item`로 `docs/work-items/<work-item-id>.md`를 생성한다.
 - Work Item은 Goal/clarification을 PR 실행 단위로 연결하는 수동 Markdown artifact다.
 - 필요하면 반복 가능한 `--clarification-id`로 같은 goal 아래 clarification linkage를 함께 기록할 수 있다.
@@ -53,7 +60,7 @@
 - readiness summary도 visibility only이며 create-pr-plan, start-execution, gate, approval semantics를 바꾸지 않는다.
 - 현재 단계는 artifact 생성과 수동 관리까지만 제공하며 auto decomposition, clarification auto-link recommendation, 강제 gating은 다음 PR 범위다.
 
-4. Active PR 계획
+5. Active PR 계획
 - `factory create-pr-plan`로 PR plan 후보를 생성한다.
 - active PR plan은 Work Item을 현재 실행 중인 단 하나의 PR로 연결하는 수동 Markdown artifact다.
 - 기본 섹션은 PR ID, Work Item ID, Title, Status, Summary, Work Item Readiness, Linked Clarifications, Scope, Out of Scope, Implementation Notes, Risks, Open Questions다.
@@ -69,7 +76,7 @@
 - `factory status`는 active PR가 있을 때 source work item readiness summary를 같은 규칙으로 read-only 노출할 수 있다.
 - 이 status readiness는 visibility only이며 start-execution, gate, approval semantics를 바꾸지 않는다.
 
-5. Run 부트스트랩
+6. Run 부트스트랩
 - `factory start-execution`으로 `prs/active/`의 단일 active PR plan을 읽어 `runs/latest/<run-id>/` 및 기본 artifact를 만든다.
 - active PR가 사용자의 의도와 다르면 먼저 `activate-pr`로 전환한 뒤 실행한다.
 - active PR plan의 `Work Item ID`가 실제 `docs/work-items/` artifact와 연결되지 않으면 시작하지 않는다.
@@ -87,17 +94,17 @@
 - 이 명령은 전체 reset이 아니라 partial cleanup만 허용하며, `docs/prs/` 이력 문서는 유지한다.
 - 실제 운영 이력과 non-rehearsal artifact는 기본적으로 보존한다.
 
-6. 역할별 결과 기록
+7. 역할별 결과 기록
 - Implementer/Reviewer/QA/Docs Sync/Verification 결과를 해당 record 명령으로 artifact에 반영한다.
 - 같은 세션에서 방금 시작한 run에 계속 기록할 때는 `--run-id <id>` 대신 `--latest`를 사용할 수 있다.
 - `--latest`는 `factory status`와 같은 latest-run 규칙을 사용하므로 operator가 상태 화면에서 본 latest run과 같은 대상을 고른다.
 - 과거 run 재작업이나 명시성이 필요한 상황에서는 기존 `--run-id <id>`를 유지한다.
 
-7. 게이트 판정
+8. 게이트 판정
 - `factory gate-check`로 `gate-status.yaml`을 갱신한다.
  - 이 단계는 gate 판정 확인용이며, 최종 승인 요청 산출물 최신화 단계는 아니다.
 
-8. 승인 패키지 생성
+9. 승인 패키지 생성
 - `factory build-approval`로 `evidence-bundle.yaml`, `approval-request.yaml`를 최신 상태로 만든다.
 - 이 단계는 가능하면 source work item readiness context를 approval artifact에 함께 남겨 approver가 evidence와 readiness 맥락을 같이 볼 수 있게 한다.
 - 이 단계는 `record-review`, `record-qa`, `record-docs-sync`, `record-verification`이 모두 실제로 기록된 뒤에만 허용된다.
@@ -106,7 +113,7 @@
 - latest run에는 placeholder artifact가 남아 있어도 prerequisite를 충족한 것이 아니므로, 에러가 나면 안내된 `record-*` 명령을 먼저 수행한다.
 - readiness는 informational only이며 queue 적재, gate 계산, resolve-approval semantics를 바꾸지 않는다.
 
-9. 승인자 결정
+10. 승인자 결정
 - 승인자는 queue 파일과 evidence를 보고 `approve/reject/exception`을 결정한다.
 - `factory resolve-approval`로 승인 결정을 `approval-decision.yaml`에 기록한다.
 - 이 단계는 populated `approval-request.yaml`와 pending queue item이 모두 있을 때만 허용된다.
