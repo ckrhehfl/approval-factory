@@ -780,6 +780,168 @@ class PromoteClarificationDraftCliTest(unittest.TestCase):
             self.assertIn(existing_path.as_posix(), error_output)
 
 
+class PromoteWorkItemDraftCliTest(unittest.TestCase):
+    def _write_goal_and_draft(self, root, *, goal_id: str = "GOAL-037") -> None:
+        DraftWorkItemsCliTest()._write_goal(root, goal_id=goal_id)
+        DraftWorkItemsCliTest()._write_official_clarification(
+            root,
+            goal_id=goal_id,
+            clarification_id="CLAR-037",
+            status="resolved",
+        )
+        exit_code = main(
+            [
+                "draft-work-items",
+                "--root",
+                str(root),
+                "--goal-id",
+                goal_id,
+            ]
+        )
+        self.assertEqual(exit_code, 0)
+
+    def test_promote_work_item_draft_creates_one_official_artifact_via_create_path(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            goal_id = "GOAL-037"
+            self._write_goal_and_draft(root, goal_id=goal_id)
+
+            draft_path = root / "work_item_drafts" / f"{goal_id}.md"
+            original_draft_content = draft_path.read_text(encoding="utf-8")
+
+            exit_code = main(
+                [
+                    "promote-work-item-draft",
+                    "--root",
+                    str(root),
+                    "--goal-id",
+                    goal_id,
+                    "--draft-index",
+                    "1",
+                    "--work-item-id",
+                    "WI-037",
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+
+            work_item_path = root / "docs" / "work-items" / "WI-037.md"
+            self.assertTrue(work_item_path.exists())
+            self.assertEqual(draft_path.read_text(encoding="utf-8"), original_draft_content)
+
+            content = work_item_path.read_text(encoding="utf-8")
+            self.assertIn("# WI-037: Define manual promotion boundary implementation", content)
+            self.assertIn("## Work Item ID\nWI-037", content)
+            self.assertIn(f"## Goal ID\n{goal_id}", content)
+            self.assertIn("## Title\nDefine manual promotion boundary implementation", content)
+            self.assertIn("## Status\ndraft", content)
+            self.assertIn(
+                "## Description\nPrepare the smallest work item for CLAR-037 under goal 'clarification drafting'",
+                content,
+            )
+            self.assertIn("## Related Clarifications\n- CLAR-037 (resolved)", content)
+            self.assertIn(
+                "## Acceptance Criteria\nOperator can create one official work item linked to CLAR-037 "
+                "without changing readiness, approval, queue, selector, active PR, or lifecycle semantics.",
+                content,
+            )
+            self.assertNotIn("## Acceptance Criteria\nTBD", content)
+
+    def test_promote_work_item_draft_fails_when_draft_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "promote-work-item-draft",
+                            "--root",
+                            str(root),
+                            "--goal-id",
+                            "GOAL-404",
+                            "--draft-index",
+                            "1",
+                            "--work-item-id",
+                            "WI-404",
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("draft artifact was not found", error_output)
+            self.assertIn((root / "work_item_drafts" / "GOAL-404.md").as_posix(), error_output)
+            self.assertIn("factory draft-work-items", error_output)
+
+    def test_promote_work_item_draft_fails_when_index_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_goal_and_draft(root)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "promote-work-item-draft",
+                            "--root",
+                            str(root),
+                            "--goal-id",
+                            "GOAL-037",
+                            "--draft-index",
+                            "99",
+                            "--work-item-id",
+                            "WI-099",
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("requested draft index was not found", error_output)
+            self.assertIn("Available indexes:", error_output)
+
+    def test_promote_work_item_draft_fails_when_target_exists(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            goal_id = "GOAL-037"
+            work_item_id = "WI-037"
+            self._write_goal_and_draft(root, goal_id=goal_id)
+            (root / "docs" / "work-items").mkdir(parents=True, exist_ok=True)
+            existing_path = root / "docs" / "work-items" / f"{work_item_id}.md"
+            existing_path.write_text("# existing work item\n", encoding="utf-8")
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as exc_info:
+                    main(
+                        [
+                            "promote-work-item-draft",
+                            "--root",
+                            str(root),
+                            "--goal-id",
+                            goal_id,
+                            "--draft-index",
+                            "1",
+                            "--work-item-id",
+                            work_item_id,
+                        ]
+                    )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            error_output = stderr.getvalue()
+            self.assertIn("Work item artifact already exists", error_output)
+            self.assertIn(existing_path.as_posix(), error_output)
+
+
 class ResolveClarificationCliTest(unittest.TestCase):
     def _write_open_clarification(self, root, *, goal_id: str = "GOAL-018", clarification_id: str = "CLAR-001") -> None:
         (root / "clarifications" / goal_id).mkdir(parents=True, exist_ok=True)

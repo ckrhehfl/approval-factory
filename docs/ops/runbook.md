@@ -10,25 +10,26 @@
 5. draft를 거치지 않는 수동 clarification이 필요하면 `factory create-clarification`로 `clarifications/<goal-id>/<clarification-id>.md` 생성
 6. clarification을 공식 종결해야 하면 `factory resolve-clarification`로 `resolved|deferred|escalated` 중 하나를 기록
 7. 필요 시 `factory draft-work-items`로 `work_item_drafts/<goal-id>.md` 생성
-8. `factory create-work-item`로 `docs/work-items/<work-item-id>.md` 생성
-9. 필요 시 `factory work-item-readiness`로 linked clarification 기준 최소 readiness visibility 확인
-10. `factory create-pr-plan`로 PR plan 후보 생성
-11. active PR가 없으면 `prs/active/<pr-id>.md`, 이미 있으면 `prs/archive/<pr-id>.md`에 저장
-12. 생성된 PR plan에는 source work item readiness summary와 linked clarification 목록을 함께 기록
-13. 필요 시 `factory activate-pr`로 기존 active PR을 `prs/archive/`로 옮기고 의도한 PR을 active로 전환
-14. `factory start-execution`로 active PR plan에서 `runs/latest/<run-id>/` 시작
-15. Scope 승인
-16. 설계 초안 생성
-17. Architecture 승인 필요 여부 판정
-18. PR별 구현
-19. Verification 기록(lint/tests/type_check/build)
-20. Review
-21. QA
-22. Docs Sync 완료
-23. `gate-check`로 gate 판정 확인
-24. `build-approval`로 Evidence Bundle + Approval Request 생성
-25. `resolve-approval`로 승인자 결정 기록 및 queue 정리
-26. Merge
+8. 필요 시 `factory promote-work-item-draft`로 `work_item_drafts/<goal-id>.md`의 단일 후보를 `docs/work-items/<work-item-id>.md`로 승격
+9. 또는 `factory create-work-item`로 `docs/work-items/<work-item-id>.md` 생성
+10. 필요 시 `factory work-item-readiness`로 linked clarification 기준 최소 readiness visibility 확인
+11. `factory create-pr-plan`로 PR plan 후보 생성
+12. active PR가 없으면 `prs/active/<pr-id>.md`, 이미 있으면 `prs/archive/<pr-id>.md`에 저장
+13. 생성된 PR plan에는 source work item readiness summary와 linked clarification 목록을 함께 기록
+14. 필요 시 `factory activate-pr`로 기존 active PR을 `prs/archive/`로 옮기고 의도한 PR을 active로 전환
+15. `factory start-execution`로 active PR plan에서 `runs/latest/<run-id>/` 시작
+16. Scope 승인
+17. 설계 초안 생성
+18. Architecture 승인 필요 여부 판정
+19. PR별 구현
+20. Verification 기록(lint/tests/type_check/build)
+21. Review
+22. QA
+23. Docs Sync 완료
+24. `gate-check`로 gate 판정 확인
+25. `build-approval`로 Evidence Bundle + Approval Request 생성
+26. `resolve-approval`로 승인자 결정 기록 및 queue 정리
+27. Merge
 
 run convenience:
 - `start-execution` 직후 이어지는 run-scoped 명령은 `--run-id <id>` 대신 `--latest`를 사용할 수 있다.
@@ -106,6 +107,12 @@ run convenience:
 - draft는 operator-facing local aid다. `docs/work-items/` official artifact를 만들지 않는다.
 - draft는 readiness, approval, queue, selector, active PR, lifecycle semantics를 바꾸지 않는다.
 - 같은 `goal-id` draft가 이미 있거나 goal artifact가 없으면 안전하게 실패한다.
+- draft 승격 명령은 `factory promote-work-item-draft --root <repo> --goal-id <goal-id> --draft-index <n> --work-item-id <id>` 이다.
+- 승격 명령은 draft에서 정확히 하나의 후보만 골라 official work item artifact 하나만 생성한다.
+- 승격된 official work item은 draft candidate의 `title`과 `summary`를 각각 official `Title`, `Description`으로 보존한다.
+- draft candidate에 `source_clarification_id`가 있으면 같은 goal 아래 linked clarification context도 official work item에 함께 기록한다.
+- 승격 명령은 official artifact shape를 새로 만들지 않고 기존 `factory create-work-item` 경로를 재사용한다.
+- 승격 명령은 draft file을 삭제하거나 다시 쓰지 않는다.
 - Work Item artifact는 `docs/work-items/<work-item-id>.md`에 저장한다.
 - 생성 명령은 `factory create-work-item --root <repo> --work-item-id <id> --title <title> --goal-id <goal-id> --description <text> [--acceptance-criteria <text>] [--clarification-id <id> ...]` 이다.
 - Work Item은 Goal/clarification을 실제 PR 실행 단위로 연결하는 최소 수동 계층이다.
@@ -132,10 +139,11 @@ run convenience:
 - readiness summary 규칙은 linked clarification 없음=`no-linked-clarifications`, 모두 resolved=`ready`, 하나라도 open/deferred/escalated 포함=`attention-needed` 이다.
 - 이 summary는 visibility only이며 create-pr-plan/start-execution/gate/approval 허용 여부를 바꾸지 않는다.
 - linked clarification artifact가 누락되면 readiness 조회는 경로와 함께 명확히 실패한다.
+- draft artifact가 없거나 draft index가 없거나 같은 work item id target이 이미 있으면 `promote-work-item-draft`는 안전하게 실패한다.
 - 동일 `work-item-id`가 이미 존재하면 명령은 실패한다.
 - 이번 PR 범위에서 Work Item은 artifact 생성과 수동 관리까지만 제공한다.
 - unresolved clarification을 자동 차단하지 않으며 사람이 status를 보고 판단한다.
-- Goal to Work Item 자동 분해, clarification 자동 추천/해결, planner 자동화, LLM 연결은 아직 없다.
+- Goal to Work Item 자동 분해, work item draft auto-promotion, bulk promotion, clarification 자동 추천/해결, planner 자동화, LLM 연결은 아직 없다.
 
 ## active pr plan 최소 계약
 

@@ -352,6 +352,47 @@ def _parse_clarification_draft_items(path: Path) -> list[dict[str, str]]:
     ]
 
 
+def _parse_work_item_draft_items(path: Path) -> list[dict[str, str]]:
+    items: list[dict[str, str]] = []
+    current: dict[str, str] | None = None
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        if raw_line.startswith("### Candidate "):
+            if current is not None:
+                items.append(current)
+            match = re.fullmatch(r"### Candidate (\d+)", raw_line.strip())
+            current = {"draft_index": str(int(match.group(1))) if match else ""}
+            continue
+
+        if current is None:
+            continue
+
+        if raw_line.startswith("## "):
+            items.append(current)
+            current = None
+            continue
+
+        if not raw_line.startswith("- "):
+            continue
+
+        key, separator, value = raw_line[2:].partition(":")
+        if separator:
+            current[key.strip()] = value.strip()
+
+    if current is not None:
+        items.append(current)
+
+    return [
+        item
+        for item in items
+        if item.get("draft_index")
+        and item.get("title")
+        and item.get("summary")
+        and item.get("acceptance_focus")
+        and item.get("source_rule")
+    ]
+
+
 def _parse_iso_for_sort(value: Any) -> datetime:
     text = str(value or "").strip()
     if not text:
@@ -2213,6 +2254,50 @@ def promote_clarification_draft(
     clarification_path.parent.mkdir(parents=True, exist_ok=True)
     clarification_path.write_text("\n".join(lines), encoding="utf-8")
     return clarification_path
+
+
+def promote_work_item_draft(
+    *,
+    root_dir: Path,
+    goal_id: str,
+    draft_index: int,
+    work_item_id: str,
+) -> Path:
+    draft_path = root_dir / "work_item_drafts" / f"{goal_id}.md"
+    if not draft_path.exists():
+        raise FileNotFoundError(
+            "cannot promote work item draft because the draft artifact was not found "
+            f"at {draft_path.as_posix()} for goal-id '{goal_id}'. "
+            f"Next action: create it first with `factory draft-work-items --root {root_dir.as_posix()} --goal-id {goal_id}`"
+        )
+
+    draft_items = _parse_work_item_draft_items(draft_path)
+    selected_item = next((item for item in draft_items if int(item["draft_index"]) == draft_index), None)
+    if selected_item is None:
+        available_indexes = ", ".join(item["draft_index"] for item in draft_items) or "none"
+        raise IndexError(
+            "cannot promote work item draft because the requested draft index was not found "
+            f"in {draft_path.as_posix()} for goal-id '{goal_id}': draft-index '{draft_index}'. "
+            f"Available indexes: {available_indexes}"
+        )
+
+    work_item_path = root_dir / "docs" / "work-items" / f"{work_item_id}.md"
+    if work_item_path.exists():
+        raise FileExistsError(
+            f"Work item artifact already exists for work-item-id '{work_item_id}': {work_item_path.as_posix()}"
+        )
+
+    source_clarification_id = selected_item.get("source_clarification_id", "").strip()
+    clarification_ids = [source_clarification_id] if source_clarification_id and source_clarification_id != "none" else []
+    return create_work_item(
+        root_dir=root_dir,
+        work_item_id=work_item_id,
+        title=selected_item["title"],
+        goal_id=goal_id,
+        description=selected_item["summary"],
+        acceptance_criteria=selected_item["acceptance_focus"],
+        clarification_ids=clarification_ids,
+    )
 
 
 def _render_clarification_lines(
