@@ -28,6 +28,7 @@ from orchestrator.pipeline import (
     inspect_run,
     inspect_work_item,
     promote_clarification_draft,
+    promote_pr_plan_draft,
     promote_work_item_draft,
     record_docs_sync,
     record_qa,
@@ -416,6 +417,26 @@ def _render_draft_pr_plan_summary(path: Path, work_item_id: str) -> str:
     return "\n".join(lines)
 
 
+def _render_promote_pr_plan_draft_summary(
+    path: Path,
+    had_active_pr: bool,
+    pr_id: str,
+    readiness: dict[str, object],
+) -> str:
+    lines = ["PR Plan Draft Promoted:"]
+    lines.append(f"- pr_id: {pr_id}")
+    lines.append(f"- location: {'archive' if had_active_pr else 'active'}")
+    lines.append(f"- path: {path.as_posix()}")
+    lines.append(f"- work_item_readiness: {readiness['overall_readiness_summary']}")
+    lines.append(f"- linked_clarifications: {readiness['linked_clarification_count']}")
+    if had_active_pr:
+        lines.append("- reason: active PR already exists, so the promoted plan was created in archive")
+        lines.append(f"- next: factory activate-pr --root . --pr-id {pr_id}")
+    else:
+        lines.append("- reason: no active PR existed, so the promoted plan became active")
+    return "\n".join(lines)
+
+
 def _render_activate_pr_summary(pr_id: str, active_path: Path, archived_paths: list[Path]) -> str:
     lines = ["Active PR Updated:"]
     lines.append(f"- active_pr_id: {pr_id}")
@@ -723,6 +744,13 @@ def build_parser() -> argparse.ArgumentParser:
     promote_work_item_draft_parser.add_argument("--goal-id", required=True)
     promote_work_item_draft_parser.add_argument("--draft-index", type=int, required=True)
     promote_work_item_draft_parser.add_argument("--work-item-id", required=True)
+
+    promote_pr_plan_draft_parser = subparsers.add_parser(
+        "promote-pr-plan-draft",
+        help="Promote one PR plan draft into an official PR plan artifact",
+    )
+    promote_pr_plan_draft_parser.add_argument("--root", default=".", help="Repository root path")
+    promote_pr_plan_draft_parser.add_argument("--work-item-id", required=True)
 
     create_clarification_parser = subparsers.add_parser(
         "create-clarification",
@@ -1062,6 +1090,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         except (FileNotFoundError, FileExistsError, IndexError, ValueError) as exc:
             parser.error(str(exc))
         print(path.as_posix())
+        return 0
+
+    if args.command == "promote-pr-plan-draft":
+        root_dir = Path(args.root)
+        had_active_pr = any((root_dir / "prs" / "active").glob("*.md"))
+        try:
+            result = promote_pr_plan_draft(
+                root_dir=root_dir,
+                work_item_id=args.work_item_id,
+            )
+        except (FileNotFoundError, FileExistsError, ValueError) as exc:
+            parser.error(str(exc))
+        print(
+            _render_promote_pr_plan_draft_summary(
+                result["path"],
+                had_active_pr,
+                result["path"].stem,
+                result["readiness"],
+            )
+        )
         return 0
 
     if args.command == "resolve-clarification":

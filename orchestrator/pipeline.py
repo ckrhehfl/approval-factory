@@ -398,6 +398,13 @@ def _parse_work_item_draft_items(path: Path) -> list[dict[str, str]]:
     ]
 
 
+def _derive_pr_id_from_work_item_id(work_item_id: str) -> str:
+    normalized = work_item_id.strip()
+    if normalized.startswith("WI"):
+        return f"PR{normalized[2:]}"
+    return f"PR-{normalized}"
+
+
 def _parse_iso_for_sort(value: Any) -> datetime:
     text = str(value or "").strip()
     if not text:
@@ -2262,6 +2269,17 @@ def draft_pr_plan(*, root_dir: Path, work_item_id: str) -> Path:
     return draft_path
 
 
+def _render_pr_plan_promotion_notes(*, acceptance_seed: str | None, dependency_seed: str | None, note_seed: str | None) -> str:
+    lines: list[str] = []
+    for line in _meaningful_goal_lines(acceptance_seed):
+        lines.append(f"- validation intent: {line}")
+    for line in _meaningful_goal_lines(dependency_seed):
+        lines.append(f"- dependency seed: {line}")
+    for line in _meaningful_goal_lines(note_seed):
+        lines.append(f"- note seed: {line}")
+    return "\n".join(lines) if lines else "- TBD"
+
+
 def create_clarification(
     *,
     root_dir: Path,
@@ -2402,6 +2420,48 @@ def promote_work_item_draft(
         description=selected_item["summary"],
         acceptance_criteria=selected_item["acceptance_focus"],
         clarification_ids=clarification_ids,
+    )
+
+
+def promote_pr_plan_draft(
+    *,
+    root_dir: Path,
+    work_item_id: str,
+) -> dict[str, Any]:
+    draft_path = root_dir / "pr_plan_drafts" / f"{work_item_id}.md"
+    if not draft_path.exists():
+        raise FileNotFoundError(
+            "cannot promote PR plan draft because the draft artifact was not found "
+            f"at {draft_path.as_posix()} for work-item-id '{work_item_id}'. "
+            f"Next action: create it first with `factory draft-pr-plan --root {root_dir.as_posix()} --work-item-id {work_item_id}`"
+        )
+
+    sections = _parse_markdown_sections(draft_path)
+    draft_work_item_id = sections.get("Work Item ID", "").strip()
+    if draft_work_item_id and draft_work_item_id != work_item_id:
+        raise ValueError(
+            "cannot promote PR plan draft because the draft artifact does not match the requested work-item-id: "
+            f"{draft_path.as_posix()} declares '{draft_work_item_id}', requested '{work_item_id}'."
+        )
+
+    return create_pr_plan(
+        root_dir=root_dir,
+        pr_id=_derive_pr_id_from_work_item_id(work_item_id),
+        work_item_id=work_item_id,
+        title=(sections.get("Suggested PR Title", "").strip() or sections.get("Work Item Title", "").strip() or work_item_id),
+        summary=(
+            sections.get("Suggested PR Summary", "").strip()
+            or sections.get("Source Description", "").strip()
+            or f"Implement {work_item_id}."
+        ),
+        scope=sections.get("Scope Seed"),
+        out_of_scope=sections.get("Out of Scope Seed"),
+        implementation_notes=_render_pr_plan_promotion_notes(
+            acceptance_seed=sections.get("Acceptance Seed"),
+            dependency_seed=sections.get("Dependency Seed"),
+            note_seed=sections.get("Note Seed"),
+        ),
+        risks=sections.get("Risk Seed"),
     )
 
 
@@ -2574,6 +2634,11 @@ def create_pr_plan(
     work_item_id: str,
     title: str,
     summary: str,
+    scope: str | None = None,
+    out_of_scope: str | None = None,
+    implementation_notes: str | None = None,
+    risks: str | None = None,
+    open_questions: str | None = None,
 ) -> dict[str, Any]:
     active_dir = _pr_active_dir(root_dir)
     archive_dir = _pr_archive_dir(root_dir)
@@ -2591,6 +2656,11 @@ def create_pr_plan(
     readiness = get_work_item_readiness(root_dir=root_dir, work_item_id=work_item_id)
     existing_active_plans = sorted(active_dir.glob("*.md"))
     pr_plan_path = active_pr_plan_path if not existing_active_plans else archive_pr_plan_path
+    scope_lines = _normalize_markdown_section_lines(scope)
+    out_of_scope_lines = _normalize_markdown_section_lines(out_of_scope)
+    implementation_note_lines = _normalize_markdown_section_lines(implementation_notes)
+    risk_lines = _normalize_markdown_section_lines(risks)
+    open_question_lines = _normalize_markdown_section_lines(open_questions)
 
     lines = [
         f"# {pr_id}: {title}",
@@ -2612,19 +2682,19 @@ def create_pr_plan(
         "",
         *_render_pr_plan_readiness_lines(readiness),
         "## Scope",
-        "- TBD",
+        *scope_lines,
         "",
         "## Out of Scope",
-        "- TBD",
+        *out_of_scope_lines,
         "",
         "## Implementation Notes",
-        "- TBD",
+        *implementation_note_lines,
         "",
         "## Risks",
-        "- TBD",
+        *risk_lines,
         "",
         "## Open Questions",
-        "- TBD",
+        *open_question_lines,
         "",
     ]
     pr_plan_path.parent.mkdir(parents=True, exist_ok=True)
