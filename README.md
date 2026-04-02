@@ -382,6 +382,7 @@ factory cleanup-rehearsal --root . --apply --include-demo
 - readiness는 visibility only다. `attention-needed`여도 PR plan 생성은 허용되며 activation/start-execution/gate/approval semantics를 바꾸지 않는다.
 - linked clarification artifact가 누락된 work item이면 `work-item-readiness`와 같은 안전한 실패 규칙을 따른다.
 - 성공 출력은 기존 CLI tone을 유지하면서 readiness summary와 linked clarification count를 짧게 함께 보여준다.
+- 성공 출력의 다음 단계 안내는 location이 `active`면 `factory start-execution --root .`, `archive`면 `factory activate-pr --root . --pr-id <id>`를 사용한다.
 
 `draft-clarifications` 최소 계약:
 - 입력: `goals/<goal-id>.md`
@@ -421,6 +422,7 @@ factory cleanup-rehearsal --root . --apply --include-demo
 - 입력: `--root`, `--work-item-id <id>`
 - 전제: `pr_plan_drafts/<work-item-id>.md`가 존재해야 한다.
 - 동작: draft seed를 읽어 기존 `create-pr-plan` 경로로 official PR plan artifact 하나를 생성한다.
+- 성공 출력의 다음 단계 안내는 location이 `active`면 `factory start-execution --root .`, `archive`면 `factory activate-pr --root . --pr-id <id>`를 사용한다.
 - 보존: linked work item id를 유지하고 draft의 summary/scope/validation intent를 가능한 범위에서 official PR plan에 반영한다.
 - id 규칙: target pr id는 work item id에서 deterministic 하게 파생되며 `WI-*`는 대응하는 `PR-*`로 승격한다.
 - 범위: draft file은 삭제하거나 다시 쓰지 않으며 auto-activation, auto-promotion, readiness/approval/queue/selector/active PR/lifecycle semantics를 바꾸지 않는다.
