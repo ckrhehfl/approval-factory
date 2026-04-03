@@ -58,6 +58,80 @@ def _write_minimal_work_item(root, *, work_item_id: str, goal_id: str = "GOAL-TE
     )
 
 
+class CliHelpDiscoverabilityTest(unittest.TestCase):
+    def _run_help(self, *argv: str) -> str:
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            with self.assertRaises(SystemExit) as exc_info:
+                main(list(argv) + ["--help"])
+        self.assertEqual(exc_info.exception.code, 0)
+        return stdout.getvalue()
+
+    def test_draft_clarifications_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("draft-clarifications")
+
+        self.assertIn("Create a deterministic clarification draft artifact without queue mutation.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn(
+            "review the draft, then promote one item with factory promote-clarification-draft --root . --goal-id <goal-id> --draft-index <n> --clarification-id <id>",
+            output,
+        )
+        self.assertIn("factory draft-clarifications --root . --goal-id GOAL-034", output)
+
+    def test_promote_clarification_draft_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("promote-clarification-draft")
+
+        self.assertIn("Promote one draft item into an official clarification artifact.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("factory draft-work-items --root . --goal-id <goal-id>", output)
+        self.assertIn(
+            "factory promote-clarification-draft --root . --goal-id GOAL-034 --draft-index 1 --clarification-id CLAR-001",
+            output,
+        )
+
+    def test_draft_work_items_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("draft-work-items")
+
+        self.assertIn("Draft work item candidates from official clarification artifacts.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn(
+            "review the draft, then promote one candidate with factory promote-work-item-draft --root . --goal-id <goal-id> --draft-index <n> --work-item-id <id>",
+            output,
+        )
+        self.assertIn("factory draft-work-items --root . --goal-id GOAL-036", output)
+
+    def test_promote_work_item_draft_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("promote-work-item-draft")
+
+        self.assertIn("Promote one work item draft candidate into an official work item artifact.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("factory draft-pr-plan --root . --work-item-id <work-item-id>", output)
+        self.assertIn(
+            "factory promote-work-item-draft --root . --goal-id GOAL-036 --draft-index 1 --work-item-id WI-036",
+            output,
+        )
+
+    def test_draft_pr_plan_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("draft-pr-plan")
+
+        self.assertIn("Draft a PR plan artifact from an official work item without PR lifecycle mutation.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn(
+            "review the draft, then promote it with factory promote-pr-plan-draft --root . --work-item-id <work-item-id>",
+            output,
+        )
+        self.assertIn("factory draft-pr-plan --root . --work-item-id WI-038", output)
+
+    def test_promote_pr_plan_draft_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("promote-pr-plan-draft")
+
+        self.assertIn("Promote one PR plan draft into an official PR plan artifact.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("if no active PR exists, factory start-execution --root .", output)
+        self.assertIn("if an active PR already exists, factory activate-pr --root . --pr-id <pr-id>", output)
+        self.assertIn("factory promote-pr-plan-draft --root . --work-item-id WI-039", output)
+
+
 class BootstrapCliTest(unittest.TestCase):
     def test_bootstrap_run_creates_canonical_artifacts(self) -> None:
         from pathlib import Path

@@ -482,6 +482,10 @@ def _render_pr_plan_next_step(*, had_active_pr: bool, pr_id: str) -> str:
     return "- next: factory start-execution --root ."
 
 
+def _render_help_epilog(*lines: str) -> str:
+    return "\n".join(lines)
+
+
 def _render_activate_pr_summary(pr_id: str, active_path: Path, archived_paths: list[Path]) -> str:
     lines = ["Active PR Updated:"]
     lines.append(f"- active_pr_id: {pr_id}")
@@ -806,6 +810,15 @@ def build_parser() -> argparse.ArgumentParser:
     draft_clarifications_parser = subparsers.add_parser(
         "draft-clarifications",
         help="Create a deterministic clarification draft artifact without queue mutation",
+        description="Create a deterministic clarification draft artifact without queue mutation.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  review the draft, then promote one item with factory promote-clarification-draft --root . --goal-id <goal-id> --draft-index <n> --clarification-id <id>",
+            "",
+            "Example:",
+            "  factory draft-clarifications --root . --goal-id GOAL-034",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     draft_clarifications_parser.add_argument("--root", default=".", help="Repository root path")
     draft_clarifications_parser.add_argument("--goal-id", required=True)
@@ -813,6 +826,15 @@ def build_parser() -> argparse.ArgumentParser:
     draft_work_items_parser = subparsers.add_parser(
         "draft-work-items",
         help="Draft work item candidates from official clarification artifacts",
+        description="Draft work item candidates from official clarification artifacts.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  review the draft, then promote one candidate with factory promote-work-item-draft --root . --goal-id <goal-id> --draft-index <n> --work-item-id <id>",
+            "",
+            "Example:",
+            "  factory draft-work-items --root . --goal-id GOAL-036",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     draft_work_items_parser.add_argument("--root", default=".", help="Repository root path")
     draft_work_items_parser.add_argument("--goal-id", required=True)
@@ -820,6 +842,15 @@ def build_parser() -> argparse.ArgumentParser:
     draft_pr_plan_parser = subparsers.add_parser(
         "draft-pr-plan",
         help="Draft a PR plan artifact from an official work item without PR lifecycle mutation",
+        description="Draft a PR plan artifact from an official work item without PR lifecycle mutation.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  review the draft, then promote it with factory promote-pr-plan-draft --root . --work-item-id <work-item-id>",
+            "",
+            "Example:",
+            "  factory draft-pr-plan --root . --work-item-id WI-038",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     draft_pr_plan_parser.add_argument("--root", default=".", help="Repository root path")
     draft_pr_plan_parser.add_argument("--work-item-id", required=True)
@@ -827,6 +858,15 @@ def build_parser() -> argparse.ArgumentParser:
     promote_clarification_draft_parser = subparsers.add_parser(
         "promote-clarification-draft",
         help="Promote one draft item into an official clarification artifact",
+        description="Promote one draft item into an official clarification artifact.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  factory draft-work-items --root . --goal-id <goal-id>",
+            "",
+            "Example:",
+            "  factory promote-clarification-draft --root . --goal-id GOAL-034 --draft-index 1 --clarification-id CLAR-001",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     promote_clarification_draft_parser.add_argument("--root", default=".", help="Repository root path")
     promote_clarification_draft_parser.add_argument("--goal-id", required=True)
@@ -836,6 +876,15 @@ def build_parser() -> argparse.ArgumentParser:
     promote_work_item_draft_parser = subparsers.add_parser(
         "promote-work-item-draft",
         help="Promote one work item draft candidate into an official work item artifact",
+        description="Promote one work item draft candidate into an official work item artifact.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  factory draft-pr-plan --root . --work-item-id <work-item-id>",
+            "",
+            "Example:",
+            "  factory promote-work-item-draft --root . --goal-id GOAL-036 --draft-index 1 --work-item-id WI-036",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     promote_work_item_draft_parser.add_argument("--root", default=".", help="Repository root path")
     promote_work_item_draft_parser.add_argument("--goal-id", required=True)
@@ -845,6 +894,16 @@ def build_parser() -> argparse.ArgumentParser:
     promote_pr_plan_draft_parser = subparsers.add_parser(
         "promote-pr-plan-draft",
         help="Promote one PR plan draft into an official PR plan artifact",
+        description="Promote one PR plan draft into an official PR plan artifact.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  if no active PR exists, factory start-execution --root .",
+            "  if an active PR already exists, factory activate-pr --root . --pr-id <pr-id>",
+            "",
+            "Example:",
+            "  factory promote-pr-plan-draft --root . --work-item-id WI-039",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     promote_pr_plan_draft_parser.add_argument("--root", default=".", help="Repository root path")
     promote_pr_plan_draft_parser.add_argument("--work-item-id", required=True)
