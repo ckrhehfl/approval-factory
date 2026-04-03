@@ -841,7 +841,19 @@ def build_parser() -> argparse.ArgumentParser:
     trace_lineage_parser.add_argument("--root", default=".", help="Repository root path")
     _add_trace_lineage_selector_arguments(trace_lineage_parser)
 
-    bootstrap_parser = subparsers.add_parser("bootstrap-run", help="Create baseline run artifacts")
+    bootstrap_parser = subparsers.add_parser(
+        "bootstrap-run",
+        help="Create baseline run artifacts",
+        description="Create baseline run artifacts for an operator-managed flow.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  inspect the run state with factory status --root . or factory inspect-run --root . --run-id <run-id>",
+            "",
+            "Example:",
+            "  factory bootstrap-run --root . --run-id RUN-064 --work-item-id WI-064 --work-item-title \"operator assist help\" --pr-id PR-064",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     bootstrap_parser.add_argument("--root", default=".", help="Repository root path")
     bootstrap_parser.add_argument("--run-id", default=_default_run_id())
     bootstrap_parser.add_argument("--work-item-id", default="WI-000")
@@ -955,7 +967,19 @@ def build_parser() -> argparse.ArgumentParser:
     build_approval_parser.add_argument("--root", default=".", help="Repository root path")
     _add_run_selector_arguments(build_approval_parser)
 
-    create_goal_parser = subparsers.add_parser("create-goal", help="Create a goal intake artifact")
+    create_goal_parser = subparsers.add_parser(
+        "create-goal",
+        help="Create a goal intake artifact",
+        description="Create a goal intake artifact for operator-managed manual/create intake.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  add an operator-selected follow-up with factory create-clarification --root . --goal-id <goal-id> --clarification-id <clarification-id> --title \"...\" --category scope --question \"...\" or review possible prompts with factory draft-clarifications --root . --goal-id <goal-id>",
+            "",
+            "Example:",
+            '  factory create-goal --root . --goal-id GOAL-064 --title "manual help discoverability" --problem "operators need clearer manual/create command help" --outcome "operators can choose the next command explicitly"',
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     create_goal_parser.add_argument("--root", default=".", help="Repository root path")
     create_goal_parser.add_argument("--goal-id", required=True)
     create_goal_parser.add_argument("--title", required=True)
@@ -1067,6 +1091,15 @@ def build_parser() -> argparse.ArgumentParser:
     create_clarification_parser = subparsers.add_parser(
         "create-clarification",
         help="Create a clarification artifact for a goal",
+        description="Create a clarification artifact for a goal in an operator-managed manual/create flow.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  record the chosen outcome with factory resolve-clarification --root . --goal-id <goal-id> --clarification-id <clarification-id> --decision resolved --resolution-notes \"...\" --next-action \"...\" or review candidate work with factory draft-work-items --root . --goal-id <goal-id>",
+            "",
+            "Example:",
+            '  factory create-clarification --root . --goal-id GOAL-064 --clarification-id CLAR-064 --title "manual next step wording" --category ux --question "Which operator hint should follow create-goal?"',
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     create_clarification_parser.add_argument("--root", default=".", help="Repository root path")
     create_clarification_parser.add_argument("--goal-id", required=True)
@@ -1079,6 +1112,15 @@ def build_parser() -> argparse.ArgumentParser:
     resolve_clarification_parser = subparsers.add_parser(
         "resolve-clarification",
         help="Resolve an open clarification artifact for a goal",
+        description="Resolve an open clarification artifact for a goal within an operator-managed manual/create flow.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  prepare the next operator-selected planning step with factory draft-work-items --root . --goal-id <goal-id> or create an official item with factory create-work-item --root . --work-item-id <work-item-id> --title \"...\" --goal-id <goal-id> --description \"...\"",
+            "",
+            "Example:",
+            '  factory resolve-clarification --root . --goal-id GOAL-064 --clarification-id CLAR-064 --decision resolved --resolution-notes "Use operator hints only." --next-action "Create a work item once wording is confirmed"',
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     resolve_clarification_parser.add_argument("--root", default=".", help="Repository root path")
     resolve_clarification_parser.add_argument("--goal-id", required=True)
@@ -1088,7 +1130,19 @@ def build_parser() -> argparse.ArgumentParser:
     resolve_clarification_parser.add_argument("--next-action", required=True)
     resolve_clarification_parser.add_argument("--suggested-resolution")
 
-    create_work_item_parser = subparsers.add_parser("create-work-item", help="Create a work item artifact")
+    create_work_item_parser = subparsers.add_parser(
+        "create-work-item",
+        help="Create a work item artifact",
+        description="Create a work item artifact from approved manual/create inputs.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  inspect clarification visibility with factory work-item-readiness --root . --work-item-id <work-item-id> or prepare a plan with factory create-pr-plan --root . --pr-id <pr-id> --work-item-id <work-item-id> --title \"...\" --summary \"...\"",
+            "",
+            "Example:",
+            '  factory create-work-item --root . --work-item-id WI-064 --title "manual command help discoverability" --goal-id GOAL-064 --description "Add descriptions, next steps, and examples for manual/create commands"',
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     create_work_item_parser.add_argument("--root", default=".", help="Repository root path")
     create_work_item_parser.add_argument("--work-item-id", required=True)
     create_work_item_parser.add_argument("--title", required=True)
@@ -1105,6 +1159,15 @@ def build_parser() -> argparse.ArgumentParser:
     work_item_readiness_parser = subparsers.add_parser(
         "work-item-readiness",
         help="Show read-only clarification readiness visibility for a work item",
+        description="Show read-only clarification readiness visibility for a work item.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  use this visibility to decide the next operator action, such as factory create-pr-plan --root . --pr-id <pr-id> --work-item-id <work-item-id> --title \"...\" --summary \"...\" or factory inspect-work-item --root . --work-item-id <work-item-id>",
+            "",
+            "Example:",
+            "  factory work-item-readiness --root . --work-item-id WI-064",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     work_item_readiness_parser.add_argument("--root", default=".", help="Repository root path")
     work_item_readiness_parser.add_argument("--work-item-id", required=True)
@@ -1183,6 +1246,15 @@ def build_parser() -> argparse.ArgumentParser:
     cleanup_parser = subparsers.add_parser(
         "cleanup-rehearsal",
         help="List or remove rehearsal artifacts from repo-local operating paths",
+        description="List or remove rehearsal artifacts from repo-local operating paths in an operator-managed flow.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  inspect the resulting repo-local state with factory status --root . or factory inspect-run --root . --run-id <run-id>",
+            "",
+            "Example:",
+            "  factory cleanup-rehearsal --root .",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     cleanup_parser.add_argument("--root", default=".", help="Repository root path")
     cleanup_parser.add_argument("--apply", action="store_true", help="Actually delete matched artifacts")
