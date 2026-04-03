@@ -56,16 +56,27 @@
 
 ## 4. canonical naming
 
+### docs roles
+
+- `docs/work-items/`는 Goal/clarification을 official work item artifact로 고정하는 canonical planning surface다.
+- `docs/prs/`는 PR별 history/audit trail을 남기는 canonical documentation surface다.
+- active execution에 사용되는 official PR plan artifact는 `prs/active/`와 `prs/archive/`에 있다.
+- 따라서 `docs/prs/`는 runtime source of truth가 아니며, history coverage 차이만으로 runtime semantics를 판정하지 않는다.
+
+### canonical paths
+
 사람용 문서 경로:
 
 - `docs/work-items/WI-###-<slug>.md`
-- `docs/prs/PR-###/scope.md`
-- `docs/prs/PR-###/plan.md`
-- `docs/prs/PR-###/review.md`
-- `docs/prs/PR-###/qa.md`
-- `docs/prs/PR-###/docs-sync.md`
-- `docs/prs/PR-###/evidence.md`
-- `docs/prs/PR-###/decision.md`
+- `docs/prs/PR-###/scope.md` (recommended history-doc shape)
+- `docs/prs/PR-###/plan.md` (recommended history-doc shape)
+- `docs/prs/PR-###/review.md` (recommended history-doc shape)
+- `docs/prs/PR-###/qa.md` (recommended history-doc shape)
+- `docs/prs/PR-###/docs-sync.md` (recommended history-doc shape)
+- `docs/prs/PR-###/evidence.md` (recommended history-doc shape)
+- `docs/prs/PR-###/decision.md` (recommended history-doc shape)
+- `prs/active/<pr-id>.md` (official active PR plan artifact)
+- `prs/archive/<pr-id>.md` (official archived PR plan artifact)
 
 기계용 artifact 경로:
 
@@ -78,6 +89,13 @@
 - `runs/latest/<run_id>/artifacts/evidence-bundle.yaml`
 - `runs/latest/<run_id>/artifacts/approval-request.yaml`
 - `runs/latest/<run_id>/artifacts/gate-status.yaml`
+
+### history alignment policy
+
+- 현재 저장소의 `docs/prs/`는 mixed legacy formats를 가진다.
+- git history에는 PR-040~049 merge commit이 존재하지만, 현재 저장소에는 해당 per-PR history docs가 없다.
+- PR-040~049 retro docs policy는 `README/architecture alignment only`다.
+- 즉, architecture와 README는 실제 repo/history에 맞게 정렬하되, 확인 가능한 근거 없이 PR-040~049용 retro history docs를 새로 만들지 않는다.
 
 ## 5. 확장 경계
 
