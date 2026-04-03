@@ -131,6 +131,34 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         self.assertIn("if an active PR already exists, factory activate-pr --root . --pr-id <pr-id>", output)
         self.assertIn("factory promote-pr-plan-draft --root . --work-item-id WI-039", output)
 
+    def test_create_pr_plan_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("create-pr-plan")
+
+        self.assertIn("Create an official PR plan artifact from a work item.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("if no active PR exists, factory start-execution --root .", output)
+        self.assertIn("if an active PR already exists, factory activate-pr --root . --pr-id <pr-id>", output)
+        self.assertIn(
+            'factory create-pr-plan --root . --pr-id PR-055 --work-item-id WI-055 --title "official PR help discoverability" --summary "Add minimum help next steps for official PR flow"',
+            output,
+        )
+
+    def test_activate_pr_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("activate-pr")
+
+        self.assertIn("Switch the single active PR plan.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("factory start-execution --root .", output)
+        self.assertIn("factory activate-pr --root . --pr-id PR-055", output)
+
+    def test_start_execution_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("start-execution")
+
+        self.assertIn("Start a run from the single active PR plan.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("factory inspect-run --root . --run-id <run-id>", output)
+        self.assertIn("factory start-execution --root . --run-id RUN-055", output)
+
 
 class BootstrapCliTest(unittest.TestCase):
     def test_bootstrap_run_creates_canonical_artifacts(self) -> None:
