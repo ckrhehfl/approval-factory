@@ -318,6 +318,64 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         self.assertIn("factory inspect-run --root . --run-id <run-id>", output)
         self.assertIn("factory trace-lineage --root . --run-id RUN-063", output)
 
+    def test_create_goal_help_includes_description_next_step_and_example(self) -> None:
+        output = self._run_help("create-goal")
+
+        self.assertIn("Create a goal intake artifact for operator-managed manual/create intake.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("Example:", output)
+
+    def test_create_clarification_help_includes_description_next_step_and_example(self) -> None:
+        output = self._run_help("create-clarification")
+
+        self.assertIn(
+            "Create a clarification artifact for a goal in an operator-managed manual/create flow.",
+            output,
+        )
+        self.assertIn("Next step:", output)
+        self.assertIn("Example:", output)
+
+    def test_resolve_clarification_help_includes_description_next_step_and_example(self) -> None:
+        output = self._run_help("resolve-clarification")
+
+        self.assertIn(
+            "Resolve an open clarification artifact for a goal within an operator-managed manual/create flow.",
+            output,
+        )
+        self.assertIn("Next step:", output)
+        self.assertIn("Example:", output)
+
+    def test_create_work_item_help_includes_description_next_step_and_example(self) -> None:
+        output = self._run_help("create-work-item")
+
+        self.assertIn("Create a work item artifact from approved manual/create inputs.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("Example:", output)
+
+    def test_work_item_readiness_help_includes_description_next_step_and_example(self) -> None:
+        output = self._run_help("work-item-readiness")
+
+        self.assertIn("Show read-only clarification readiness visibility for a work item.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("Example:", output)
+
+    def test_cleanup_rehearsal_help_includes_description_next_step_and_example(self) -> None:
+        output = self._run_help("cleanup-rehearsal")
+
+        self.assertIn(
+            "List or remove rehearsal artifacts from repo-local operating paths in an operator-managed flow.",
+            output,
+        )
+        self.assertIn("Next step:", output)
+        self.assertIn("Example:", output)
+
+    def test_bootstrap_run_help_includes_description_next_step_and_example(self) -> None:
+        output = self._run_help("bootstrap-run")
+
+        self.assertIn("Create baseline run artifacts for an operator-managed flow.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("Example:", output)
+
 
 class BootstrapCliTest(unittest.TestCase):
     def test_bootstrap_run_creates_canonical_artifacts(self) -> None:
