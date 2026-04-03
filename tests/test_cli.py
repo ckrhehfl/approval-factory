@@ -222,6 +222,17 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         )
         self.assertIn("factory build-approval --root . --run-id RUN-056", output)
 
+    def test_resolve_approval_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("resolve-approval")
+
+        self.assertIn("Resolve pending approval request.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("factory inspect-approval --root . --run-id <run-id>", output)
+        self.assertIn(
+            'factory resolve-approval --root . --run-id RUN-056 --decision approve --actor approver.local --note "all gates satisfied"',
+            output,
+        )
+
 
 class BootstrapCliTest(unittest.TestCase):
     def test_bootstrap_run_creates_canonical_artifacts(self) -> None:
