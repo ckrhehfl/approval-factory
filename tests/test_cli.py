@@ -244,6 +244,17 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         )
         self.assertIn("factory inspect-approval --root . --run-id RUN-056", output)
 
+    def test_inspect_run_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("inspect-run")
+
+        self.assertIn("Inspect run-scoped execution artifacts in visibility-only mode.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn(
+            'factory record-review --root . --run-id <run-id> --status pass --summary "review ok"',
+            output,
+        )
+        self.assertIn("factory inspect-run --root . --run-id RUN-055", output)
+
 
 class BootstrapCliTest(unittest.TestCase):
     def test_bootstrap_run_creates_canonical_artifacts(self) -> None:
