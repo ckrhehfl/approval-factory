@@ -123,6 +123,16 @@ def _render_approval_queue_inspection(inspection: dict[str, object]) -> str:
     lines = ["Approval Queue Inspection:"]
     lines.append(f"- latest_run_id: {inspection.get('latest_run_id') or 'none'}")
     lines.append(f"- pending_total: {inspection['pending_total']}")
+    relation_summary = inspection.get("latest_relation_summary")
+    if not isinstance(relation_summary, dict):
+        relation_summary = {}
+
+    lines.append("")
+    lines.append("Relation Summary:")
+    lines.append(f"- latest_relation_count_latest: {relation_summary.get('latest_relation_count_latest', 0)}")
+    lines.append(f"- latest_relation_count_stale: {relation_summary.get('latest_relation_count_stale', 0)}")
+    lines.append(f"- latest_relation_count_no_latest_run: {relation_summary.get('latest_relation_count_no_latest_run', 0)}")
+    lines.append(f"- latest_relation_count_unparseable: {relation_summary.get('latest_relation_count_unparseable', 0)}")
 
     lines.append("")
     lines.append("Pending Approvals:")

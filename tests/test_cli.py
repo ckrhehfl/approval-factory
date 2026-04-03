@@ -3768,6 +3768,12 @@ class CleanupRehearsalCliTest(unittest.TestCase):
                         "- latest_run_id: none",
                         "- pending_total: 0",
                         "",
+                        "Relation Summary:",
+                        "- latest_relation_count_latest: 0",
+                        "- latest_relation_count_stale: 0",
+                        "- latest_relation_count_no_latest_run: 0",
+                        "- latest_relation_count_unparseable: 0",
+                        "",
                         "Pending Approvals:",
                         "- none",
                     ]
@@ -3822,6 +3828,11 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("Approval Queue Inspection:", output)
             self.assertIn("- latest_run_id: RUN-301", output)
             self.assertIn("- pending_total: 1", output)
+            self.assertIn("Relation Summary:", output)
+            self.assertIn("- latest_relation_count_latest: 1", output)
+            self.assertIn("- latest_relation_count_stale: 0", output)
+            self.assertIn("- latest_relation_count_no_latest_run: 0", output)
+            self.assertIn("- latest_relation_count_unparseable: 0", output)
             self.assertIn("- item: 1", output)
             self.assertIn(f"  path: {queue_item.as_posix()}", output)
             self.assertIn("  parsed_run_id: RUN-301", output)
@@ -3884,6 +3895,11 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             output = stdout.getvalue()
             self.assertIn("- latest_run_id: RUN-410", output)
             self.assertIn("- pending_total: 2", output)
+            self.assertIn("Relation Summary:", output)
+            self.assertIn("- latest_relation_count_latest: 1", output)
+            self.assertIn("- latest_relation_count_stale: 1", output)
+            self.assertIn("- latest_relation_count_no_latest_run: 0", output)
+            self.assertIn("- latest_relation_count_unparseable: 0", output)
             self.assertIn("  latest_relation: latest", output)
             self.assertIn(f"  path: {stale_item.as_posix()}", output)
             self.assertIn("  parsed_run_id: RUN-405", output)
@@ -4763,7 +4779,7 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("- status: deferred", inspect_stdout.getvalue())
             self.assertEqual(
                 queue_stdout.getvalue(),
-                "Approval Queue Inspection:\n- latest_run_id: none\n- pending_total: 0\n\nPending Approvals:\n- none\n",
+                "Approval Queue Inspection:\n- latest_run_id: none\n- pending_total: 0\n\nRelation Summary:\n- latest_relation_count_latest: 0\n- latest_relation_count_stale: 0\n- latest_relation_count_no_latest_run: 0\n- latest_relation_count_unparseable: 0\n\nPending Approvals:\n- none\n",
             )
 
     def test_inspect_goal_successfully_by_id(self) -> None:
@@ -4997,7 +5013,7 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("- status: in_review", inspect_stdout.getvalue())
             self.assertEqual(
                 queue_stdout.getvalue(),
-                "Approval Queue Inspection:\n- latest_run_id: none\n- pending_total: 0\n\nPending Approvals:\n- none\n",
+                "Approval Queue Inspection:\n- latest_run_id: none\n- pending_total: 0\n\nRelation Summary:\n- latest_relation_count_latest: 0\n- latest_relation_count_stale: 0\n- latest_relation_count_no_latest_run: 0\n- latest_relation_count_unparseable: 0\n\nPending Approvals:\n- none\n",
             )
 
     def test_inspect_goal_keeps_existing_visibility_commands_unchanged(self) -> None:

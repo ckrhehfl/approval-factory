@@ -537,12 +537,19 @@ def inspect_approval_queue(root_dir: Path) -> dict[str, Any]:
     latest_run_id = latest_run["run_id"] if latest_run else None
     pending_items = sorted((root_dir / "approval_queue" / "pending").glob("APR-*.yaml"))
     items: list[dict[str, Any]] = []
+    relation_counts = {
+        "latest": 0,
+        "stale": 0,
+        "no-latest-run": 0,
+        "unparseable": 0,
+    }
 
     for pending_item in pending_items:
         parsed_run_id = _parse_pending_approval_run_id(pending_item)
         relation = "unparseable"
         if parsed_run_id is not None:
             relation = "no-latest-run" if latest_run_id is None else ("latest" if parsed_run_id == latest_run_id else "stale")
+        relation_counts[relation] += 1
 
         payload, payload_note = _safe_read_approval_queue_item(pending_item)
         approval_request = payload.get("approval_request", {}) if isinstance(payload, dict) else {}
@@ -586,6 +593,12 @@ def inspect_approval_queue(root_dir: Path) -> dict[str, Any]:
         "latest_run_id": latest_run_id,
         "latest_run_path": latest_run.get("path") if latest_run else None,
         "pending_total": len(pending_items),
+        "latest_relation_summary": {
+            "latest_relation_count_latest": relation_counts["latest"],
+            "latest_relation_count_stale": relation_counts["stale"],
+            "latest_relation_count_no_latest_run": relation_counts["no-latest-run"],
+            "latest_relation_count_unparseable": relation_counts["unparseable"],
+        },
         "items": items,
     }
 
