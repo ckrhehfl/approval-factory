@@ -693,12 +693,33 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="factory")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    status_parser = subparsers.add_parser("status", help="Show current repo-local system status")
+    status_parser = subparsers.add_parser(
+        "status",
+        help="Show current repo-local system status",
+        description="Show current repo-local system status for operator visibility continuity.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  choose a read-only follow-up such as factory inspect-approval-queue --root . or factory inspect-pr-plan --root . --active",
+            "",
+            "Example:",
+            "  factory status --root .",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     status_parser.add_argument("--root", default=".", help="Repository root path")
 
     inspect_approval_queue_parser = subparsers.add_parser(
         "inspect-approval-queue",
         help="Inspect pending approval queue entries without changing approval semantics",
+        description="Inspect pending approval queue entries in visibility-only mode.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  continue read-only approval visibility with factory inspect-approval --root . --run-id <run-id>",
+            "",
+            "Example:",
+            "  factory inspect-approval-queue --root .",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     inspect_approval_queue_parser.add_argument("--root", default=".", help="Repository root path")
 
@@ -737,6 +758,15 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_pr_plan_parser = subparsers.add_parser(
         "inspect-pr-plan",
         help="Inspect PR plan artifacts in visibility-only mode",
+        description="Inspect PR plan artifacts in visibility-only mode.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  check whether the plan is active or archived, then choose the next operator command explicitly",
+            "",
+            "Example:",
+            "  factory inspect-pr-plan --root . --active",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     inspect_pr_plan_parser.add_argument("--root", default=".", help="Repository root path")
     pr_plan_selector = inspect_pr_plan_parser.add_mutually_exclusive_group(required=True)
@@ -750,6 +780,15 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_work_item_parser = subparsers.add_parser(
         "inspect-work-item",
         help="Inspect work item artifacts in visibility-only mode",
+        description="Inspect work item artifacts in visibility-only mode.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            '  continue visibility with factory work-item-readiness --root . --work-item-id <work-item-id> or prepare a plan with factory create-pr-plan --root . --pr-id <pr-id> --work-item-id <work-item-id> --title "..." --summary "..."',
+            "",
+            "Example:",
+            "  factory inspect-work-item --root . --work-item-id WI-063",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     inspect_work_item_parser.add_argument("--root", default=".", help="Repository root path")
     inspect_work_item_parser.add_argument("--work-item-id", required=True)
@@ -757,6 +796,15 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_clarification_parser = subparsers.add_parser(
         "inspect-clarification",
         help="Inspect clarification artifacts in visibility-only mode",
+        description="Inspect clarification artifacts in visibility-only mode.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            '  resolve it with factory resolve-clarification --root . --goal-id <goal-id> --clarification-id <clarification-id> --resolution "..." or continue planning with factory draft-work-items --root . --goal-id <goal-id>',
+            "",
+            "Example:",
+            "  factory inspect-clarification --root . --clarification-id CLAR-063",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     inspect_clarification_parser.add_argument("--root", default=".", help="Repository root path")
     inspect_clarification_parser.add_argument("--clarification-id", required=True)
@@ -764,6 +812,15 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_goal_parser = subparsers.add_parser(
         "inspect-goal",
         help="Inspect goal artifacts in visibility-only mode",
+        description="Inspect goal artifacts in visibility-only mode.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            '  continue visibility with factory draft-clarifications --root . --goal-id <goal-id> or add one with factory create-clarification --root . --goal-id <goal-id> --clarification-id <clarification-id> --question "..."',
+            "",
+            "Example:",
+            "  factory inspect-goal --root . --goal-id GOAL-063",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     inspect_goal_parser.add_argument("--root", default=".", help="Repository root path")
     inspect_goal_parser.add_argument("--goal-id", required=True)
@@ -771,6 +828,15 @@ def build_parser() -> argparse.ArgumentParser:
     trace_lineage_parser = subparsers.add_parser(
         "trace-lineage",
         help="Trace run-linked repo-local artifacts in visibility-only mode",
+        description="Trace run-linked repo-local artifacts in visibility-only mode.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  continue read-only follow-up with factory inspect-run --root . --run-id <run-id> or factory inspect-approval --root . --run-id <run-id>",
+            "",
+            "Example:",
+            "  factory trace-lineage --root . --run-id RUN-063",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     trace_lineage_parser.add_argument("--root", default=".", help="Repository root path")
     _add_trace_lineage_selector_arguments(trace_lineage_parser)
