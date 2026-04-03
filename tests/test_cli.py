@@ -368,16 +368,18 @@ class DraftClarificationsCliTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             self._write_goal(root)
+            stdout = StringIO()
 
-            exit_code = main(
-                [
-                    "draft-clarifications",
-                    "--root",
-                    str(root),
-                    "--goal-id",
-                    "GOAL-034",
-                ]
-            )
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "draft-clarifications",
+                        "--root",
+                        str(root),
+                        "--goal-id",
+                        "GOAL-034",
+                    ]
+                )
 
             self.assertEqual(exit_code, 0)
 
@@ -385,6 +387,14 @@ class DraftClarificationsCliTest(unittest.TestCase):
             self.assertTrue(draft_path.exists())
             self.assertFalse((root / "clarifications").exists())
             self.assertFalse((root / "approval_queue").exists())
+            output = stdout.getvalue()
+            self.assertIn("Clarification Draft Created:", output)
+            self.assertIn("- goal_id: GOAL-034", output)
+            self.assertIn(f"- path: {draft_path.as_posix()}", output)
+            self.assertIn(
+                "- next: review the draft, then promote one item with factory promote-clarification-draft --root . --goal-id GOAL-034 --draft-index <n> --clarification-id <id>",
+                output,
+            )
 
             content = draft_path.read_text(encoding="utf-8")
             self.assertIn("# Clarification Draft: GOAL-034", content)
@@ -516,22 +526,32 @@ class DraftWorkItemsCliTest(unittest.TestCase):
             self._write_official_clarification(root, goal_id=goal_id)
             (root / "clarification_drafts").mkdir(parents=True, exist_ok=True)
             (root / "clarification_drafts" / f"{goal_id}.md").write_text("# ignored draft\n", encoding="utf-8")
+            stdout = StringIO()
 
-            exit_code = main(
-                [
-                    "draft-work-items",
-                    "--root",
-                    str(root),
-                    "--goal-id",
-                    goal_id,
-                ]
-            )
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "draft-work-items",
+                        "--root",
+                        str(root),
+                        "--goal-id",
+                        goal_id,
+                    ]
+                )
 
             self.assertEqual(exit_code, 0)
 
             draft_path = root / "work_item_drafts" / f"{goal_id}.md"
             self.assertTrue(draft_path.exists())
             self.assertFalse((root / "docs" / "work-items").exists())
+            output = stdout.getvalue()
+            self.assertIn("Work Item Draft Created:", output)
+            self.assertIn(f"- goal_id: {goal_id}", output)
+            self.assertIn(f"- path: {draft_path.as_posix()}", output)
+            self.assertIn(
+                f"- next: review the draft, then promote one candidate with factory promote-work-item-draft --root . --goal-id {goal_id} --draft-index <n> --work-item-id <id>",
+                output,
+            )
 
             content = draft_path.read_text(encoding="utf-8")
             self.assertIn(f"# Work Item Draft: {goal_id}", content)
@@ -654,26 +674,34 @@ class PromoteClarificationDraftCliTest(unittest.TestCase):
 
             draft_path = root / "clarification_drafts" / f"{goal_id}.md"
             original_draft_content = draft_path.read_text(encoding="utf-8")
+            stdout = StringIO()
 
-            exit_code = main(
-                [
-                    "promote-clarification-draft",
-                    "--root",
-                    str(root),
-                    "--goal-id",
-                    goal_id,
-                    "--draft-index",
-                    "1",
-                    "--clarification-id",
-                    "CLAR-035",
-                ]
-            )
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "promote-clarification-draft",
+                        "--root",
+                        str(root),
+                        "--goal-id",
+                        goal_id,
+                        "--draft-index",
+                        "1",
+                        "--clarification-id",
+                        "CLAR-035",
+                    ]
+                )
 
             self.assertEqual(exit_code, 0)
 
             clarification_path = root / "clarifications" / goal_id / "CLAR-035.md"
             self.assertTrue(clarification_path.exists())
             self.assertEqual(draft_path.read_text(encoding="utf-8"), original_draft_content)
+            output = stdout.getvalue()
+            self.assertIn("Clarification Draft Promoted:", output)
+            self.assertIn(f"- goal_id: {goal_id}", output)
+            self.assertIn("- clarification_id: CLAR-035", output)
+            self.assertIn(f"- path: {clarification_path.as_posix()}", output)
+            self.assertIn(f"- next: factory draft-work-items --root . --goal-id {goal_id}", output)
 
             content = clarification_path.read_text(encoding="utf-8")
             self.assertIn("# CLAR-035: Clarify explicit non-goals", content)
@@ -810,26 +838,33 @@ class PromoteWorkItemDraftCliTest(unittest.TestCase):
 
             draft_path = root / "work_item_drafts" / f"{goal_id}.md"
             original_draft_content = draft_path.read_text(encoding="utf-8")
+            stdout = StringIO()
 
-            exit_code = main(
-                [
-                    "promote-work-item-draft",
-                    "--root",
-                    str(root),
-                    "--goal-id",
-                    goal_id,
-                    "--draft-index",
-                    "1",
-                    "--work-item-id",
-                    "WI-037",
-                ]
-            )
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "promote-work-item-draft",
+                        "--root",
+                        str(root),
+                        "--goal-id",
+                        goal_id,
+                        "--draft-index",
+                        "1",
+                        "--work-item-id",
+                        "WI-037",
+                    ]
+                )
 
             self.assertEqual(exit_code, 0)
 
             work_item_path = root / "docs" / "work-items" / "WI-037.md"
             self.assertTrue(work_item_path.exists())
             self.assertEqual(draft_path.read_text(encoding="utf-8"), original_draft_content)
+            output = stdout.getvalue()
+            self.assertIn("Work Item Draft Promoted:", output)
+            self.assertIn("- work_item_id: WI-037", output)
+            self.assertIn(f"- path: {work_item_path.as_posix()}", output)
+            self.assertIn("- next: factory draft-pr-plan --root . --work-item-id WI-037", output)
 
             content = work_item_path.read_text(encoding="utf-8")
             self.assertIn("# WI-037: Define manual promotion boundary implementation", content)
