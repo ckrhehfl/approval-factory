@@ -16,6 +16,7 @@ git history에는 PR-040~049 merge commit이 존재하지만 현재 `docs/prs/PR
 
 - `docs/prs/`의 canonical role은 historical record와 audit trail 유지다.
 - 이 경로의 문서 유무만으로 runtime behavior, readiness, approval, queue, activation, execution semantics를 추론하지 않는다.
+- 앞으로 새 PR은 merge 전 최소 `docs/prs/PR-###/plan.md` 하나를 남긴다.
 - 새로운 PR history docs를 추가할 때는 해당 PR에 대해 확인 가능한 근거만 기록한다.
 - PR별 history docs의 권장 shape는 다음 7개 문서다.
   - `scope.md`
@@ -25,9 +26,11 @@ git history에는 PR-040~049 merge commit이 존재하지만 현재 `docs/prs/PR
   - `docs-sync.md`
   - `evidence.md`
   - `decision.md`
+- 위 7-file shape는 recommended history-doc shape이며, forward minimum requirement는 `plan.md` 1개다.
 - 다만 기존 저장소에는 mixed legacy formats가 존재하므로, 과거 PR 전체가 동일 shape를 가진다고 가정하지 않는다.
 - PR-040~049에 대한 retro docs policy는 `README/architecture alignment only`다.
 - 위 정책은 `docs/prs`와 architecture wording을 실제 repo/history에 맞게 정렬하는 데만 적용하며, 근거 없는 per-PR retro docs 작성은 포함하지 않는다.
+- PR-060은 PR-053~059 history-doc backfill을 같은 PR 안에서 처리하지 않는다.
 
 ## non-goals
 

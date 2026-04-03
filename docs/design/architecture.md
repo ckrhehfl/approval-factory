@@ -62,6 +62,7 @@
 - `docs/prs/`는 PR별 history/audit trail을 남기는 canonical documentation surface다.
 - active execution에 사용되는 official PR plan artifact는 `prs/active/`와 `prs/archive/`에 있다.
 - 따라서 `docs/prs/`는 runtime source of truth가 아니며, history coverage 차이만으로 runtime semantics를 판정하지 않는다.
+- 앞으로 새 PR은 merge 전 최소 `docs/prs/PR-###/plan.md`를 남긴다.
 
 ### canonical paths
 
@@ -77,6 +78,11 @@
 - `docs/prs/PR-###/decision.md` (recommended history-doc shape)
 - `prs/active/<pr-id>.md` (official active PR plan artifact)
 - `prs/archive/<pr-id>.md` (official archived PR plan artifact)
+
+forward minimum:
+
+- 7-file shape는 recommended history-doc shape다.
+- 새 PR의 forward minimum history-doc requirement는 `docs/prs/PR-###/plan.md` 1개다.
 
 기계용 artifact 경로:
 
@@ -96,6 +102,7 @@
 - git history에는 PR-040~049 merge commit이 존재하지만, 현재 저장소에는 해당 per-PR history docs가 없다.
 - PR-040~049 retro docs policy는 `README/architecture alignment only`다.
 - 즉, architecture와 README는 실제 repo/history에 맞게 정렬하되, 확인 가능한 근거 없이 PR-040~049용 retro history docs를 새로 만들지 않는다.
+- PR-060은 PR-053~059 history-doc backfill을 같은 PR 안에서 처리하지 않는다.
 
 ## 5. 확장 경계
 
