@@ -6314,8 +6314,10 @@ class BuildApprovalCliReadinessTest(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             output = stdout.getvalue()
             self.assertIn("Build Approval:", output)
+            self.assertIn("- run_id: RUN-CLI-READY", output)
             self.assertIn("- readiness_summary: ready", output)
             self.assertIn("- linked_clarifications: 2", output)
+            self.assertIn("- next: factory inspect-approval --root . --run-id RUN-CLI-READY", output)
 
     def test_build_approval_output_marks_unavailable_readiness_without_failing(self) -> None:
         from pathlib import Path
@@ -6333,4 +6335,6 @@ class BuildApprovalCliReadinessTest(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             output = stdout.getvalue()
             self.assertIn("Build Approval:", output)
+            self.assertIn("- run_id: RUN-CLI-UNAVAILABLE", output)
             self.assertIn("- readiness: unavailable", output)
+            self.assertIn("- next: factory inspect-approval --root . --run-id RUN-CLI-UNAVAILABLE", output)
