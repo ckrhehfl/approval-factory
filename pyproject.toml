@@ -21,4 +21,4 @@ dev = [
 factory = "orchestrator.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["orchestrator*"]
+include = ["orchestrator*", "factory*"]
