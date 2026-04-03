@@ -255,6 +255,69 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         )
         self.assertIn("factory inspect-run --root . --run-id RUN-055", output)
 
+    def test_status_help_includes_description_next_step_and_example(self) -> None:
+        output = self._run_help("status")
+
+        self.assertIn("Show current repo-local system status for operator visibility continuity.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("Example:", output)
+        self.assertIn("factory inspect-approval-queue --root .", output)
+        self.assertIn("factory status --root .", output)
+
+    def test_inspect_approval_queue_help_includes_description_next_step_and_example(self) -> None:
+        output = self._run_help("inspect-approval-queue")
+
+        self.assertIn("Inspect pending approval queue entries in visibility-only mode.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("Example:", output)
+        self.assertIn("factory inspect-approval --root . --run-id <run-id>", output)
+        self.assertIn("factory inspect-approval-queue --root .", output)
+
+    def test_inspect_pr_plan_help_includes_description_next_step_and_example(self) -> None:
+        output = self._run_help("inspect-pr-plan")
+
+        self.assertIn("Inspect PR plan artifacts in visibility-only mode.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("Example:", output)
+        self.assertIn("check whether the plan is active or archived, then choose the next operator command explicitly", output)
+        self.assertIn("factory inspect-pr-plan --root . --active", output)
+
+    def test_inspect_work_item_help_includes_description_next_step_and_example(self) -> None:
+        output = self._run_help("inspect-work-item")
+
+        self.assertIn("Inspect work item artifacts in visibility-only mode.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("Example:", output)
+        self.assertIn("factory work-item-readiness --root . --work-item-id <work-item-id>", output)
+        self.assertIn("factory inspect-work-item --root . --work-item-id WI-063", output)
+
+    def test_inspect_clarification_help_includes_description_next_step_and_example(self) -> None:
+        output = self._run_help("inspect-clarification")
+
+        self.assertIn("Inspect clarification artifacts in visibility-only mode.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("Example:", output)
+        self.assertIn("factory resolve-clarification --root . --goal-id <goal-id> --clarification-id <clarification-id>", output)
+        self.assertIn("factory inspect-clarification --root . --clarification-id CLAR-063", output)
+
+    def test_inspect_goal_help_includes_description_next_step_and_example(self) -> None:
+        output = self._run_help("inspect-goal")
+
+        self.assertIn("Inspect goal artifacts in visibility-only mode.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("Example:", output)
+        self.assertIn("factory draft-clarifications --root . --goal-id <goal-id>", output)
+        self.assertIn("factory inspect-goal --root . --goal-id GOAL-063", output)
+
+    def test_trace_lineage_help_includes_description_next_step_and_example(self) -> None:
+        output = self._run_help("trace-lineage")
+
+        self.assertIn("Trace run-linked repo-local artifacts in visibility-only mode.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("Example:", output)
+        self.assertIn("factory inspect-run --root . --run-id <run-id>", output)
+        self.assertIn("factory trace-lineage --root . --run-id RUN-063", output)
+
 
 class BootstrapCliTest(unittest.TestCase):
     def test_bootstrap_run_creates_canonical_artifacts(self) -> None:
