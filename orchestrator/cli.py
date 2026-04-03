@@ -419,6 +419,43 @@ def _render_draft_pr_plan_summary(path: Path, work_item_id: str) -> str:
     return "\n".join(lines)
 
 
+def _render_draft_clarifications_summary(path: Path, goal_id: str) -> str:
+    lines = ["Clarification Draft Created:"]
+    lines.append(f"- goal_id: {goal_id}")
+    lines.append(f"- path: {path.as_posix()}")
+    lines.append(
+        f"- next: review the draft, then promote one item with factory promote-clarification-draft --root . --goal-id {goal_id} --draft-index <n> --clarification-id <id>"
+    )
+    return "\n".join(lines)
+
+
+def _render_promote_clarification_draft_summary(path: Path, goal_id: str, clarification_id: str) -> str:
+    lines = ["Clarification Draft Promoted:"]
+    lines.append(f"- goal_id: {goal_id}")
+    lines.append(f"- clarification_id: {clarification_id}")
+    lines.append(f"- path: {path.as_posix()}")
+    lines.append(f"- next: factory draft-work-items --root . --goal-id {goal_id}")
+    return "\n".join(lines)
+
+
+def _render_draft_work_items_summary(path: Path, goal_id: str) -> str:
+    lines = ["Work Item Draft Created:"]
+    lines.append(f"- goal_id: {goal_id}")
+    lines.append(f"- path: {path.as_posix()}")
+    lines.append(
+        f"- next: review the draft, then promote one candidate with factory promote-work-item-draft --root . --goal-id {goal_id} --draft-index <n> --work-item-id <id>"
+    )
+    return "\n".join(lines)
+
+
+def _render_promote_work_item_draft_summary(path: Path, work_item_id: str) -> str:
+    lines = ["Work Item Draft Promoted:"]
+    lines.append(f"- work_item_id: {work_item_id}")
+    lines.append(f"- path: {path.as_posix()}")
+    lines.append(f"- next: factory draft-pr-plan --root . --work-item-id {work_item_id}")
+    return "\n".join(lines)
+
+
 def _render_promote_pr_plan_draft_summary(
     path: Path,
     had_active_pr: bool,
@@ -1085,7 +1122,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         except (FileNotFoundError, FileExistsError) as exc:
             parser.error(str(exc))
-        print(path.as_posix())
+        print(_render_draft_clarifications_summary(path, args.goal_id))
         return 0
 
     if args.command == "draft-work-items":
@@ -1096,7 +1133,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         except (FileNotFoundError, FileExistsError) as exc:
             parser.error(str(exc))
-        print(path.as_posix())
+        print(_render_draft_work_items_summary(path, args.goal_id))
         return 0
 
     if args.command == "draft-pr-plan":
@@ -1136,7 +1173,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         except (FileNotFoundError, FileExistsError, IndexError) as exc:
             parser.error(str(exc))
-        print(path.as_posix())
+        print(_render_promote_clarification_draft_summary(path, args.goal_id, args.clarification_id))
         return 0
 
     if args.command == "promote-work-item-draft":
@@ -1149,7 +1186,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         except (FileNotFoundError, FileExistsError, IndexError, ValueError) as exc:
             parser.error(str(exc))
-        print(path.as_posix())
+        print(_render_promote_work_item_draft_summary(path, args.work_item_id))
         return 0
 
     if args.command == "promote-pr-plan-draft":
