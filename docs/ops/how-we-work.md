@@ -86,6 +86,7 @@
 - `factory create-pr-plan`로 PR plan 후보를 생성한다.
 - draft seed를 최대한 재사용해 official PR plan 하나를 만들 때는 `factory promote-pr-plan-draft --root <repo> --work-item-id <id>`를 사용한다.
 - active PR plan은 Work Item을 현재 실행 중인 단 하나의 PR로 연결하는 수동 Markdown artifact다.
+- operator는 merge 전 해당 PR에 대한 최소 history note로 `docs/prs/PR-###/plan.md`를 남긴다. 이 문서는 history/audit trail surface이며 runtime source of truth는 아니다.
 - 기본 섹션은 PR ID, Work Item ID, Title, Status, Summary, Work Item Readiness, Linked Clarifications, Scope, Out of Scope, Implementation Notes, Risks, Open Questions다.
 - `prs/active/`는 항상 0 또는 1개의 PR만 가져야 한다.
 - active PR가 없으면 `create-pr-plan`은 `prs/active/<pr-id>.md`를 만든다.
@@ -101,6 +102,7 @@
 - 이번 범위는 PR-011 execution flow 보강용 최소 전환만 포함하며, lifecycle 전체나 multi-PR orchestration은 포함하지 않는다.
 - `factory status`는 active PR가 있을 때 source work item readiness summary를 같은 규칙으로 read-only 노출할 수 있다.
 - 이 status readiness는 visibility only이며 start-execution, gate, approval semantics를 바꾸지 않는다.
+- `docs/prs`의 7-file shape는 권장 history-doc shape일 뿐이며, forward minimum requirement는 `plan.md` 1개다.
 
 8. Run 부트스트랩
 - `factory start-execution`으로 `prs/active/`의 단일 active PR plan을 읽어 `runs/latest/<run-id>/` 및 기본 artifact를 만든다.
