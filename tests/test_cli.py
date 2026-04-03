@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+from pathlib import Path
+import shutil
+import subprocess
+import sys
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -427,6 +431,44 @@ class BootstrapCliTest(unittest.TestCase):
             self.assertTrue((pr_docs / "docs-sync.md").exists())
             self.assertTrue((pr_docs / "evidence.md").exists())
             self.assertTrue((pr_docs / "decision.md").exists())
+
+
+class PythonModuleEntrypointTest(unittest.TestCase):
+    def _run_module(self, *argv: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, "-m", "factory", *argv],
+            cwd=Path(__file__).resolve().parents[1],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+    def test_python_m_factory_help_succeeds(self) -> None:
+        result = self._run_module("--help")
+
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("usage: factory", result.stdout)
+        self.assertIn("status", result.stdout)
+
+    def test_python_m_factory_status_help_succeeds(self) -> None:
+        result = self._run_module("status", "--help")
+
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("Show current repo-local system status for operator visibility continuity.", result.stdout)
+        self.assertIn("factory status --root .", result.stdout)
+
+    @unittest.skipUnless(shutil.which("factory"), "factory console entrypoint not installed in this environment")
+    def test_factory_console_status_help_remains_available(self) -> None:
+        result = subprocess.run(
+            ["factory", "status", "--help"],
+            cwd=Path(__file__).resolve().parents[1],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("Show current repo-local system status for operator visibility continuity.", result.stdout)
 
 
 class CreateGoalCliTest(unittest.TestCase):
