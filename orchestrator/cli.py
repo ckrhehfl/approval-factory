@@ -705,6 +705,15 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_approval_parser = subparsers.add_parser(
         "inspect-approval",
         help="Inspect approval package artifacts in visibility-only mode",
+        description="Inspect approval package artifacts in visibility-only mode.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  factory resolve-approval --root . --run-id <run-id> --decision approve --actor <actor> --note \"all gates satisfied\"",
+            "",
+            "Example:",
+            "  factory inspect-approval --root . --run-id RUN-056",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     inspect_approval_parser.add_argument("--root", default=".", help="Repository root path")
     _add_run_selector_arguments(inspect_approval_parser)

@@ -233,6 +233,17 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
             output,
         )
 
+    def test_inspect_approval_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("inspect-approval")
+
+        self.assertIn("Inspect approval package artifacts in visibility-only mode.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn(
+            'factory resolve-approval --root . --run-id <run-id> --decision approve --actor <actor> --note "all gates satisfied"',
+            output,
+        )
+        self.assertIn("factory inspect-approval --root . --run-id RUN-056", output)
+
 
 class BootstrapCliTest(unittest.TestCase):
     def test_bootstrap_run_creates_canonical_artifacts(self) -> None:
