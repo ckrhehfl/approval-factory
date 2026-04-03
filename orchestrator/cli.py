@@ -721,6 +721,15 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_run_parser = subparsers.add_parser(
         "inspect-run",
         help="Inspect run-scoped execution artifacts in visibility-only mode",
+        description="Inspect run-scoped execution artifacts in visibility-only mode.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            '  factory record-review --root . --run-id <run-id> --status pass --summary "review ok"',
+            "",
+            "Example:",
+            "  factory inspect-run --root . --run-id RUN-055",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     inspect_run_parser.add_argument("--root", default=".", help="Repository root path")
     _add_run_selector_arguments(inspect_run_parser)
