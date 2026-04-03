@@ -764,13 +764,37 @@ def build_parser() -> argparse.ArgumentParser:
     bootstrap_parser.add_argument("--work-item-title", default="bootstrap-run")
     bootstrap_parser.add_argument("--pr-id", default="PR-000")
 
-    record_review_parser = subparsers.add_parser("record-review", help="Record review result")
+    record_review_parser = subparsers.add_parser(
+        "record-review",
+        help="Record review result",
+        description="Record review result.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  factory record-qa --root . --run-id <run-id> --status pass --summary \"qa ok\"",
+            "",
+            "Example:",
+            "  factory record-review --root . --run-id RUN-056 --status pass --summary \"review ok\"",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     record_review_parser.add_argument("--root", default=".", help="Repository root path")
     _add_run_selector_arguments(record_review_parser)
     record_review_parser.add_argument("--status", choices=["pass", "fail"], required=True)
     record_review_parser.add_argument("--summary", required=True)
 
-    record_verification_parser = subparsers.add_parser("record-verification", help="Record verification checks result")
+    record_verification_parser = subparsers.add_parser(
+        "record-verification",
+        help="Record verification checks result",
+        description="Record verification checks result.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  factory gate-check --root . --run-id <run-id>",
+            "",
+            "Example:",
+            "  factory record-verification --root . --run-id RUN-056 --lint pass --tests pass --type-check pass --build pass --summary \"verification ok\"",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     record_verification_parser.add_argument("--root", default=".", help="Repository root path")
     _add_run_selector_arguments(record_verification_parser)
     record_verification_parser.add_argument("--lint", choices=["pass", "fail", "pending"], required=True)
@@ -779,23 +803,71 @@ def build_parser() -> argparse.ArgumentParser:
     record_verification_parser.add_argument("--build", choices=["pass", "fail", "pending"], required=True)
     record_verification_parser.add_argument("--summary", required=True)
 
-    record_qa_parser = subparsers.add_parser("record-qa", help="Record QA result")
+    record_qa_parser = subparsers.add_parser(
+        "record-qa",
+        help="Record QA result",
+        description="Record QA result.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  factory record-docs-sync --root . --run-id <run-id> --status complete --summary \"docs synced\"",
+            "",
+            "Example:",
+            "  factory record-qa --root . --run-id RUN-056 --status pass --summary \"qa ok\"",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     record_qa_parser.add_argument("--root", default=".", help="Repository root path")
     _add_run_selector_arguments(record_qa_parser)
     record_qa_parser.add_argument("--status", choices=["pass", "fail"], required=True)
     record_qa_parser.add_argument("--summary", required=True)
 
-    record_docs_sync_parser = subparsers.add_parser("record-docs-sync", help="Record docs sync result")
+    record_docs_sync_parser = subparsers.add_parser(
+        "record-docs-sync",
+        help="Record docs sync result",
+        description="Record docs sync result.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  factory record-verification --root . --run-id <run-id> --lint pass --tests pass --type-check pass --build pass --summary \"verification ok\"",
+            "",
+            "Example:",
+            "  factory record-docs-sync --root . --run-id RUN-056 --status complete --summary \"docs synced\"",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     record_docs_sync_parser.add_argument("--root", default=".", help="Repository root path")
     _add_run_selector_arguments(record_docs_sync_parser)
     record_docs_sync_parser.add_argument("--status", choices=["complete", "required", "not-needed"], required=True)
     record_docs_sync_parser.add_argument("--summary", required=True)
 
-    gate_check_parser = subparsers.add_parser("gate-check", help="Evaluate gate status")
+    gate_check_parser = subparsers.add_parser(
+        "gate-check",
+        help="Evaluate gate status",
+        description="Evaluate gate status.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  factory build-approval --root . --run-id <run-id>",
+            "",
+            "Example:",
+            "  factory gate-check --root . --run-id RUN-056",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     gate_check_parser.add_argument("--root", default=".", help="Repository root path")
     _add_run_selector_arguments(gate_check_parser)
 
-    build_approval_parser = subparsers.add_parser("build-approval", help="Build evidence and approval request")
+    build_approval_parser = subparsers.add_parser(
+        "build-approval",
+        help="Build evidence and approval request",
+        description="Build evidence and approval request.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  factory resolve-approval --root . --run-id <run-id> --decision approve --actor <actor> --note \"all gates satisfied\"",
+            "",
+            "Example:",
+            "  factory build-approval --root . --run-id RUN-056",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     build_approval_parser.add_argument("--root", default=".", help="Repository root path")
     _add_run_selector_arguments(build_approval_parser)
 

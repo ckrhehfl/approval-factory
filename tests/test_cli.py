@@ -159,6 +159,69 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         self.assertIn("factory inspect-run --root . --run-id <run-id>", output)
         self.assertIn("factory start-execution --root . --run-id RUN-055", output)
 
+    def test_record_review_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("record-review")
+
+        self.assertIn("Record review result.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn('factory record-qa --root . --run-id <run-id> --status pass --summary "qa ok"', output)
+        self.assertIn('factory record-review --root . --run-id RUN-056 --status pass --summary "review ok"', output)
+
+    def test_record_qa_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("record-qa")
+
+        self.assertIn("Record QA result.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn(
+            'factory record-docs-sync --root . --run-id <run-id> --status complete --summary "docs synced"',
+            output,
+        )
+        self.assertIn('factory record-qa --root . --run-id RUN-056 --status pass --summary "qa ok"', output)
+
+    def test_record_docs_sync_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("record-docs-sync")
+
+        self.assertIn("Record docs sync result.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn(
+            'factory record-verification --root . --run-id <run-id> --lint pass --tests pass --type-check pass --build pass --summary "verification ok"',
+            output,
+        )
+        self.assertIn(
+            'factory record-docs-sync --root . --run-id RUN-056 --status complete --summary "docs synced"',
+            output,
+        )
+
+    def test_record_verification_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("record-verification")
+
+        self.assertIn("Record verification checks result.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("factory gate-check --root . --run-id <run-id>", output)
+        self.assertIn(
+            'factory record-verification --root . --run-id RUN-056 --lint pass --tests pass --type-check pass --build pass --summary "verification ok"',
+            output,
+        )
+
+    def test_gate_check_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("gate-check")
+
+        self.assertIn("Evaluate gate status.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("factory build-approval --root . --run-id <run-id>", output)
+        self.assertIn("factory gate-check --root . --run-id RUN-056", output)
+
+    def test_build_approval_help_includes_next_step_and_example(self) -> None:
+        output = self._run_help("build-approval")
+
+        self.assertIn("Build evidence and approval request.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn(
+            'factory resolve-approval --root . --run-id <run-id> --decision approve --actor <actor> --note "all gates satisfied"',
+            output,
+        )
+        self.assertIn("factory build-approval --root . --run-id RUN-056", output)
+
 
 class BootstrapCliTest(unittest.TestCase):
     def test_bootstrap_run_creates_canonical_artifacts(self) -> None:
