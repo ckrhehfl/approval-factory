@@ -1077,7 +1077,19 @@ def build_parser() -> argparse.ArgumentParser:
     start_execution_parser.add_argument("--root", default=".", help="Repository root path")
     start_execution_parser.add_argument("--run-id", default=_default_run_id())
 
-    resolve_approval_parser = subparsers.add_parser("resolve-approval", help="Resolve pending approval request")
+    resolve_approval_parser = subparsers.add_parser(
+        "resolve-approval",
+        help="Resolve pending approval request",
+        description="Resolve pending approval request.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  factory inspect-approval --root . --run-id <run-id>",
+            "",
+            "Example:",
+            "  factory resolve-approval --root . --run-id RUN-056 --decision approve --actor approver.local --note \"all gates satisfied\"",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     resolve_approval_parser.add_argument("--root", default=".", help="Repository root path")
     _add_run_selector_arguments(resolve_approval_parser)
     resolve_approval_parser.add_argument("--decision", choices=["approve", "reject", "exception"], required=True)
