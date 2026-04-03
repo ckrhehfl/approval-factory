@@ -953,20 +953,54 @@ def build_parser() -> argparse.ArgumentParser:
     work_item_readiness_parser.add_argument("--root", default=".", help="Repository root path")
     work_item_readiness_parser.add_argument("--work-item-id", required=True)
 
-    create_pr_plan_parser = subparsers.add_parser("create-pr-plan", help="Create the single active PR plan artifact")
+    create_pr_plan_parser = subparsers.add_parser(
+        "create-pr-plan",
+        help="Create an official PR plan artifact from a work item",
+        description="Create an official PR plan artifact from a work item.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  if no active PR exists, factory start-execution --root .",
+            "  if an active PR already exists, factory activate-pr --root . --pr-id <pr-id>",
+            "",
+            "Example:",
+            '  factory create-pr-plan --root . --pr-id PR-055 --work-item-id WI-055 --title "official PR help discoverability" --summary "Add minimum help next steps for official PR flow"',
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     create_pr_plan_parser.add_argument("--root", default=".", help="Repository root path")
     create_pr_plan_parser.add_argument("--pr-id", required=True)
     create_pr_plan_parser.add_argument("--work-item-id", required=True)
     create_pr_plan_parser.add_argument("--title", required=True)
     create_pr_plan_parser.add_argument("--summary", required=True)
 
-    activate_pr_parser = subparsers.add_parser("activate-pr", help="Switch the single active PR plan")
+    activate_pr_parser = subparsers.add_parser(
+        "activate-pr",
+        help="Switch the single active PR plan",
+        description="Switch the single active PR plan.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  factory start-execution --root .",
+            "",
+            "Example:",
+            "  factory activate-pr --root . --pr-id PR-055",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     activate_pr_parser.add_argument("--root", default=".", help="Repository root path")
     activate_pr_parser.add_argument("--pr-id", required=True)
 
     start_execution_parser = subparsers.add_parser(
         "start-execution",
         help="Start a run from the single active PR plan",
+        description="Start a run from the single active PR plan.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  factory inspect-run --root . --run-id <run-id>",
+            "",
+            "Example:",
+            "  factory start-execution --root . --run-id RUN-055",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     start_execution_parser.add_argument("--root", default=".", help="Repository root path")
     start_execution_parser.add_argument("--run-id", default=_default_run_id())
