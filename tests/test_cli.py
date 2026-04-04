@@ -62,6 +62,33 @@ def _write_minimal_work_item(root, *, work_item_id: str, goal_id: str = "GOAL-TE
     )
 
 
+def _write_minimal_pending_approval(root: Path, *, run_id: str) -> Path:
+    pending = root / "approval_queue" / "pending"
+    pending.mkdir(parents=True, exist_ok=True)
+    approval_path = pending / f"APR-{run_id}.yaml"
+    approval_path.write_text(
+        "\n".join(
+            [
+                "approval_request:",
+                f"  id: APR-{run_id}",
+                "  status: pending",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return approval_path
+
+
+def _snapshot_files(root: Path) -> dict[str, str]:
+    snapshot: dict[str, str] = {}
+    if not root.exists():
+        return snapshot
+    for path in sorted(candidate for candidate in root.rglob("*") if candidate.is_file()):
+        snapshot[str(path.relative_to(root))] = path.read_text(encoding="utf-8")
+    return snapshot
+
+
 class CliHelpDiscoverabilityTest(unittest.TestCase):
     def _run_help(self, *argv: str) -> str:
         stdout = StringIO()
@@ -277,6 +304,15 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         self.assertIn("factory inspect-approval --root . --run-id <run-id>", output)
         self.assertIn("factory inspect-approval-queue --root .", output)
 
+    def test_hygiene_approval_queue_help_includes_description_next_step_and_examples(self) -> None:
+        output = self._run_help("hygiene-approval-queue")
+
+        self.assertIn("Stage 1 parser-only validation for an explicit approval queue hygiene selector.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("Example:", output)
+        self.assertIn("factory hygiene-approval-queue --root . --run-id RUN-20260327T055614Z", output)
+        self.assertIn("factory hygiene-approval-queue --root . --approval-id APR-RUN-20260327T055614Z", output)
+
     def test_inspect_pr_plan_help_includes_description_next_step_and_example(self) -> None:
         output = self._run_help("inspect-pr-plan")
 
@@ -379,6 +415,171 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         self.assertIn("Create baseline run artifacts for an operator-managed flow.", output)
         self.assertIn("Next step:", output)
         self.assertIn("Example:", output)
+
+
+class HygieneApprovalQueueCliTest(unittest.TestCase):
+    def test_accepts_exact_run_id_selector(self) -> None:
+        stdout = StringIO()
+
+        with redirect_stdout(stdout):
+            exit_code = main(["hygiene-approval-queue", "--root", ".", "--run-id", "RUN-20260327T055614Z"])
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn("Hygiene Approval Queue Parser Acceptance:", output)
+        self.assertIn("- stage: parser-only", output)
+        self.assertIn("- selector_family: run-id", output)
+        self.assertIn("- run_id: RUN-20260327T055614Z", output)
+        self.assertIn("- approval_id: APR-RUN-20260327T055614Z", output)
+        self.assertIn("- mutation: none", output)
+
+    def test_accepts_exact_approval_id_selector(self) -> None:
+        stdout = StringIO()
+
+        with redirect_stdout(stdout):
+            exit_code = main(
+                [
+                    "hygiene-approval-queue",
+                    "--root",
+                    ".",
+                    "--approval-id",
+                    "APR-RUN-20260327T055614Z",
+                ]
+            )
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn("- selector_family: approval-id", output)
+        self.assertIn("- run_id: RUN-20260327T055614Z", output)
+        self.assertIn("- approval_id: APR-RUN-20260327T055614Z", output)
+
+    def test_refuses_when_selector_is_missing(self) -> None:
+        stderr = StringIO()
+
+        with self.assertRaises(SystemExit) as exc_info, redirect_stderr(stderr):
+            main(["hygiene-approval-queue", "--root", "."])
+
+        self.assertEqual(exc_info.exception.code, 2)
+        self.assertIn("one of the arguments --run-id --approval-id is required", stderr.getvalue())
+
+    def test_refuses_when_both_selectors_are_provided(self) -> None:
+        stderr = StringIO()
+
+        with self.assertRaises(SystemExit) as exc_info, redirect_stderr(stderr):
+            main(
+                [
+                    "hygiene-approval-queue",
+                    "--root",
+                    ".",
+                    "--run-id",
+                    "RUN-20260327T055614Z",
+                    "--approval-id",
+                    "APR-RUN-20260327T055614Z",
+                ]
+            )
+
+        self.assertEqual(exc_info.exception.code, 2)
+        self.assertIn("not allowed with argument --run-id", stderr.getvalue())
+
+    def test_refuses_malformed_run_id(self) -> None:
+        stderr = StringIO()
+
+        with self.assertRaises(SystemExit) as exc_info, redirect_stderr(stderr):
+            main(["hygiene-approval-queue", "--root", ".", "--run-id", "RUN_20260327"])
+
+        self.assertEqual(exc_info.exception.code, 2)
+        self.assertIn("requires an exact --run-id value in the form RUN-...", stderr.getvalue())
+
+    def test_refuses_malformed_approval_id(self) -> None:
+        stderr = StringIO()
+
+        with self.assertRaises(SystemExit) as exc_info, redirect_stderr(stderr):
+            main(["hygiene-approval-queue", "--root", ".", "--approval-id", "APR_RUN_20260327"])
+
+        self.assertEqual(exc_info.exception.code, 2)
+        self.assertIn("requires an exact --approval-id value in the form APR-RUN-...", stderr.getvalue())
+
+    def test_refuses_heuristic_pseudo_run_id(self) -> None:
+        for value in ("stale", "latest", "RUN-stale"):
+            stderr = StringIO()
+
+            with self.assertRaises(SystemExit) as exc_info, redirect_stderr(stderr):
+                main(["hygiene-approval-queue", "--root", ".", "--run-id", value])
+
+            self.assertEqual(exc_info.exception.code, 2)
+            self.assertIn("heuristic or pseudo selectors such as stale/latest are not allowed", stderr.getvalue())
+
+    def test_refuses_heuristic_pseudo_approval_id(self) -> None:
+        for value in ("APR-latest", "APR-stale", "latest"):
+            stderr = StringIO()
+
+            with self.assertRaises(SystemExit) as exc_info, redirect_stderr(stderr):
+                main(["hygiene-approval-queue", "--root", ".", "--approval-id", value])
+
+            self.assertEqual(exc_info.exception.code, 2)
+            self.assertIn("heuristic or pseudo selectors such as stale/latest are not allowed", stderr.getvalue())
+
+    def test_parser_only_command_does_not_mutate_temp_root(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_minimal_pending_approval(root, run_id="RUN-20260327T055614Z")
+            before = _snapshot_files(root)
+
+            run_stdout = StringIO()
+            with redirect_stdout(run_stdout):
+                exit_code = main(
+                    [
+                        "hygiene-approval-queue",
+                        "--root",
+                        str(root),
+                        "--run-id",
+                        "RUN-20260327T055614Z",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("- mutation: none", run_stdout.getvalue())
+            self.assertEqual(before, _snapshot_files(root))
+
+            approval_stdout = StringIO()
+            with redirect_stdout(approval_stdout):
+                exit_code = main(
+                    [
+                        "hygiene-approval-queue",
+                        "--root",
+                        str(root),
+                        "--approval-id",
+                        "APR-RUN-20260327T055614Z",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("- selector_family: approval-id", approval_stdout.getvalue())
+            self.assertEqual(before, _snapshot_files(root))
+
+            stderr = StringIO()
+            with self.assertRaises(SystemExit) as exc_info, redirect_stderr(stderr):
+                main(
+                    [
+                        "hygiene-approval-queue",
+                        "--root",
+                        str(root),
+                        "--run-id",
+                        "RUN-20260327T055614Z",
+                        "--approval-id",
+                        "APR-RUN-20260327T055614Z",
+                    ]
+                )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            self.assertEqual(before, _snapshot_files(root))
+
+            heuristic_stderr = StringIO()
+            with self.assertRaises(SystemExit) as exc_info, redirect_stderr(heuristic_stderr):
+                main(["hygiene-approval-queue", "--root", str(root), "--run-id", "RUN-stale"])
+
+            self.assertEqual(exc_info.exception.code, 2)
+            self.assertEqual(before, _snapshot_files(root))
 
 
 class BootstrapCliTest(unittest.TestCase):

@@ -28,6 +28,7 @@ from orchestrator.pipeline import (
     inspect_pr_plan,
     inspect_run,
     inspect_work_item,
+    parse_hygiene_approval_queue_selector,
     promote_clarification_draft,
     promote_pr_plan_draft,
     promote_work_item_draft,
@@ -669,6 +670,19 @@ def _render_build_approval_summary(
     return "\n".join(lines)
 
 
+def _render_hygiene_approval_queue_parser_acceptance(selection: dict[str, str]) -> str:
+    lines = ["Hygiene Approval Queue Parser Acceptance:"]
+    lines.append("- stage: parser-only")
+    lines.append(f"- selector_family: {selection['selector_family']}")
+    lines.append(f"- run_id: {selection['run_id']}")
+    lines.append(f"- approval_id: {selection['approval_id']}")
+    lines.append("- mutation: none")
+    lines.append("- apply: not implemented")
+    lines.append("- dry_run: not implemented")
+    lines.append("- next: parser-only acceptance only; no queue artifacts were changed")
+    return "\n".join(lines)
+
+
 def _add_run_selector_arguments(parser: argparse.ArgumentParser) -> None:
     selector = parser.add_mutually_exclusive_group()
     selector.add_argument("--run-id")
@@ -734,6 +748,25 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     inspect_approval_queue_parser.add_argument("--root", default=".", help="Repository root path")
+
+    hygiene_approval_queue_parser = subparsers.add_parser(
+        "hygiene-approval-queue",
+        help="Validate an explicit approval queue hygiene selector without mutating artifacts",
+        description="Stage 1 parser-only validation for an explicit approval queue hygiene selector.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  provide exactly one explicit selector and confirm parser-only acceptance before any later dry-run or apply design exists",
+            "",
+            "Example:",
+            "  factory hygiene-approval-queue --root . --run-id RUN-20260327T055614Z",
+            "  factory hygiene-approval-queue --root . --approval-id APR-RUN-20260327T055614Z",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    hygiene_approval_queue_parser.add_argument("--root", default=".", help="Repository root path")
+    hygiene_selector = hygiene_approval_queue_parser.add_mutually_exclusive_group(required=True)
+    hygiene_selector.add_argument("--run-id", help="Exact run selector in the form RUN-...")
+    hygiene_selector.add_argument("--approval-id", help="Exact approval selector in the form APR-RUN-...")
 
     inspect_approval_parser = subparsers.add_parser(
         "inspect-approval",
@@ -1289,6 +1322,17 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "inspect-approval-queue":
         print(_render_approval_queue_inspection(inspect_approval_queue(root_dir=Path(args.root))))
+        return 0
+
+    if args.command == "hygiene-approval-queue":
+        try:
+            selection = parse_hygiene_approval_queue_selector(
+                run_id=getattr(args, "run_id", None),
+                approval_id=getattr(args, "approval_id", None),
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
+        print(_render_hygiene_approval_queue_parser_acceptance(selection))
         return 0
 
     if args.command == "inspect-approval":

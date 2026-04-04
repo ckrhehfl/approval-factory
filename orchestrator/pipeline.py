@@ -114,9 +114,53 @@ CLEANUP_DEMO_SPECS: tuple[tuple[str, str], ...] = (
     ("prs_archive_demo", "prs/archive/*DEMO*.md"),
 )
 
+RUN_ID_PATTERN = re.compile(r"RUN-[A-Z0-9][A-Z0-9-]*")
+APPROVAL_ID_PATTERN = re.compile(r"APR-(RUN-[A-Z0-9][A-Z0-9-]*)")
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def is_exact_run_id(value: str) -> bool:
+    return bool(RUN_ID_PATTERN.fullmatch(value.strip()))
+
+
+def is_exact_approval_id(value: str) -> bool:
+    return bool(APPROVAL_ID_PATTERN.fullmatch(value.strip()))
+
+
+def parse_hygiene_approval_queue_selector(*, run_id: str | None, approval_id: str | None) -> dict[str, str]:
+    provided = [name for name, value in (("run_id", run_id), ("approval_id", approval_id)) if value is not None]
+    if len(provided) != 1:
+        raise ValueError("hygiene-approval-queue requires exactly one selector: --run-id <RUN-...> or --approval-id <APR-RUN-...>")
+
+    if run_id is not None:
+        normalized_run_id = run_id.strip()
+        if not is_exact_run_id(normalized_run_id):
+            raise ValueError(
+                "hygiene-approval-queue requires an exact --run-id value in the form RUN-...; "
+                "heuristic or pseudo selectors such as stale/latest are not allowed"
+            )
+        return {
+            "selector_family": "run-id",
+            "run_id": normalized_run_id,
+            "approval_id": f"APR-{normalized_run_id}",
+        }
+
+    normalized_approval_id = str(approval_id).strip()
+    match = APPROVAL_ID_PATTERN.fullmatch(normalized_approval_id)
+    if match is None:
+        raise ValueError(
+            "hygiene-approval-queue requires an exact --approval-id value in the form APR-RUN-...; "
+            "heuristic or pseudo selectors such as stale/latest are not allowed"
+        )
+    normalized_run_id = match.group(1)
+    return {
+        "selector_family": "approval-id",
+        "run_id": normalized_run_id,
+        "approval_id": normalized_approval_id,
+    }
 
 
 def _slugify(value: str) -> str:
