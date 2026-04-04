@@ -79,6 +79,13 @@
 - `prs/active/<pr-id>.md` (official active PR plan artifact)
 - `prs/archive/<pr-id>.md` (official archived PR plan artifact)
 
+approval queue hygiene visibility boundary:
+
+- `factory status`와 `factory inspect-approval-queue`의 stale/latest 및 Relation Summary는 operator visibility only다.
+- `factory hygiene-approval-queue`는 exact selector family(`--run-id` 또는 `--approval-id`)와 exact mode family(`--dry-run` 또는 `--apply`)만 사용한다.
+- hygiene apply는 exact pending queue target artifact 하나에 대한 target-local mutation만 허용한다.
+- 이 visibility는 cleanup selector, auto-resolve trigger, broad queue mutation semantics로 승격되지 않는다.
+
 forward minimum:
 
 - 7-file shape는 recommended history-doc shape다.
