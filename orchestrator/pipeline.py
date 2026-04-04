@@ -163,6 +163,43 @@ def parse_hygiene_approval_queue_selector(*, run_id: str | None, approval_id: st
     }
 
 
+def resolve_hygiene_approval_queue_dry_run_target(
+    *,
+    root_dir: Path,
+    selection: dict[str, str],
+) -> dict[str, str]:
+    approval_id = str(selection["approval_id"]).strip()
+    pending_dir = root_dir / "approval_queue" / "pending"
+    match_pattern = re.compile(rf"{re.escape(approval_id)}(?:--r\d+)?\.yaml")
+    matches = sorted(path for path in pending_dir.glob(f"{approval_id}*.yaml") if match_pattern.fullmatch(path.name))
+
+    if not matches:
+        raise ValueError(
+            "hygiene-approval-queue found no matching queue artifact under approval_queue/pending/ for "
+            f"{selection['selector_family']} '{selection[selection['selector_family'].replace('-', '_')]}': {approval_id}"
+        )
+
+    if len(matches) > 1:
+        match_list = ", ".join(path.as_posix() for path in matches)
+        raise ValueError(
+            "hygiene-approval-queue found multiple matching queue artifacts under approval_queue/pending/ for "
+            f"approval-id '{approval_id}': {match_list}"
+        )
+
+    queue_item = matches[0]
+    try:
+        queue_item_path = queue_item.relative_to(root_dir).as_posix()
+    except ValueError:
+        queue_item_path = queue_item.as_posix()
+
+    return {
+        "selector_family": str(selection["selector_family"]),
+        "run_id": str(selection["run_id"]),
+        "approval_id": approval_id,
+        "queue_item_path": queue_item_path,
+    }
+
+
 def _slugify(value: str) -> str:
     slug = "".join(ch.lower() if ch.isalnum() else "-" for ch in value).strip("-")
     return "-".join(filter(None, slug.split("-"))) or "untitled"
