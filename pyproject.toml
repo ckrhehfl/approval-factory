@@ -19,6 +19,7 @@ dev = [
 
 [project.scripts]
 factory = "orchestrator.cli:main"
+inspect-approval-queue = "orchestrator.cli:inspect_approval_queue_main"
 
 [tool.setuptools.packages.find]
 include = ["orchestrator*", "factory*"]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
@@ -1662,6 +1663,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     parser.error(f"Unsupported command: {args.command}")
     return 2
+
+
+def inspect_approval_queue_main(argv: Sequence[str] | None = None) -> int:
+    forwarded_argv = list(sys.argv[1:] if argv is None else argv)
+    return main(["inspect-approval-queue", *forwarded_argv])
 
 
 if __name__ == "__main__":

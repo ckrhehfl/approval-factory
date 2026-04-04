@@ -9,7 +9,7 @@ import sys
 from tempfile import TemporaryDirectory
 import unittest
 
-from orchestrator.cli import main
+from orchestrator.cli import inspect_approval_queue_main, main
 from orchestrator.yaml_io import read_yaml
 
 
@@ -456,6 +456,44 @@ class PythonModuleEntrypointTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         self.assertIn("Show current repo-local system status for operator visibility continuity.", result.stdout)
         self.assertIn("factory status --root .", result.stdout)
+
+    def test_inspect_approval_queue_direct_entrypoint_matches_subcommand_output(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "runs" / "latest" / "RUN-910"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-910",
+                        "  work_item_id: WI-910",
+                        "  pr_id: PR-910",
+                        "  state: approval_pending",
+                        "  created_at: '2026-04-04T00:00:00+00:00'",
+                        "  updated_at: '2026-04-04T00:00:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            pending = root / "approval_queue" / "pending"
+            pending.mkdir(parents=True, exist_ok=True)
+            (pending / "APR-RUN-910.yaml").write_text("approval_request:\n  id: APR-RUN-910\n", encoding="utf-8")
+
+            subcommand_stdout = StringIO()
+            with redirect_stdout(subcommand_stdout):
+                subcommand_exit_code = main(["inspect-approval-queue", "--root", str(root)])
+
+            direct_stdout = StringIO()
+            with redirect_stdout(direct_stdout):
+                direct_exit_code = inspect_approval_queue_main(["--root", str(root)])
+
+            self.assertEqual(subcommand_exit_code, 0)
+            self.assertEqual(direct_exit_code, 0)
+            self.assertEqual(direct_stdout.getvalue(), subcommand_stdout.getvalue())
 
     @unittest.skipUnless(shutil.which("factory"), "factory console entrypoint not installed in this environment")
     def test_factory_console_status_help_remains_available(self) -> None:
