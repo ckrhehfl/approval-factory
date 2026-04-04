@@ -307,12 +307,14 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
     def test_hygiene_approval_queue_help_includes_description_next_step_and_examples(self) -> None:
         output = self._run_help("hygiene-approval-queue")
 
-        self.assertIn("Stage 2 dry-run preview for an explicit approval queue hygiene selector.", output)
+        self.assertIn("Stage 3 exact-target approval queue hygiene with dry-run-first preview and explicit apply.", output)
         self.assertIn("Next step:", output)
         self.assertIn("Example:", output)
         self.assertIn("--dry-run", output)
+        self.assertIn("--apply", output)
         self.assertIn("factory hygiene-approval-queue --root . --run-id RUN-20260327T055614Z --dry-run", output)
         self.assertIn("factory hygiene-approval-queue --root . --approval-id APR-RUN-20260327T055614Z --dry-run", output)
+        self.assertIn("factory hygiene-approval-queue --root . --run-id RUN-20260327T055614Z --apply", output)
 
     def test_inspect_pr_plan_help_includes_description_next_step_and_example(self) -> None:
         output = self._run_help("inspect-pr-plan")
@@ -442,6 +444,7 @@ class HygieneApprovalQueueCliTest(unittest.TestCase):
         self.assertIn("Hygiene Approval Queue Dry Run Preview:", output)
         self.assertIn("- stage: dry-run", output)
         self.assertIn("- dry_run: true", output)
+        self.assertIn("- apply: false", output)
         self.assertIn("- selector_family: run-id", output)
         self.assertIn("- run_id: RUN-20260327T055614Z", output)
         self.assertIn("- approval_id: APR-RUN-20260327T055614Z", output)
@@ -473,14 +476,69 @@ class HygieneApprovalQueueCliTest(unittest.TestCase):
         self.assertIn("- approval_id: APR-RUN-20260327T055614Z", output)
         self.assertIn("- queue_item: approval_queue/pending/APR-RUN-20260327T055614Z.yaml", output)
 
-    def test_refuses_when_dry_run_is_missing(self) -> None:
+    def test_accepts_exact_run_id_selector_with_apply(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            approval_path = _write_minimal_pending_approval(root, run_id="RUN-20260327T055614Z")
+            stdout = StringIO()
+
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "hygiene-approval-queue",
+                        "--root",
+                        str(root),
+                        "--run-id",
+                        "RUN-20260327T055614Z",
+                        "--apply",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Hygiene Approval Queue Apply:", output)
+            self.assertIn("- stage: apply", output)
+            self.assertIn("- apply: true", output)
+            self.assertIn("- selector_family: run-id", output)
+            payload = read_yaml(approval_path)
+            self.assertEqual(payload["queue_hygiene"]["status"], "applied")
+            self.assertEqual(payload["queue_hygiene"]["requested_run_id"], "RUN-20260327T055614Z")
+            self.assertEqual(payload["queue_hygiene"]["requested_approval_id"], "APR-RUN-20260327T055614Z")
+
+    def test_accepts_exact_approval_id_selector_with_apply(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            approval_path = _write_minimal_pending_approval(root, run_id="RUN-20260327T055614Z")
+            stdout = StringIO()
+
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "hygiene-approval-queue",
+                        "--root",
+                        str(root),
+                        "--approval-id",
+                        "APR-RUN-20260327T055614Z",
+                        "--apply",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- selector_family: approval-id", output)
+            payload = read_yaml(approval_path)
+            self.assertEqual(payload["queue_hygiene"]["status"], "applied")
+            self.assertEqual(payload["queue_hygiene"]["requested_run_id"], "RUN-20260327T055614Z")
+            self.assertEqual(payload["queue_hygiene"]["requested_approval_id"], "APR-RUN-20260327T055614Z")
+
+    def test_refuses_when_mode_is_missing(self) -> None:
         stderr = StringIO()
 
         with self.assertRaises(SystemExit) as exc_info, redirect_stderr(stderr):
             main(["hygiene-approval-queue", "--root", ".", "--run-id", "RUN-20260327T055614Z"])
 
         self.assertEqual(exc_info.exception.code, 2)
-        self.assertIn("the following arguments are required: --dry-run", stderr.getvalue())
+        self.assertIn("one of the arguments --dry-run --apply is required", stderr.getvalue())
 
     def test_refuses_when_selector_is_missing(self) -> None:
         stderr = StringIO()
@@ -510,6 +568,25 @@ class HygieneApprovalQueueCliTest(unittest.TestCase):
 
         self.assertEqual(exc_info.exception.code, 2)
         self.assertIn("not allowed with argument --run-id", stderr.getvalue())
+
+    def test_refuses_when_both_modes_are_provided(self) -> None:
+        stderr = StringIO()
+
+        with self.assertRaises(SystemExit) as exc_info, redirect_stderr(stderr):
+            main(
+                [
+                    "hygiene-approval-queue",
+                    "--root",
+                    ".",
+                    "--run-id",
+                    "RUN-20260327T055614Z",
+                    "--dry-run",
+                    "--apply",
+                ]
+            )
+
+        self.assertEqual(exc_info.exception.code, 2)
+        self.assertIn("not allowed with argument --dry-run", stderr.getvalue())
 
     def test_refuses_malformed_run_id(self) -> None:
         stderr = StringIO()
@@ -683,6 +760,131 @@ class HygieneApprovalQueueCliTest(unittest.TestCase):
             self.assertEqual(exc_info.exception.code, 2)
             self.assertIn("found no matching queue artifact under approval_queue/pending/", missing_stderr.getvalue())
             self.assertEqual(before, _snapshot_files(root))
+
+    def test_apply_execution_one_shot_and_exact_target_only_mutation(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target_path = _write_minimal_pending_approval(root, run_id="RUN-20260327T055614Z")
+            other_path = _write_minimal_pending_approval(root, run_id="RUN-20260327T063724Z")
+            before = _snapshot_files(root)
+
+            run_dry_run_stdout = StringIO()
+            with redirect_stdout(run_dry_run_stdout):
+                exit_code = main(
+                    [
+                        "hygiene-approval-queue",
+                        "--root",
+                        str(root),
+                        "--run-id",
+                        "RUN-20260327T055614Z",
+                        "--dry-run",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(before, _snapshot_files(root))
+
+            run_apply_stdout = StringIO()
+            with redirect_stdout(run_apply_stdout):
+                exit_code = main(
+                    [
+                        "hygiene-approval-queue",
+                        "--root",
+                        str(root),
+                        "--run-id",
+                        "RUN-20260327T055614Z",
+                        "--apply",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("- queue_item: approval_queue/pending/APR-RUN-20260327T055614Z.yaml", run_apply_stdout.getvalue())
+
+            after_run_apply = _snapshot_files(root)
+            changed_after_run_apply = sorted(path for path, content in after_run_apply.items() if before.get(path) != content)
+            self.assertEqual(changed_after_run_apply, ["approval_queue/pending/APR-RUN-20260327T055614Z.yaml"])
+
+            approval_apply_stdout = StringIO()
+            with redirect_stdout(approval_apply_stdout):
+                exit_code = main(
+                    [
+                        "hygiene-approval-queue",
+                        "--root",
+                        str(root),
+                        "--approval-id",
+                        "APR-RUN-20260327T055614Z",
+                        "--apply",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("- selector_family: approval-id", approval_apply_stdout.getvalue())
+
+            target_payload = read_yaml(target_path)
+            self.assertEqual(target_payload["approval_request"]["id"], "APR-RUN-20260327T055614Z")
+            self.assertEqual(target_payload["queue_hygiene"]["status"], "applied")
+            self.assertEqual(target_payload["queue_hygiene"]["requested_run_id"], "RUN-20260327T055614Z")
+            self.assertEqual(target_payload["queue_hygiene"]["requested_approval_id"], "APR-RUN-20260327T055614Z")
+
+            other_payload = read_yaml(other_path)
+            self.assertEqual(other_payload, read_yaml(other_path))
+            self.assertNotIn("queue_hygiene", other_payload)
+
+            conflicting_selector_stderr = StringIO()
+            with self.assertRaises(SystemExit) as exc_info, redirect_stderr(conflicting_selector_stderr):
+                main(
+                    [
+                        "hygiene-approval-queue",
+                        "--root",
+                        str(root),
+                        "--run-id",
+                        "RUN-20260327T055614Z",
+                        "--approval-id",
+                        "APR-RUN-20260327T055614Z",
+                        "--apply",
+                    ]
+                )
+
+            self.assertEqual(exc_info.exception.code, 2)
+
+            conflicting_mode_stderr = StringIO()
+            with self.assertRaises(SystemExit) as exc_info, redirect_stderr(conflicting_mode_stderr):
+                main(
+                    [
+                        "hygiene-approval-queue",
+                        "--root",
+                        str(root),
+                        "--run-id",
+                        "RUN-20260327T055614Z",
+                        "--dry-run",
+                        "--apply",
+                    ]
+                )
+
+            self.assertEqual(exc_info.exception.code, 2)
+
+            heuristic_stderr = StringIO()
+            with self.assertRaises(SystemExit) as exc_info, redirect_stderr(heuristic_stderr):
+                main(["hygiene-approval-queue", "--root", str(root), "--run-id", "RUN-stale", "--apply"])
+
+            self.assertEqual(exc_info.exception.code, 2)
+
+            missing_stderr = StringIO()
+            with self.assertRaises(SystemExit) as exc_info, redirect_stderr(missing_stderr):
+                main(
+                    [
+                        "hygiene-approval-queue",
+                        "--root",
+                        str(root),
+                        "--approval-id",
+                        "APR-RUN-20260327T099999Z",
+                        "--apply",
+                    ]
+                )
+
+            self.assertEqual(exc_info.exception.code, 2)
+            self.assertIn("found no matching queue artifact under approval_queue/pending/", missing_stderr.getvalue())
+            self.assertNotIn("queue_hygiene", read_yaml(other_path))
 
 
 class BootstrapCliTest(unittest.TestCase):

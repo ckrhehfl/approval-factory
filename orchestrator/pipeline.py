@@ -200,6 +200,24 @@ def resolve_hygiene_approval_queue_dry_run_target(
     }
 
 
+def apply_hygiene_approval_queue_target(
+    *,
+    root_dir: Path,
+    selection: dict[str, str],
+) -> dict[str, str]:
+    target = resolve_hygiene_approval_queue_dry_run_target(root_dir=root_dir, selection=selection)
+    queue_item_path = root_dir / target["queue_item_path"]
+    payload = read_yaml(queue_item_path)
+    queue_hygiene = payload.setdefault("queue_hygiene", {})
+    queue_hygiene["status"] = "applied"
+    queue_hygiene["applied_at"] = _now_iso()
+    queue_hygiene["selector_family"] = target["selector_family"]
+    queue_hygiene["requested_run_id"] = target["run_id"]
+    queue_hygiene["requested_approval_id"] = target["approval_id"]
+    write_yaml(queue_item_path, payload)
+    return target
+
+
 def _slugify(value: str) -> str:
     slug = "".join(ch.lower() if ch.isalnum() else "-" for ch in value).strip("-")
     return "-".join(filter(None, slug.split("-"))) or "untitled"

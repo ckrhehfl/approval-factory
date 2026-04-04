@@ -29,6 +29,7 @@ from orchestrator.pipeline import (
     inspect_run,
     inspect_work_item,
     parse_hygiene_approval_queue_selector,
+    apply_hygiene_approval_queue_target,
     promote_clarification_draft,
     promote_pr_plan_draft,
     promote_work_item_draft,
@@ -675,14 +676,29 @@ def _render_hygiene_approval_queue_dry_run_preview(preview: dict[str, str]) -> s
     lines = ["Hygiene Approval Queue Dry Run Preview:"]
     lines.append("- stage: dry-run")
     lines.append("- dry_run: true")
+    lines.append("- apply: false")
     lines.append(f"- selector_family: {preview['selector_family']}")
     lines.append(f"- run_id: {preview['run_id']}")
     lines.append(f"- approval_id: {preview['approval_id']}")
     lines.append(f"- queue_item: {preview['queue_item_path']}")
     lines.append("- mutation: none")
-    lines.append("- apply: not implemented")
     lines.append("- cleanup: not implemented")
-    lines.append("- next: review this exact target-local preview only; no queue artifacts were changed")
+    lines.append("- next: review this exact target-local preview first, then rerun the same selector with --apply if mutation is still intended")
+    return "\n".join(lines)
+
+
+def _render_hygiene_approval_queue_apply_summary(applied: dict[str, str]) -> str:
+    lines = ["Hygiene Approval Queue Apply:"]
+    lines.append("- stage: apply")
+    lines.append("- dry_run: false")
+    lines.append("- apply: true")
+    lines.append(f"- selector_family: {applied['selector_family']}")
+    lines.append(f"- run_id: {applied['run_id']}")
+    lines.append(f"- approval_id: {applied['approval_id']}")
+    lines.append(f"- queue_item: {applied['queue_item_path']}")
+    lines.append("- mutation: queue_hygiene metadata updated on the exact target queue artifact only")
+    lines.append("- cleanup: not implemented")
+    lines.append("- next: verify the exact target artifact change; no non-target queue artifacts were touched")
     return "\n".join(lines)
 
 
@@ -754,15 +770,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     hygiene_approval_queue_parser = subparsers.add_parser(
         "hygiene-approval-queue",
-        help="Validate an explicit approval queue hygiene selector without mutating artifacts",
-        description="Stage 2 dry-run preview for an explicit approval queue hygiene selector.",
+        help="Preview or apply exact-target approval queue hygiene without cleanup semantics",
+        description="Stage 3 exact-target approval queue hygiene with dry-run-first preview and explicit apply.",
         epilog=_render_help_epilog(
             "Next step:",
-            "  provide exactly one explicit selector with --dry-run to preview the exact pending queue target without mutating artifacts",
+            "  run --dry-run first with exactly one explicit selector, review the exact pending queue target, then rerun the same selector with --apply only if the target-local mutation is still intended",
             "",
             "Example:",
             "  factory hygiene-approval-queue --root . --run-id RUN-20260327T055614Z --dry-run",
             "  factory hygiene-approval-queue --root . --approval-id APR-RUN-20260327T055614Z --dry-run",
+            "  factory hygiene-approval-queue --root . --run-id RUN-20260327T055614Z --apply",
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -770,11 +787,16 @@ def build_parser() -> argparse.ArgumentParser:
     hygiene_selector = hygiene_approval_queue_parser.add_mutually_exclusive_group(required=True)
     hygiene_selector.add_argument("--run-id", help="Exact run selector in the form RUN-...")
     hygiene_selector.add_argument("--approval-id", help="Exact approval selector in the form APR-RUN-...")
-    hygiene_approval_queue_parser.add_argument(
+    hygiene_mode = hygiene_approval_queue_parser.add_mutually_exclusive_group(required=True)
+    hygiene_mode.add_argument(
         "--dry-run",
         action="store_true",
-        required=True,
         help="Preview the exact pending queue target without changing queue artifacts",
+    )
+    hygiene_mode.add_argument(
+        "--apply",
+        action="store_true",
+        help="After dry-run review, mutate only the exact pending queue target artifact",
     )
 
     inspect_approval_parser = subparsers.add_parser(
@@ -1339,13 +1361,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                 run_id=getattr(args, "run_id", None),
                 approval_id=getattr(args, "approval_id", None),
             )
-            preview = resolve_hygiene_approval_queue_dry_run_target(
-                root_dir=Path(args.root),
-                selection=selection,
-            )
+            if getattr(args, "dry_run", False):
+                preview = resolve_hygiene_approval_queue_dry_run_target(
+                    root_dir=Path(args.root),
+                    selection=selection,
+                )
+            else:
+                preview = apply_hygiene_approval_queue_target(
+                    root_dir=Path(args.root),
+                    selection=selection,
+                )
         except ValueError as exc:
             parser.error(str(exc))
-        print(_render_hygiene_approval_queue_dry_run_preview(preview))
+        if getattr(args, "dry_run", False):
+            print(_render_hygiene_approval_queue_dry_run_preview(preview))
+        else:
+            print(_render_hygiene_approval_queue_apply_summary(preview))
         return 0
 
     if args.command == "inspect-approval":
