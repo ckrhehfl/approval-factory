@@ -3905,6 +3905,7 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("  parsed_run_id: RUN-405", output)
             self.assertIn("  latest_relation: stale", output)
             self.assertIn(f"  matching_run_path: {(stale_dir / 'run.yaml').as_posix()}", output)
+            self.assertIn("  matching_pr_id: PR-405", output)
             self.assertIn("  matching_run_state: in_progress", output)
             self.assertIn("  readiness_context: absent", output)
 
@@ -3929,6 +3930,7 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("  parsed_run_id: RUN-501", output)
             self.assertIn("  latest_relation: no-latest-run", output)
             self.assertIn("  matching_run_path: none", output)
+            self.assertIn("  matching_pr_id: none", output)
             self.assertIn("  matching_run_state: none", output)
             self.assertIn("matching run missing from filesystem", output)
 
@@ -3952,6 +3954,7 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("  parsed_run_id: unparseable", output)
             self.assertIn("  latest_relation: unparseable", output)
             self.assertIn("  matching_run_path: none", output)
+            self.assertIn("  matching_pr_id: none", output)
             self.assertIn("  matching_run_state: none", output)
             self.assertIn("could not parse run_id from pending approval filename", output)
 
@@ -3992,6 +3995,7 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("  parsed_run_id: RUN-600", output)
             self.assertIn("  latest_relation: stale", output)
             self.assertIn("  matching_run_path: none", output)
+            self.assertIn("  matching_pr_id: none", output)
             self.assertIn("  matching_run_state: none", output)
             self.assertIn("matching run missing from filesystem", output)
 

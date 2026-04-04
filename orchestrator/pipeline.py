@@ -558,6 +558,7 @@ def inspect_approval_queue(root_dir: Path) -> dict[str, Any]:
 
         matching_run_path: str | None = None
         matching_run_state: str | None = None
+        matching_pr_id: str | None = None
         note_parts: list[str] = []
         if payload_note:
             note_parts.append(payload_note)
@@ -574,6 +575,9 @@ def inspect_approval_queue(root_dir: Path) -> dict[str, Any]:
                     note_parts.append(f"matching run unreadable: {exc}")
                 else:
                     matching_run_state = str(run_payload.get("state", "unknown"))
+                    pr_id = run_payload.get("pr_id")
+                    if pr_id is not None:
+                        matching_pr_id = str(pr_id)
             else:
                 note_parts.append(f"matching run missing from filesystem: {run_path.as_posix()}")
 
@@ -583,6 +587,7 @@ def inspect_approval_queue(root_dir: Path) -> dict[str, Any]:
                 "parsed_run_id": parsed_run_id,
                 "latest_relation": relation,
                 "matching_run_path": matching_run_path,
+                "matching_pr_id": matching_pr_id,
                 "matching_run_state": matching_run_state,
                 "readiness_context_presence": readiness_presence,
                 "note": "; ".join(note_parts) if note_parts else None,

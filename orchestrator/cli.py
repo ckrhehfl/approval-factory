@@ -149,6 +149,7 @@ def _render_approval_queue_inspection(inspection: dict[str, object]) -> str:
         lines.append(f"  parsed_run_id: {item.get('parsed_run_id') or 'unparseable'}")
         lines.append(f"  latest_relation: {item['latest_relation']}")
         lines.append(f"  matching_run_path: {item.get('matching_run_path') or 'none'}")
+        lines.append(f"  matching_pr_id: {item.get('matching_pr_id') or 'none'}")
         lines.append(f"  matching_run_state: {item.get('matching_run_state') or 'none'}")
         lines.append(f"  readiness_context: {item['readiness_context_presence']}")
         lines.append(f"  note: {item.get('note') or 'none'}")
