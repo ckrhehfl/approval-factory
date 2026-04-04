@@ -35,6 +35,7 @@
 - `bootstrap-run`
 - `status`
 - `inspect-approval-queue`
+- `hygiene-approval-queue`
 - `inspect-approval`
 - `inspect-goal`
 - `inspect-clarification`
@@ -176,7 +177,17 @@ approval queue visibility 규칙:
 - latest run 선택 규칙은 `factory status`와 동일하다.
 - 항목별로 queue item path, 가능한 경우 parsed `run_id`, latest relation(`latest|stale|no-latest-run|unparseable`), matching run path/state, readiness context presence, degraded note를 보여준다.
 - stale/non-latest queue entry는 inspection output only이며 자동 blocker, cleanup, resolve 대상으로 승격하지 않는다.
+- `Relation Summary`, `latest_relation=stale|latest|...`, `stale_pending_*`는 operator visibility only다. `factory hygiene-approval-queue` selector나 apply 대상 범위를 넓히는 의미가 아니다.
 - matching run이나 source artifact가 없거나 읽기 제한이 있어도 semantics를 바꾸지 않고 degraded note로만 보여준다.
+
+`hygiene-approval-queue` 최소 계약:
+- `factory hygiene-approval-queue`는 exact selector family 하나만 받는다: `--run-id <id>` 또는 `--approval-id <id>`.
+- mode family도 exact 하나만 받는다: `--dry-run` 또는 `--apply`.
+- operator guidance는 항상 dry-run first다. 같은 exact selector로 preview를 확인한 뒤에만 `--apply`를 재실행한다.
+- `--dry-run`은 exact pending queue target 하나만 preview하고 filesystem mutation을 하지 않는다.
+- `--apply`는 exact pending queue target artifact 하나에만 target-local metadata mutation을 남긴다.
+- stale/latest visibility, `Relation Summary`, `stale_pending_*`는 read-only operator visibility일 뿐 cleanup/apply selector가 아니다.
+- command는 cleanup semantics, broad queue mutation, auto-resolve semantics를 추가하지 않는다.
 
 `inspect-run` 최소 계약:
 - `factory inspect-run`은 latest run 또는 지정된 run의 execution run 전체를 읽기 전용 inspection 출력한다.

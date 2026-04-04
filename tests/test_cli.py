@@ -308,13 +308,27 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         output = self._run_help("hygiene-approval-queue")
 
         self.assertIn("Stage 3 exact-target approval queue hygiene with dry-run-first preview and explicit apply.", output)
+        self.assertIn("Use exactly one selector family (--run-id or --approval-id) and exactly one mode family (--dry-run or --apply).", output)
         self.assertIn("Next step:", output)
         self.assertIn("Example:", output)
         self.assertIn("--dry-run", output)
         self.assertIn("--apply", output)
+        self.assertIn("stale/latest visibility from factory status or factory inspect-approval-queue is read-only operator guidance, not a hygiene selector or cleanup signal", output)
+        self.assertIn("hygiene mutates only the exact pending queue target artifact; it does not add cleanup or auto-resolve semantics", output)
         self.assertIn("factory hygiene-approval-queue --root . --run-id RUN-20260327T055614Z --dry-run", output)
         self.assertIn("factory hygiene-approval-queue --root . --approval-id APR-RUN-20260327T055614Z --dry-run", output)
         self.assertIn("factory hygiene-approval-queue --root . --run-id RUN-20260327T055614Z --apply", output)
+
+    def test_hygiene_approval_queue_help_locks_exact_selector_and_mode_help(self) -> None:
+        output = self._run_help("hygiene-approval-queue")
+
+        self.assertIn("Exact run selector in the form RUN-...", output)
+        self.assertIn("selectors such as stale/latest are refused", output)
+        self.assertIn("Exact approval selector in the form APR-RUN-...", output)
+        self.assertIn("Preview the exact pending queue target without", output)
+        self.assertIn("changing queue artifacts; run this first", output)
+        self.assertIn("After dry-run review, mutate only the exact pending", output)
+        self.assertIn("queue target artifact; no cleanup or auto-resolve", output)
 
     def test_inspect_pr_plan_help_includes_description_next_step_and_example(self) -> None:
         output = self._run_help("inspect-pr-plan")
@@ -450,6 +464,12 @@ class HygieneApprovalQueueCliTest(unittest.TestCase):
         self.assertIn("- approval_id: APR-RUN-20260327T055614Z", output)
         self.assertIn("- queue_item: approval_queue/pending/APR-RUN-20260327T055614Z.yaml", output)
         self.assertIn("- mutation: none", output)
+        self.assertIn("- auto_resolve: not implemented", output)
+        self.assertIn("- selector_scope: exact target only", output)
+        self.assertIn(
+            "- visibility_note: stale/latest and Relation Summary remain read-only operator visibility, not hygiene selectors",
+            output,
+        )
 
     def test_accepts_exact_approval_id_selector_with_dry_run(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -500,6 +520,12 @@ class HygieneApprovalQueueCliTest(unittest.TestCase):
             self.assertIn("- stage: apply", output)
             self.assertIn("- apply: true", output)
             self.assertIn("- selector_family: run-id", output)
+            self.assertIn("- selector_scope: exact target only", output)
+            self.assertIn("- auto_resolve: not implemented", output)
+            self.assertIn(
+                "- visibility_note: stale/latest and Relation Summary remain read-only operator visibility, not hygiene selectors",
+                output,
+            )
             payload = read_yaml(approval_path)
             self.assertEqual(payload["queue_hygiene"]["status"], "applied")
             self.assertEqual(payload["queue_hygiene"]["requested_run_id"], "RUN-20260327T055614Z")
@@ -700,6 +726,7 @@ class HygieneApprovalQueueCliTest(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertIn("- queue_item: approval_queue/pending/APR-RUN-20260327T055614Z.yaml", run_stdout.getvalue())
+            self.assertIn("- selector_scope: exact target only", run_stdout.getvalue())
             self.assertEqual(before, _snapshot_files(root))
 
             approval_stdout = StringIO()
@@ -717,6 +744,10 @@ class HygieneApprovalQueueCliTest(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertIn("- selector_family: approval-id", approval_stdout.getvalue())
+            self.assertIn(
+                "- visibility_note: stale/latest and Relation Summary remain read-only operator visibility, not hygiene selectors",
+                approval_stdout.getvalue(),
+            )
             self.assertEqual(before, _snapshot_files(root))
 
             stderr = StringIO()
@@ -799,6 +830,7 @@ class HygieneApprovalQueueCliTest(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertIn("- queue_item: approval_queue/pending/APR-RUN-20260327T055614Z.yaml", run_apply_stdout.getvalue())
+            self.assertIn("- selector_scope: exact target only", run_apply_stdout.getvalue())
 
             after_run_apply = _snapshot_files(root)
             changed_after_run_apply = sorted(path for path, content in after_run_apply.items() if before.get(path) != content)
@@ -819,6 +851,7 @@ class HygieneApprovalQueueCliTest(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertIn("- selector_family: approval-id", approval_apply_stdout.getvalue())
+            self.assertIn("- auto_resolve: not implemented", approval_apply_stdout.getvalue())
 
             target_payload = read_yaml(target_path)
             self.assertEqual(target_payload["approval_request"]["id"], "APR-RUN-20260327T055614Z")
