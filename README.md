@@ -176,6 +176,10 @@ approval queue visibility 규칙:
 - `factory inspect-approval-queue`는 `approval_queue/pending/APR-*.yaml`를 item 단위로 읽기 전용 inspection 출력한다.
 - latest run 선택 규칙은 `factory status`와 동일하다.
 - 항목별로 queue item path, 가능한 경우 parsed `run_id`, latest relation(`latest|stale|no-latest-run|unparseable`), matching run path/state, readiness context presence, degraded note를 보여준다.
+- pending item이 target-local `queue_hygiene` metadata를 저장하고 있으면 같은 item 아래에만 `queue_hygiene_audit`와 `queue_hygiene_note`를 읽기 전용으로 보여줄 수 있다.
+- 현재 wording verification 기준에서 safe interpretation은 `read-only operator visibility only`와 `exact stored audit fields only`다.
+- unsafe interpretation은 cleanup, resolve, approval decision, readiness/gate, selector, latest/stale relation, Relation Summary state로의 승격이다.
+- PR-088의 docs/help/tests-only verification은 현재 inspect wording을 evidence lock으로만 다루며 runtime wording, inspect output code, queue schema, `factory status` surface는 바꾸지 않는다.
 - stale/non-latest queue entry는 inspection output only이며 자동 blocker, cleanup, resolve 대상으로 승격하지 않는다.
 - `Relation Summary`, `latest_relation=stale|latest|...`, `stale_pending_*`는 operator visibility only다. `factory hygiene-approval-queue` selector나 apply 대상 범위를 넓히는 의미가 아니다.
 - matching run이나 source artifact가 없거나 읽기 제한이 있어도 semantics를 바꾸지 않고 degraded note로만 보여준다.

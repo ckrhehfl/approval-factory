@@ -89,6 +89,32 @@ def _snapshot_files(root: Path) -> dict[str, str]:
     return snapshot
 
 
+def _assert_queue_hygiene_operator_safe_wording(output: str) -> None:
+    note = (
+        "  queue_hygiene_note: read-only operator visibility only; exact stored audit fields only; "
+        "not cleanup, resolve, approval decision, readiness/gate, selector, latest/stale relation, "
+        "or Relation Summary state"
+    )
+
+    assert "  queue_hygiene_audit:" in output
+    assert "    status: applied" in output
+    assert "    selector_family: run-id" in output
+    assert "    requested_run_id: RUN-405" in output
+    assert "    requested_approval_id: APR-RUN-405" in output
+    assert note in output
+    for forbidden_phrase in (
+        "safe to resolve",
+        "approval-ready",
+        "gate satisfied",
+        "cleanup complete",
+        "selector state",
+        "latest item state",
+        "stale item state",
+        "Relation Summary count",
+    ):
+        assert forbidden_phrase not in output
+
+
 class CliHelpDiscoverabilityTest(unittest.TestCase):
     def _run_help(self, *argv: str) -> str:
         stdout = StringIO()
@@ -4558,19 +4584,104 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("- latest_relation_count_latest: 1", output)
             self.assertIn("- latest_relation_count_stale: 1", output)
             self.assertIn(f"  path: {target_item.as_posix()}", output)
-            self.assertIn("  queue_hygiene_audit:", output)
-            self.assertIn("    status: applied", output)
             self.assertIn("    applied_at: 2026-03-29T04:11:00+00:00", output)
-            self.assertIn("    selector_family: run-id", output)
-            self.assertIn("    requested_run_id: RUN-405", output)
-            self.assertIn("    requested_approval_id: APR-RUN-405", output)
-            self.assertIn(
-                "  queue_hygiene_note: read-only operator visibility only; exact stored audit fields only; not cleanup, resolve, approval decision, readiness/gate, selector, latest/stale relation, or Relation Summary state",
-                output,
-            )
+            _assert_queue_hygiene_operator_safe_wording(output)
             self.assertNotIn("queue_hygiene_audit: present", output)
             self.assertNotIn("matching_pr_id: none\n  queue_hygiene_audit:", output)
             self.assertEqual(output.count("  queue_hygiene_audit:"), 1)
+
+    def test_queue_hygiene_wording_verification_one_shot_preserves_item_local_visibility_and_status_boundary(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            latest_dir = root / "runs" / "latest" / "RUN-410"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            (latest_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-410",
+                        "  work_item_id: WI-410",
+                        "  pr_id: PR-410",
+                        "  state: approval_pending",
+                        "  created_at: '2026-03-29T04:10:00+00:00'",
+                        "  updated_at: '2026-03-29T04:10:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            stale_dir = root / "runs" / "latest" / "RUN-405"
+            stale_dir.mkdir(parents=True, exist_ok=True)
+            (stale_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-405",
+                        "  work_item_id: WI-405",
+                        "  pr_id: PR-405",
+                        "  state: approval_pending",
+                        "  created_at: '2026-03-29T04:05:00+00:00'",
+                        "  updated_at: '2026-03-29T04:05:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            pending = root / "approval_queue" / "pending"
+            pending.mkdir(parents=True, exist_ok=True)
+            target_item = pending / "APR-RUN-405.yaml"
+            target_item.write_text(
+                "\n".join(
+                    [
+                        "approval_request:",
+                        "  id: APR-RUN-405",
+                        "queue_hygiene:",
+                        "  status: applied",
+                        "  applied_at: '2026-03-29T04:11:00+00:00'",
+                        "  selector_family: run-id",
+                        "  requested_run_id: RUN-405",
+                        "  requested_approval_id: APR-RUN-405",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            other_item = pending / "APR-RUN-410.yaml"
+            other_item.write_text("approval_request:\n  id: APR-RUN-410\n", encoding="utf-8")
+
+            inspect_stdout = StringIO()
+            with redirect_stdout(inspect_stdout):
+                inspect_exit_code = main(["inspect-approval-queue", "--root", str(root)])
+
+            status_stdout = StringIO()
+            with redirect_stdout(status_stdout):
+                status_exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(inspect_exit_code, 0)
+            self.assertEqual(status_exit_code, 0)
+
+            inspect_output = inspect_stdout.getvalue()
+            self.assertIn("Approval Queue Inspection:", inspect_output)
+            self.assertIn("Relation Summary:", inspect_output)
+            self.assertIn("- latest_relation_count_latest: 1", inspect_output)
+            self.assertIn("- latest_relation_count_stale: 1", inspect_output)
+            self.assertIn(f"  path: {target_item.as_posix()}", inspect_output)
+            self.assertIn(f"  path: {other_item.as_posix()}", inspect_output)
+            self.assertIn("  latest_relation: stale", inspect_output)
+            self.assertIn("  latest_relation: latest", inspect_output)
+            _assert_queue_hygiene_operator_safe_wording(inspect_output)
+            self.assertEqual(inspect_output.count("  queue_hygiene_audit:"), 1)
+            self.assertNotIn(f"  path: {other_item.as_posix()}\n  queue_hygiene_audit:", inspect_output)
+
+            status_output = status_stdout.getvalue()
+            self.assertIn("Approval Queue:", status_output)
+            self.assertIn("- pending_total: 2", status_output)
+            self.assertNotIn("queue_hygiene", status_output)
+            self.assertNotIn("queue_hygiene_audit", status_output)
+            self.assertNotIn("queue_hygiene_note", status_output)
+            self.assertNotIn("selector_family", status_output)
 
     def test_status_does_not_surface_queue_hygiene_visibility(self) -> None:
         from pathlib import Path

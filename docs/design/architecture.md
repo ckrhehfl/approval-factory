@@ -85,6 +85,10 @@ approval queue hygiene visibility boundary:
 - `factory hygiene-approval-queue`는 exact selector family(`--run-id` 또는 `--approval-id`)와 exact mode family(`--dry-run` 또는 `--apply`)만 사용한다.
 - hygiene apply는 exact pending queue target artifact 하나에 대한 target-local mutation만 허용한다.
 - 이 visibility는 cleanup selector, auto-resolve trigger, broad queue mutation semantics로 승격되지 않는다.
+- PR-088 wording verification boundary는 현재 `queue_hygiene_audit` note를 operator-audit evidence lock으로만 다룬다.
+- safe interpretation은 read-only operator visibility와 exact stored audit fields에 한정된다.
+- unsafe interpretation은 cleanup, resolve, approval decision, readiness/gate, selector, latest/stale relation, Relation Summary state다.
+- docs/help/tests는 이 boundary를 검증할 수 있지만 runtime wording, inspect output wiring, `factory status`, queue artifact schema는 이 단계에서 바꾸지 않는다.
 
 forward minimum:
 
