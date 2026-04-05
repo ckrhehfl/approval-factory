@@ -374,6 +374,18 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         self.assertIn("factory work-item-readiness --root . --work-item-id <work-item-id>", output)
         self.assertIn("factory inspect-work-item --root . --work-item-id WI-063", output)
 
+    def test_inspect_orchestration_help_includes_exact_anchor_visibility_boundary(self) -> None:
+        output = self._run_help("inspect-orchestration")
+
+        self.assertIn(
+            "Inspect an exact work-item anchor and linked official artifacts in read-only operator visibility mode.",
+            output,
+        )
+        self.assertIn("possible next manual step appears only when official artifacts show a single obvious path", output)
+        self.assertIn("factory inspect-orchestration --root . --work-item-id WI-090", output)
+        self.assertNotIn("ready to proceed", output)
+        self.assertNotIn("recommended action", output)
+
     def test_inspect_clarification_help_includes_description_next_step_and_example(self) -> None:
         output = self._run_help("inspect-clarification")
 
@@ -6052,6 +6064,221 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("- summary: no-linked-clarifications", inspect_stdout.getvalue())
             self.assertIn("- linked_clarification_count: 0", inspect_stdout.getvalue())
             self.assertIn("Latest Run:\n- none", status_stdout.getvalue())
+
+    def test_inspect_orchestration_exact_work_item_anchor_success_path(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_item_path = root / "docs" / "work-items" / "WI-790.md"
+            work_item_path.parent.mkdir(parents=True, exist_ok=True)
+            work_item_path.write_text(
+                "\n".join(
+                    [
+                        "# WI-790: exact anchor",
+                        "",
+                        "## Work Item ID",
+                        "WI-790",
+                        "",
+                        "## Goal ID",
+                        "GOAL-790",
+                        "",
+                        "## Title",
+                        "exact anchor",
+                        "",
+                        "## Related Clarifications",
+                        "- none",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            pr_plan_path = root / "prs" / "active" / "PR-790.md"
+            pr_plan_path.parent.mkdir(parents=True, exist_ok=True)
+            pr_plan_path.write_text(
+                "# PR-790\n\n## PR ID\nPR-790\n\n## Work Item ID\nWI-790\n\n## Title\nexact anchor\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-orchestration", "--root", str(root), "--work-item-id", "WI-790"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Orchestration Inspection:", output)
+            self.assertIn("Anchor Summary:\n- work_item_id: WI-790", output)
+            self.assertIn(f"- work_item_path: {work_item_path.as_posix()}", output)
+            self.assertIn("- anchor_mode: exact anchor only", output)
+            self.assertIn("- visibility_note: read-only operator visibility only", output)
+            self.assertIn("- source_rule: official artifact summary only", output)
+            self.assertIn("- linked_pr_plan_count: 1", output)
+            self.assertIn("- linked_run_count: 0", output)
+            self.assertIn("- pr_id: PR-790", output)
+            self.assertIn(f"  path: {pr_plan_path.as_posix()}", output)
+            self.assertIn("- note: none", output)
+            self.assertIn(
+                "- possible next manual step: factory inspect-pr-plan --root . --pr-id PR-790",
+                output,
+            )
+
+    def test_inspect_orchestration_surfaces_no_linked_official_downstream_artifact(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_item_path = root / "docs" / "work-items" / "WI-791.md"
+            work_item_path.parent.mkdir(parents=True, exist_ok=True)
+            work_item_path.write_text(
+                "\n".join(
+                    [
+                        "# WI-791: downstream absent",
+                        "",
+                        "## Work Item ID",
+                        "WI-791",
+                        "",
+                        "## Goal ID",
+                        "GOAL-791",
+                        "",
+                        "## Title",
+                        "downstream absent",
+                        "",
+                        "## Related Clarifications",
+                        "- none",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-orchestration", "--root", str(root), "--work-item-id", "WI-791"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- linked_pr_plan_count: 0", output)
+            self.assertIn("- linked_run_count: 0", output)
+            self.assertIn(
+                "- note: official artifacts do not show linked downstream official artifacts for this exact anchor; human decision required",
+                output,
+            )
+            self.assertIn("Possible Next Manual Step:\n- none", output)
+
+    def test_inspect_orchestration_keeps_ambiguous_state_explicit(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_item_path = root / "docs" / "work-items" / "WI-792.md"
+            work_item_path.parent.mkdir(parents=True, exist_ok=True)
+            work_item_path.write_text(
+                "\n".join(
+                    [
+                        "# WI-792: ambiguous",
+                        "",
+                        "## Work Item ID",
+                        "WI-792",
+                        "",
+                        "## Goal ID",
+                        "GOAL-792",
+                        "",
+                        "## Title",
+                        "ambiguous",
+                        "",
+                        "## Related Clarifications",
+                        "- none",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            active_plan = root / "prs" / "active" / "PR-792A.md"
+            active_plan.parent.mkdir(parents=True, exist_ok=True)
+            active_plan.write_text(
+                "# PR-792A\n\n## PR ID\nPR-792A\n\n## Work Item ID\nWI-792\n\n## Title\nambiguous A\n",
+                encoding="utf-8",
+            )
+            archived_plan = root / "prs" / "archive" / "PR-792B.md"
+            archived_plan.parent.mkdir(parents=True, exist_ok=True)
+            archived_plan.write_text(
+                "# PR-792B\n\n## PR ID\nPR-792B\n\n## Work Item ID\nWI-792\n\n## Title\nambiguous B\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-orchestration", "--root", str(root), "--work-item-id", "WI-792"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- linked_pr_plan_count: 2", output)
+            self.assertIn("- pr_id: PR-792A", output)
+            self.assertIn("- pr_id: PR-792B", output)
+            self.assertIn("ambiguous state surfaced explicitly:", output)
+            self.assertIn("human decision required", output)
+            self.assertIn("Possible Next Manual Step:\n- none", output)
+
+    def test_inspect_orchestration_does_not_expand_status_semantics(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_item_path = root / "docs" / "work-items" / "WI-793.md"
+            work_item_path.parent.mkdir(parents=True, exist_ok=True)
+            work_item_path.write_text(
+                "# WI-793\n\n## Work Item ID\nWI-793\n\n## Goal ID\nGOAL-793\n\n## Related Clarifications\n- none\n",
+                encoding="utf-8",
+            )
+
+            status_before = StringIO()
+            with redirect_stdout(status_before):
+                before_exit_code = main(["status", "--root", str(root)])
+
+            with redirect_stdout(StringIO()):
+                inspect_exit_code = main(["inspect-orchestration", "--root", str(root), "--work-item-id", "WI-793"])
+
+            status_after = StringIO()
+            with redirect_stdout(status_after):
+                after_exit_code = main(["status", "--root", str(root)])
+
+            self.assertEqual(before_exit_code, 0)
+            self.assertEqual(inspect_exit_code, 0)
+            self.assertEqual(after_exit_code, 0)
+            self.assertEqual(status_before.getvalue(), status_after.getvalue())
+
+    def test_inspect_orchestration_avoids_decision_and_gating_wording_drift(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_item_path = root / "docs" / "work-items" / "WI-794.md"
+            work_item_path.parent.mkdir(parents=True, exist_ok=True)
+            work_item_path.write_text(
+                "# WI-794\n\n## Work Item ID\nWI-794\n\n## Goal ID\nGOAL-794\n\n## Related Clarifications\n- none\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-orchestration", "--root", str(root), "--work-item-id", "WI-794"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("read-only operator visibility only", output)
+            self.assertIn("official artifact summary only", output)
+            self.assertIn("human decision required", output)
+            self.assertNotIn("ready to proceed", output)
+            self.assertNotIn("blocked until resolved", output)
+            self.assertNotIn("selected target", output)
+            self.assertNotIn("next PR to run", output)
+            self.assertNotIn("should resolve now", output)
+            self.assertNotIn("pending cleanup", output)
+            self.assertNotIn("recommended action", output)
+            self.assertNotIn("approved path", output)
 
     def test_inspect_run_latest_successfully(self) -> None:
         from pathlib import Path

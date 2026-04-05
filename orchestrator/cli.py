@@ -25,6 +25,7 @@ from orchestrator.pipeline import (
     inspect_approval_queue,
     inspect_clarification,
     inspect_goal,
+    inspect_orchestration,
     inspect_pr_plan,
     inspect_run,
     inspect_work_item,
@@ -293,6 +294,102 @@ def _render_work_item_inspection(inspection: dict[str, object]) -> str:
                     lines.append(
                         f"- clarification: {entry.get('clarification_id') or 'unknown'} = {entry.get('status') or 'none'}"
                     )
+    else:
+        lines.append("- none")
+
+    return "\n".join(lines)
+
+
+def _render_orchestration_inspection(inspection: dict[str, object]) -> str:
+    lines = ["Orchestration Inspection:"]
+
+    anchor = inspection.get("anchor")
+    if not isinstance(anchor, dict):
+        anchor = {}
+    lines.append("")
+    lines.append("Anchor Summary:")
+    lines.append(f"- work_item_id: {anchor.get('work_item_id') or 'none'}")
+    lines.append(f"- work_item_path: {anchor.get('work_item_path') or 'none'}")
+    lines.append(f"- exists: {anchor.get('exists')}")
+    lines.append(f"- title: {anchor.get('title') or 'none'}")
+    lines.append(f"- goal_id: {anchor.get('goal_id') or 'none'}")
+    lines.append("- anchor_mode: exact anchor only")
+    lines.append("- visibility_note: read-only operator visibility only")
+
+    linked = inspection.get("linked_official_artifacts")
+    if not isinstance(linked, dict):
+        linked = {}
+    pr_plans = linked.get("pr_plans")
+    if not isinstance(pr_plans, list):
+        pr_plans = []
+    runs = linked.get("runs")
+    if not isinstance(runs, list):
+        runs = []
+
+    lines.append("")
+    lines.append("Linked Official Artifact Summary:")
+    lines.append("- source_rule: official artifact summary only")
+    lines.append(f"- linked_pr_plan_count: {len(pr_plans)}")
+    lines.append(f"- linked_run_count: {len(runs)}")
+
+    lines.append("")
+    lines.append("PR Plans:")
+    if pr_plans:
+        for plan in pr_plans:
+            if not isinstance(plan, dict):
+                continue
+            lines.append(f"- pr_id: {plan.get('pr_id') or 'none'}")
+            lines.append(f"  location: {plan.get('location') or 'none'}")
+            lines.append(f"  path: {plan.get('path') or 'none'}")
+    else:
+        lines.append("- none")
+
+    lines.append("")
+    lines.append("Runs:")
+    if runs:
+        for run in runs:
+            if not isinstance(run, dict):
+                continue
+            lines.append(f"- run_id: {run.get('run_id') or 'none'}")
+            lines.append(f"  state: {run.get('state') or 'none'}")
+            lines.append(f"  pr_id: {run.get('pr_id') or 'none'}")
+            lines.append(f"  path: {run.get('path') or 'none'}")
+            lines.append(f"  approval_request_status: {run.get('approval_request_status') or 'none'}")
+            queue_entries = run.get("queue_entries")
+            if isinstance(queue_entries, list) and queue_entries:
+                for entry in queue_entries:
+                    if not isinstance(entry, dict):
+                        continue
+                    lines.append(f"  queue_status: {entry.get('queue_status') or 'none'}")
+                    lines.append(f"  queue_path: {entry.get('path') or 'none'}")
+            else:
+                lines.append("  queue_status: none")
+                lines.append("  queue_path: none")
+    else:
+        lines.append("- none")
+
+    lines.append("")
+    lines.append("Ambiguity / Incomplete State:")
+    note_parts = [
+        value
+        for value in (
+            inspection.get("ambiguity_note"),
+            inspection.get("incomplete_state_note"),
+            inspection.get("degraded_note"),
+        )
+        if value
+    ]
+    if note_parts:
+        for note in note_parts:
+            lines.append(f"- note: {note}")
+    else:
+        lines.append("- note: none")
+
+    lines.append("")
+    lines.append("Possible Next Manual Step:")
+    next_step = inspection.get("possible_next_manual_step")
+    if next_step:
+        lines.append(f"- possible next manual step: {next_step}")
     else:
         lines.append("- none")
 
@@ -896,6 +993,22 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_work_item_parser.add_argument("--root", default=".", help="Repository root path")
     inspect_work_item_parser.add_argument("--work-item-id", required=True)
 
+    inspect_orchestration_parser = subparsers.add_parser(
+        "inspect-orchestration",
+        help="Inspect exact-anchor orchestration summary in visibility-only mode",
+        description="Inspect an exact work-item anchor and linked official artifacts in read-only operator visibility mode.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  continue with exact-anchor visibility only; a possible next manual step appears only when official artifacts show a single obvious path",
+            "",
+            "Example:",
+            "  factory inspect-orchestration --root . --work-item-id WI-090",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    inspect_orchestration_parser.add_argument("--root", default=".", help="Repository root path")
+    inspect_orchestration_parser.add_argument("--work-item-id", required=True)
+
     inspect_clarification_parser = subparsers.add_parser(
         "inspect-clarification",
         help="Inspect clarification artifacts in visibility-only mode",
@@ -1446,6 +1559,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(
             _render_work_item_inspection(
                 inspect_work_item(
+                    root_dir=Path(args.root),
+                    work_item_id=args.work_item_id,
+                )
+            )
+        )
+        return 0
+
+    if args.command == "inspect-orchestration":
+        print(
+            _render_orchestration_inspection(
+                inspect_orchestration(
                     root_dir=Path(args.root),
                     work_item_id=args.work_item_id,
                 )

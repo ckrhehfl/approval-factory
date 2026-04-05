@@ -1307,6 +1307,176 @@ def inspect_work_item(*, root_dir: Path, work_item_id: str) -> dict[str, Any]:
     }
 
 
+def _find_pr_plans_for_work_item(root_dir: Path, *, work_item_id: str) -> tuple[list[dict[str, str]], list[str]]:
+    matches: list[dict[str, str]] = []
+    notes: list[str] = []
+
+    for location, directory in (("active", _pr_active_dir(root_dir)), ("archive", _pr_archive_dir(root_dir))):
+        for plan_path in sorted(directory.glob("*.md")):
+            try:
+                sections = _parse_markdown_sections(plan_path)
+            except Exception as exc:  # pragma: no cover - defensive visibility fallback
+                notes.append(f"PR plan artifact unreadable during exact-anchor scan: {plan_path.as_posix()}: {exc}")
+                continue
+
+            if sections.get("Work Item ID", "").strip() != work_item_id:
+                continue
+
+            matches.append(
+                {
+                    "pr_id": sections.get("PR ID", "").strip() or plan_path.stem,
+                    "location": location,
+                    "path": plan_path.as_posix(),
+                }
+            )
+
+    return matches, notes
+
+
+def _approval_queue_entries_for_run(root_dir: Path, *, run_id: str) -> list[dict[str, str]]:
+    entries: list[dict[str, str]] = []
+    for queue_status, queue_dir_name in (
+        ("pending", "pending"),
+        ("approved", "approved"),
+        ("rejected", "rejected"),
+        ("exception", "exceptions"),
+    ):
+        queue_dir = root_dir / "approval_queue" / queue_dir_name
+        pattern = re.compile(rf"APR-{re.escape(run_id)}(?:--r\d+)?\.yaml")
+        for queue_path in sorted(path for path in queue_dir.glob(f"APR-{run_id}*.yaml") if pattern.fullmatch(path.name)):
+            entries.append(
+                {
+                    "queue_status": queue_status,
+                    "path": queue_path.as_posix(),
+                }
+            )
+    return entries
+
+
+def _linked_runs_for_work_item(root_dir: Path, *, work_item_id: str) -> tuple[list[dict[str, Any]], list[str]]:
+    runs: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    for run_path in sorted((root_dir / "runs" / "latest").glob("*/run.yaml")):
+        try:
+            payload, payload_note = _safe_read_mapping(run_path, label="run artifact")
+        except Exception as exc:  # pragma: no cover - defensive visibility fallback
+            notes.append(f"run artifact unreadable during exact-anchor scan: {run_path.as_posix()}: {exc}")
+            continue
+
+        if payload_note:
+            notes.append(f"{run_path.as_posix()}: {payload_note}")
+            continue
+
+        run_mapping = payload.get("run", {}) if isinstance(payload, dict) else {}
+        if not isinstance(run_mapping, dict):
+            notes.append(f"{run_path.as_posix()}: run artifact missing run mapping")
+            continue
+
+        if str(run_mapping.get("work_item_id", "")).strip() != work_item_id:
+            continue
+
+        run_id = str(run_mapping.get("run_id", run_path.parent.name)).strip() or run_path.parent.name
+        approval_request_path = _artifact_path(root_dir, run_id, "approval-request.yaml")
+        approval_request_status: str | None = None
+        approval_request_exists = approval_request_path.exists()
+        if approval_request_exists:
+            approval_payload, approval_note = _safe_read_mapping(approval_request_path, label="approval request artifact")
+            if approval_note:
+                notes.append(f"{approval_request_path.as_posix()}: {approval_note}")
+            approval_mapping = approval_payload.get("approval_request", {}) if isinstance(approval_payload, dict) else {}
+            if isinstance(approval_mapping, dict):
+                raw_status = approval_mapping.get("status")
+                if raw_status is not None:
+                    approval_request_status = str(raw_status)
+
+        queue_entries = _approval_queue_entries_for_run(root_dir, run_id=run_id)
+        runs.append(
+            {
+                "run_id": run_id,
+                "pr_id": str(run_mapping.get("pr_id", "")).strip() or None,
+                "state": str(run_mapping.get("state", "")).strip() or None,
+                "path": run_path.as_posix(),
+                "approval_request_path": approval_request_path.as_posix(),
+                "approval_request_exists": approval_request_exists,
+                "approval_request_status": approval_request_status,
+                "queue_entries": queue_entries,
+            }
+        )
+
+    return runs, notes
+
+
+def inspect_orchestration(*, root_dir: Path, work_item_id: str) -> dict[str, Any]:
+    anchor = inspect_work_item(root_dir=root_dir, work_item_id=work_item_id)
+    pr_plans, pr_plan_notes = _find_pr_plans_for_work_item(root_dir, work_item_id=work_item_id)
+    runs, run_notes = _linked_runs_for_work_item(root_dir, work_item_id=work_item_id)
+
+    notes: list[str] = []
+    _collect_degraded_notes(anchor.get("degraded_note"), notes)
+    notes.extend(pr_plan_notes)
+    notes.extend(run_notes)
+
+    ambiguity_reasons: list[str] = []
+    incomplete_reasons: list[str] = []
+
+    if not anchor.get("exists"):
+        incomplete_reasons.append("official artifacts do not resolve the exact anchor work item")
+
+    if not pr_plans and not runs:
+        incomplete_reasons.append("official artifacts do not show linked downstream official artifacts for this exact anchor")
+
+    if len(pr_plans) > 1:
+        ambiguity_reasons.append(f"official artifacts show {len(pr_plans)} linked PR plan artifacts for this exact anchor")
+
+    if len(runs) > 1:
+        ambiguity_reasons.append(f"official artifacts show {len(runs)} linked run artifacts for this exact anchor")
+
+    for run in runs:
+        queue_entries = run.get("queue_entries") or []
+        if len(queue_entries) > 1:
+            ambiguity_reasons.append(
+                f"official artifacts show {len(queue_entries)} approval queue artifacts for linked run {run['run_id']}"
+            )
+
+    ambiguity_note: str | None = None
+    if ambiguity_reasons:
+        ambiguity_note = "ambiguous state surfaced explicitly: " + "; ".join(ambiguity_reasons) + "; human decision required"
+
+    incomplete_state_note: str | None = None
+    if incomplete_reasons:
+        incomplete_state_note = "; ".join(incomplete_reasons)
+        if not ambiguity_reasons:
+            incomplete_state_note += "; human decision required"
+
+    possible_next_manual_step: str | None = None
+    if not ambiguity_reasons and anchor.get("exists"):
+        if len(pr_plans) == 1 and not runs:
+            possible_next_manual_step = f"factory inspect-pr-plan --root . --pr-id {pr_plans[0]['pr_id']}"
+        elif not pr_plans and len(runs) == 1:
+            run = runs[0]
+            if not run.get("approval_request_exists") and not run.get("queue_entries"):
+                possible_next_manual_step = f"factory inspect-run --root . --run-id {run['run_id']}"
+
+    return {
+        "anchor": {
+            "work_item_id": anchor.get("work_item_id") or work_item_id,
+            "work_item_path": anchor.get("work_item_path"),
+            "exists": bool(anchor.get("exists")),
+            "title": anchor.get("title"),
+            "goal_id": anchor.get("goal_id"),
+        },
+        "linked_official_artifacts": {
+            "pr_plans": pr_plans,
+            "runs": runs,
+        },
+        "ambiguity_note": ambiguity_note,
+        "incomplete_state_note": incomplete_state_note,
+        "possible_next_manual_step": possible_next_manual_step,
+        "degraded_note": "; ".join(_dedupe_preserving_order(notes)) if notes else None,
+    }
+
+
 def inspect_pr_plan(*, root_dir: Path, pr_id: str | None = None, active: bool = False) -> dict[str, Any]:
     notes: list[str] = []
     selected_path: Path | None = None

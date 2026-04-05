@@ -40,6 +40,7 @@
 - `inspect-goal`
 - `inspect-clarification`
 - `inspect-work-item`
+- `inspect-orchestration`
 - `inspect-pr-plan`
 - `inspect-run`
 - `trace-lineage`
@@ -206,6 +207,15 @@ approval queue visibility 규칙:
 - 출력은 operator-facing visibility only다. readiness gating, clarification resolution, planning selection, execution selection, approval decision에 영향을 주지 않는다.
 - 최소 출력 항목: `work_item_id`, work item path/existence, title/summary if present, `goal_id` if present, linked clarification identifiers if present, readiness visibility summary/context if readable, metadata timestamp if present, degraded note.
 - artifact가 없거나 부분적으로 unreadable이어도 work item mutation, clarification mutation, cleanup, auto-hide, auto-resolve, lifecycle/state transition semantics를 바꾸지 않고 degraded note로만 보여준다.
+
+`inspect-orchestration` 최소 계약:
+- `factory inspect-orchestration`은 exact `--work-item-id <id>` anchor 하나만 받아 linked official artifacts를 읽기 전용으로 summary 출력한다.
+- `factory status` 확장이 아니라 dedicated inspect-style surface다.
+- 출력은 read-only operator visibility only이며 official artifact summary only다.
+- linked official artifacts는 exact work item id로 연결되는 `docs/work-items`, `prs/active`, `prs/archive`, `runs`, approval runtime artifacts만 포함한다.
+- ambiguous/incomplete state는 명시적으로 surface하고 human decision required로 남긴다.
+- possible next manual step은 official artifacts가 single obvious path 하나만 보여줄 때만 출력한다.
+- lifecycle/readiness/approval/queue semantics, selector semantics, automation, gating, target selection behavior는 바꾸지 않는다.
 
 `inspect-clarification` 최소 계약:
 - `factory inspect-clarification`은 clarification artifact 자체를 읽기 전용으로 inspection 출력한다.
