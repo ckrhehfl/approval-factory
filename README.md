@@ -209,12 +209,13 @@ approval queue visibility 규칙:
 - artifact가 없거나 부분적으로 unreadable이어도 work item mutation, clarification mutation, cleanup, auto-hide, auto-resolve, lifecycle/state transition semantics를 바꾸지 않고 degraded note로만 보여준다.
 
 `inspect-orchestration` 최소 계약:
-- `factory inspect-orchestration`은 exact `--work-item-id <id>` anchor 하나만 받아 linked official artifacts를 읽기 전용으로 summary 출력한다.
+- `factory inspect-orchestration`은 exact `--work-item-id <WI-...>` anchor 하나만 받아 linked official artifacts를 읽기 전용으로 summary 출력한다.
 - `factory status` 확장이 아니라 dedicated inspect-style surface다.
 - 출력은 read-only operator visibility only이며 official artifact summary only다.
 - linked official artifacts는 exact work item id로 연결되는 `docs/work-items`, `prs/active`, `prs/archive`, `runs`, approval runtime artifacts만 포함한다.
 - ambiguous/incomplete state는 명시적으로 surface하고 human decision required로 남긴다.
 - possible next manual step은 official artifacts가 single obvious path 하나만 보여줄 때만 출력한다.
+- 이 surface는 recommendation behavior, gating behavior, target selection, approval/readiness/queue action advice를 제공하지 않는다.
 - lifecycle/readiness/approval/queue semantics, selector semantics, automation, gating, target selection behavior는 바꾸지 않는다.
 
 `inspect-clarification` 최소 계약:

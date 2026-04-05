@@ -995,11 +995,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     inspect_orchestration_parser = subparsers.add_parser(
         "inspect-orchestration",
-        help="Inspect exact-anchor orchestration summary in visibility-only mode",
-        description="Inspect an exact work-item anchor and linked official artifacts in read-only operator visibility mode.",
+        help="Inspect exact --work-item-id <WI-...> orchestration visibility only",
+        description=(
+            "Inspect the exact --work-item-id <WI-...> anchor and linked official artifacts in "
+            "read-only operator visibility-only mode."
+        ),
         epilog=_render_help_epilog(
             "Next step:",
-            "  continue with exact-anchor visibility only; a possible next manual step appears only when official artifacts show a single obvious path",
+            "  continue with exact-anchor visibility only; official artifact summary remains read-only only, and a possible next manual step appears only when official artifacts show a single obvious path",
             "",
             "Example:",
             "  factory inspect-orchestration --root . --work-item-id WI-090",
