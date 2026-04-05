@@ -6175,6 +6175,347 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             )
             self.assertIn("Possible Next Manual Step:\n- none", output)
 
+    def test_inspect_orchestration_suppresses_next_step_for_degraded_anchor_state(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_item_path = root / "docs" / "work-items" / "WI-791A.md"
+            work_item_path.parent.mkdir(parents=True, exist_ok=True)
+            work_item_path.write_text("# partial work item only\n", encoding="utf-8")
+            pr_plan_path = root / "prs" / "active" / "PR-791A.md"
+            pr_plan_path.parent.mkdir(parents=True, exist_ok=True)
+            pr_plan_path.write_text(
+                "# PR-791A\n\n## PR ID\nPR-791A\n\n## Work Item ID\nWI-791A\n\n## Title\ndegraded anchor\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-orchestration", "--root", str(root), "--work-item-id", "WI-791A"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- linked_pr_plan_count: 1", output)
+            self.assertIn(f"  path: {pr_plan_path.as_posix()}", output)
+            self.assertIn("- note: work item artifact missing markdown sections", output)
+            self.assertIn("human decision required", output)
+            self.assertIn("Possible Next Manual Step:\n- none", output)
+
+    def test_inspect_orchestration_keeps_safe_next_step_when_only_unrelated_scan_artifact_is_degraded(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_item_path = root / "docs" / "work-items" / "WI-791A0.md"
+            work_item_path.parent.mkdir(parents=True, exist_ok=True)
+            work_item_path.write_text(
+                "\n".join(
+                    [
+                        "# WI-791A0: safe exact anchor",
+                        "",
+                        "## Work Item ID",
+                        "WI-791A0",
+                        "",
+                        "## Goal ID",
+                        "GOAL-791A0",
+                        "",
+                        "## Title",
+                        "safe exact anchor",
+                        "",
+                        "## Related Clarifications",
+                        "- none",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            pr_plan_path = root / "prs" / "active" / "PR-791A0.md"
+            pr_plan_path.parent.mkdir(parents=True, exist_ok=True)
+            pr_plan_path.write_text(
+                "# PR-791A0\n\n## PR ID\nPR-791A0\n\n## Work Item ID\nWI-791A0\n\n## Title\nsafe exact anchor\n",
+                encoding="utf-8",
+            )
+            unrelated_plan_doc = root / "docs" / "prs" / "PR-UNRELATED" / "plan.md"
+            unrelated_plan_doc.parent.mkdir(parents=True, exist_ok=True)
+            unrelated_plan_doc.write_text("# malformed unrelated reference only\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-orchestration", "--root", str(root), "--work-item-id", "WI-791A0"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- linked_pr_plan_count: 1", output)
+            self.assertIn("- linked_run_count: 0", output)
+            self.assertIn(
+                "- possible next manual step: factory inspect-pr-plan --root . --pr-id PR-791A0",
+                output,
+            )
+            self.assertNotIn("human decision required", output)
+
+    def test_inspect_orchestration_suppresses_next_step_for_unreadable_pr_plan_during_exact_anchor_discovery(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_item_path = root / "docs" / "work-items" / "WI-791A2.md"
+            work_item_path.parent.mkdir(parents=True, exist_ok=True)
+            work_item_path.write_text(
+                "\n".join(
+                    [
+                        "# WI-791A2: discovery-blocked plan",
+                        "",
+                        "## Work Item ID",
+                        "WI-791A2",
+                        "",
+                        "## Goal ID",
+                        "GOAL-791A2",
+                        "",
+                        "## Title",
+                        "discovery-blocked plan",
+                        "",
+                        "## Related Clarifications",
+                        "- none",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            pr_plan_path = root / "prs" / "active" / "PR-791A2.md"
+            pr_plan_path.parent.mkdir(parents=True, exist_ok=True)
+            pr_plan_path.write_text(
+                "# PR-791A2\n\n## PR ID\nPR-791A2\n\n## Work Item ID\nWI-791A2\n\n## Title\ndiscovery-blocked plan\n",
+                encoding="utf-8",
+            )
+            unreadable_plan_path = root / "prs" / "archive" / "PR-UNREADABLE.md"
+            unreadable_plan_path.parent.mkdir(parents=True, exist_ok=True)
+            unreadable_plan_path.write_text("## Broken\n```", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-orchestration", "--root", str(root), "--work-item-id", "WI-791A2"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- linked_pr_plan_count: 1", output)
+            self.assertIn(f"- note: PR plan artifact missing Work Item ID linkage during exact-anchor scan: {unreadable_plan_path.as_posix()}", output)
+            self.assertIn("human decision required", output)
+            self.assertIn("Possible Next Manual Step:\n- none", output)
+
+    def test_inspect_orchestration_suppresses_next_step_for_unreadable_run_during_exact_anchor_discovery_with_linked_pr_plan(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_item_path = root / "docs" / "work-items" / "WI-791A3.md"
+            work_item_path.parent.mkdir(parents=True, exist_ok=True)
+            work_item_path.write_text(
+                "\n".join(
+                    [
+                        "# WI-791A3: discovery-blocked run with plan",
+                        "",
+                        "## Work Item ID",
+                        "WI-791A3",
+                        "",
+                        "## Goal ID",
+                        "GOAL-791A3",
+                        "",
+                        "## Title",
+                        "discovery-blocked run with plan",
+                        "",
+                        "## Related Clarifications",
+                        "- none",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            pr_plan_path = root / "prs" / "active" / "PR-791A3.md"
+            pr_plan_path.parent.mkdir(parents=True, exist_ok=True)
+            pr_plan_path.write_text(
+                "# PR-791A3\n\n## PR ID\nPR-791A3\n\n## Work Item ID\nWI-791A3\n\n## Title\ndiscovery-blocked run with plan\n",
+                encoding="utf-8",
+            )
+            unreadable_run_dir = root / "runs" / "latest" / "RUN-791A3X"
+            unreadable_run_dir.mkdir(parents=True, exist_ok=True)
+            (unreadable_run_dir / "run.yaml").write_text("run: [\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-orchestration", "--root", str(root), "--work-item-id", "WI-791A3"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- linked_pr_plan_count: 1", output)
+            self.assertIn(f"- note: {unreadable_run_dir.as_posix()}/run.yaml: run artifact unreadable:", output)
+            self.assertIn("human decision required", output)
+            self.assertIn("Possible Next Manual Step:\n- none", output)
+
+    def test_inspect_orchestration_suppresses_next_step_for_unreadable_run_during_exact_anchor_discovery_with_linked_run(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_item_path = root / "docs" / "work-items" / "WI-791A4.md"
+            work_item_path.parent.mkdir(parents=True, exist_ok=True)
+            work_item_path.write_text(
+                "\n".join(
+                    [
+                        "# WI-791A4: discovery-blocked run with linked run",
+                        "",
+                        "## Work Item ID",
+                        "WI-791A4",
+                        "",
+                        "## Goal ID",
+                        "GOAL-791A4",
+                        "",
+                        "## Title",
+                        "discovery-blocked run with linked run",
+                        "",
+                        "## Related Clarifications",
+                        "- none",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            linked_run_dir = root / "runs" / "latest" / "RUN-791A4"
+            linked_run_dir.mkdir(parents=True, exist_ok=True)
+            (linked_run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-791A4",
+                        "  work_item_id: WI-791A4",
+                        "  pr_id: PR-791A4",
+                        "  state: in_progress",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            unreadable_run_dir = root / "runs" / "latest" / "RUN-791A4X"
+            unreadable_run_dir.mkdir(parents=True, exist_ok=True)
+            (unreadable_run_dir / "run.yaml").write_text("run: [\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-orchestration", "--root", str(root), "--work-item-id", "WI-791A4"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- linked_run_count: 1", output)
+            self.assertIn(f"  path: {linked_run_dir.as_posix()}/run.yaml", output)
+            self.assertIn(f"- note: {unreadable_run_dir.as_posix()}/run.yaml: run artifact unreadable:", output)
+            self.assertIn("human decision required", output)
+            self.assertIn("Possible Next Manual Step:\n- none", output)
+
+    def test_inspect_orchestration_suppresses_next_step_for_target_linked_degraded_artifact(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_item_path = root / "docs" / "work-items" / "WI-791A1.md"
+            work_item_path.parent.mkdir(parents=True, exist_ok=True)
+            work_item_path.write_text(
+                "\n".join(
+                    [
+                        "# WI-791A1: linked degradation",
+                        "",
+                        "## Work Item ID",
+                        "WI-791A1",
+                        "",
+                        "## Goal ID",
+                        "GOAL-791A1",
+                        "",
+                        "## Title",
+                        "linked degradation",
+                        "",
+                        "## Related Clarifications",
+                        "- CLAR-791A1 (open)",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            pr_plan_path = root / "prs" / "active" / "PR-791A1.md"
+            pr_plan_path.parent.mkdir(parents=True, exist_ok=True)
+            pr_plan_path.write_text(
+                "# PR-791A1\n\n## PR ID\nPR-791A1\n\n## Work Item ID\nWI-791A1\n\n## Title\nlinked degradation\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-orchestration", "--root", str(root), "--work-item-id", "WI-791A1"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- linked_pr_plan_count: 1", output)
+            self.assertIn(f"  path: {pr_plan_path.as_posix()}", output)
+            self.assertIn(
+                "- note: cannot read work item readiness because a linked clarification artifact was not found: "
+                f"goal-id 'GOAL-791A1', clarification-id 'CLAR-791A1', expected at "
+                f"{root.as_posix()}/clarifications/GOAL-791A1/CLAR-791A1.md.",
+                output,
+            )
+            self.assertIn("human decision required", output)
+            self.assertIn("Possible Next Manual Step:\n- none", output)
+
+    def test_inspect_orchestration_suppresses_next_step_for_incomplete_official_artifact_case(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_item_path = root / "docs" / "work-items" / "WI-791B.md"
+            work_item_path.parent.mkdir(parents=True, exist_ok=True)
+            work_item_path.write_text(
+                "\n".join(
+                    [
+                        "# WI-791B: incomplete downstream",
+                        "",
+                        "## Work Item ID",
+                        "WI-791B",
+                        "",
+                        "## Goal ID",
+                        "GOAL-791B",
+                        "",
+                        "## Title",
+                        "incomplete downstream",
+                        "",
+                        "## Related Clarifications",
+                        "- none",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            incomplete_run_dir = root / "runs" / "latest" / "RUN-791B"
+            incomplete_run_dir.mkdir(parents=True, exist_ok=True)
+            (incomplete_run_dir / "run.yaml").write_text("run: [\n", encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-orchestration", "--root", str(root), "--work-item-id", "WI-791B"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- linked_pr_plan_count: 0", output)
+            self.assertIn("- linked_run_count: 0", output)
+            self.assertIn(
+                "- note: official artifacts do not show linked downstream official artifacts for this exact anchor; human decision required",
+                output,
+            )
+            self.assertIn(f"- note: {incomplete_run_dir.as_posix()}/run.yaml: run artifact unreadable:", output)
+            self.assertIn("Possible Next Manual Step:\n- none", output)
+
     def test_inspect_orchestration_keeps_ambiguous_state_explicit(self) -> None:
         from pathlib import Path
 

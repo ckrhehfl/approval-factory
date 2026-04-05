@@ -1319,7 +1319,12 @@ def _find_pr_plans_for_work_item(root_dir: Path, *, work_item_id: str) -> tuple[
                 notes.append(f"PR plan artifact unreadable during exact-anchor scan: {plan_path.as_posix()}: {exc}")
                 continue
 
-            if sections.get("Work Item ID", "").strip() != work_item_id:
+            parsed_work_item_id = sections.get("Work Item ID", "").strip()
+            if not parsed_work_item_id:
+                notes.append(f"PR plan artifact missing Work Item ID linkage during exact-anchor scan: {plan_path.as_posix()}")
+                continue
+
+            if parsed_work_item_id != work_item_id:
                 continue
 
             matches.append(
@@ -1353,24 +1358,25 @@ def _approval_queue_entries_for_run(root_dir: Path, *, run_id: str) -> list[dict
     return entries
 
 
-def _linked_runs_for_work_item(root_dir: Path, *, work_item_id: str) -> tuple[list[dict[str, Any]], list[str]]:
+def _linked_runs_for_work_item(root_dir: Path, *, work_item_id: str) -> tuple[list[dict[str, Any]], list[str], list[str]]:
     runs: list[dict[str, Any]] = []
-    notes: list[str] = []
+    linked_notes: list[str] = []
+    scan_notes: list[str] = []
 
     for run_path in sorted((root_dir / "runs" / "latest").glob("*/run.yaml")):
         try:
             payload, payload_note = _safe_read_mapping(run_path, label="run artifact")
         except Exception as exc:  # pragma: no cover - defensive visibility fallback
-            notes.append(f"run artifact unreadable during exact-anchor scan: {run_path.as_posix()}: {exc}")
+            scan_notes.append(f"run artifact unreadable during exact-anchor scan: {run_path.as_posix()}: {exc}")
             continue
 
         if payload_note:
-            notes.append(f"{run_path.as_posix()}: {payload_note}")
+            scan_notes.append(f"{run_path.as_posix()}: {payload_note}")
             continue
 
         run_mapping = payload.get("run", {}) if isinstance(payload, dict) else {}
         if not isinstance(run_mapping, dict):
-            notes.append(f"{run_path.as_posix()}: run artifact missing run mapping")
+            scan_notes.append(f"{run_path.as_posix()}: run artifact missing run mapping")
             continue
 
         if str(run_mapping.get("work_item_id", "")).strip() != work_item_id:
@@ -1383,7 +1389,7 @@ def _linked_runs_for_work_item(root_dir: Path, *, work_item_id: str) -> tuple[li
         if approval_request_exists:
             approval_payload, approval_note = _safe_read_mapping(approval_request_path, label="approval request artifact")
             if approval_note:
-                notes.append(f"{approval_request_path.as_posix()}: {approval_note}")
+                linked_notes.append(f"{approval_request_path.as_posix()}: {approval_note}")
             approval_mapping = approval_payload.get("approval_request", {}) if isinstance(approval_payload, dict) else {}
             if isinstance(approval_mapping, dict):
                 raw_status = approval_mapping.get("status")
@@ -1404,18 +1410,21 @@ def _linked_runs_for_work_item(root_dir: Path, *, work_item_id: str) -> tuple[li
             }
         )
 
-    return runs, notes
+    return runs, linked_notes, scan_notes
 
 
 def inspect_orchestration(*, root_dir: Path, work_item_id: str) -> dict[str, Any]:
     anchor = inspect_work_item(root_dir=root_dir, work_item_id=work_item_id)
-    pr_plans, pr_plan_notes = _find_pr_plans_for_work_item(root_dir, work_item_id=work_item_id)
-    runs, run_notes = _linked_runs_for_work_item(root_dir, work_item_id=work_item_id)
+    pr_plans, pr_plan_scan_notes = _find_pr_plans_for_work_item(root_dir, work_item_id=work_item_id)
+    runs, linked_run_notes, run_scan_notes = _linked_runs_for_work_item(root_dir, work_item_id=work_item_id)
 
-    notes: list[str] = []
-    _collect_degraded_notes(anchor.get("degraded_note"), notes)
-    notes.extend(pr_plan_notes)
-    notes.extend(run_notes)
+    blocking_notes: list[str] = []
+    _collect_degraded_notes(anchor.get("degraded_note"), blocking_notes)
+    blocking_notes.extend(linked_run_notes)
+    blocking_notes.extend(pr_plan_scan_notes)
+    blocking_notes.extend(run_scan_notes)
+
+    visible_notes = list(blocking_notes)
 
     ambiguity_reasons: list[str] = []
     incomplete_reasons: list[str] = []
@@ -1449,8 +1458,18 @@ def inspect_orchestration(*, root_dir: Path, work_item_id: str) -> dict[str, Any
         if not ambiguity_reasons:
             incomplete_state_note += "; human decision required"
 
+    blocking_degraded_note = "; ".join(_dedupe_preserving_order(blocking_notes)) if blocking_notes else None
+    degraded_note = "; ".join(_dedupe_preserving_order(visible_notes)) if visible_notes else None
+    if blocking_degraded_note and ambiguity_note is None and incomplete_state_note is None:
+        degraded_note += "; human decision required"
+
     possible_next_manual_step: str | None = None
-    if not ambiguity_reasons and anchor.get("exists"):
+    if (
+        anchor.get("exists")
+        and ambiguity_note is None
+        and incomplete_state_note is None
+        and blocking_degraded_note is None
+    ):
         if len(pr_plans) == 1 and not runs:
             possible_next_manual_step = f"factory inspect-pr-plan --root . --pr-id {pr_plans[0]['pr_id']}"
         elif not pr_plans and len(runs) == 1:
@@ -1473,7 +1492,7 @@ def inspect_orchestration(*, root_dir: Path, work_item_id: str) -> dict[str, Any
         "ambiguity_note": ambiguity_note,
         "incomplete_state_note": incomplete_state_note,
         "possible_next_manual_step": possible_next_manual_step,
-        "degraded_note": "; ".join(_dedupe_preserving_order(notes)) if notes else None,
+        "degraded_note": degraded_note,
     }
 
 
