@@ -378,13 +378,21 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         output = self._run_help("inspect-orchestration")
 
         self.assertIn(
-            "Inspect an exact work-item anchor and linked official artifacts in read-only operator visibility mode.",
+            "Inspect the exact --work-item-id <WI-...> anchor and linked official artifacts in read-only operator visibility-only mode.",
             output,
         )
+        self.assertIn("official artifact summary remains read-only only", output)
         self.assertIn("possible next manual step appears only when official artifacts show a single obvious path", output)
+        self.assertIn("--work-item-id WORK_ITEM_ID", output)
         self.assertIn("factory inspect-orchestration --root . --work-item-id WI-090", output)
         self.assertNotIn("ready to proceed", output)
+        self.assertNotIn("blocked until resolved", output)
+        self.assertNotIn("selected target", output)
+        self.assertNotIn("next PR to run", output)
+        self.assertNotIn("should resolve now", output)
+        self.assertNotIn("approved path", output)
         self.assertNotIn("recommended action", output)
+        self.assertNotIn("pending cleanup", output)
 
     def test_inspect_clarification_help_includes_description_next_step_and_example(self) -> None:
         output = self._run_help("inspect-clarification")
@@ -6268,8 +6276,10 @@ class CleanupRehearsalCliTest(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             output = stdout.getvalue()
+            self.assertIn("exact anchor only", output)
             self.assertIn("read-only operator visibility only", output)
             self.assertIn("official artifact summary only", output)
+            self.assertIn("Possible Next Manual Step:", output)
             self.assertIn("human decision required", output)
             self.assertNotIn("ready to proceed", output)
             self.assertNotIn("blocked until resolved", output)
