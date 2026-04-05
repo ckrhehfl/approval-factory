@@ -156,6 +156,21 @@ def _render_approval_queue_inspection(inspection: dict[str, object]) -> str:
         lines.append(f"  matching_pr_id: {item.get('matching_pr_id') or 'none'}")
         lines.append(f"  matching_run_state: {item.get('matching_run_state') or 'none'}")
         lines.append(f"  readiness_context: {item['readiness_context_presence']}")
+        queue_hygiene_audit = item.get("queue_hygiene_audit")
+        if isinstance(queue_hygiene_audit, dict) and queue_hygiene_audit:
+            lines.append("  queue_hygiene_audit:")
+            for field in (
+                "status",
+                "applied_at",
+                "selector_family",
+                "requested_run_id",
+                "requested_approval_id",
+            ):
+                if field in queue_hygiene_audit:
+                    lines.append(f"    {field}: {queue_hygiene_audit[field]}")
+            lines.append(
+                "  queue_hygiene_note: read-only operator visibility only; exact stored audit fields only; not cleanup, resolve, approval decision, readiness/gate, selector, latest/stale relation, or Relation Summary state"
+            )
         lines.append(f"  note: {item.get('note') or 'none'}")
     return "\n".join(lines)
 
