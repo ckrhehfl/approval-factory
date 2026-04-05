@@ -654,6 +654,20 @@ def inspect_approval_queue(root_dir: Path) -> dict[str, Any]:
         approval_request = payload.get("approval_request", {}) if isinstance(payload, dict) else {}
         readiness_context = approval_request.get("readiness_context", {}) if isinstance(approval_request, dict) else {}
         readiness_presence = "present" if isinstance(readiness_context, dict) and readiness_context else "absent"
+        queue_hygiene = payload.get("queue_hygiene", {}) if isinstance(payload, dict) else {}
+        queue_hygiene_audit: dict[str, str] | None = None
+        if isinstance(queue_hygiene, dict) and queue_hygiene:
+            queue_hygiene_audit = {}
+            for field in (
+                "status",
+                "applied_at",
+                "selector_family",
+                "requested_run_id",
+                "requested_approval_id",
+            ):
+                value = queue_hygiene.get(field)
+                if value is not None:
+                    queue_hygiene_audit[field] = str(value)
 
         matching_run_path: str | None = None
         matching_run_state: str | None = None
@@ -689,6 +703,7 @@ def inspect_approval_queue(root_dir: Path) -> dict[str, Any]:
                 "matching_pr_id": matching_pr_id,
                 "matching_run_state": matching_run_state,
                 "readiness_context_presence": readiness_presence,
+                "queue_hygiene_audit": queue_hygiene_audit,
                 "note": "; ".join(note_parts) if note_parts else None,
             }
         )
