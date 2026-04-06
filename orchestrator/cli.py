@@ -45,6 +45,7 @@ from orchestrator.pipeline import (
     resolve_latest_run_id,
     resolve_approval,
     start_execution,
+    trace_run,
     trace_lineage,
 )
 from orchestrator.yaml_io import read_yaml
@@ -583,6 +584,33 @@ def _render_lineage_trace(trace: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def _render_trace_run(trace: dict[str, object]) -> str:
+    lines = ["Trace Run (debug-only)"]
+
+    lines.append("")
+    lines.append("Run info:")
+    lines.append(f"- run_id: {trace.get('run_id') or 'none'}")
+    lines.append(f"- run_path: {trace.get('run_path') or 'none'}")
+    lines.append(f"- pr_id: {trace.get('pr_id') or 'none'}")
+    lines.append(f"- work_item_id: {trace.get('work_item_id') or 'none'}")
+    lines.append(f"- state: {trace.get('state') or 'none'}")
+
+    lines.append("")
+    lines.append("Artifacts:")
+    artifacts = trace.get("artifacts")
+    if not isinstance(artifacts, dict):
+        artifacts = {}
+    lines.append(f"- run.yaml: {artifacts.get('run.yaml') or 'missing'}")
+    lines.append(f"- approval-request.yaml: {artifacts.get('approval-request.yaml') or 'missing'}")
+    lines.append(f"- draft-approval: {artifacts.get('draft-approval') or 'missing'}")
+
+    lines.append("")
+    lines.append("Note:")
+    lines.append("- trace-only")
+    lines.append("- not a decision surface")
+    return "\n".join(lines)
+
+
 def _render_create_pr_plan_summary(
     path: Path,
     had_active_pr: bool,
@@ -1075,6 +1103,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     inspect_run_parser.add_argument("--root", default=".", help="Repository root path")
     _add_run_selector_arguments(inspect_run_parser)
+
+    trace_run_parser = subparsers.add_parser(
+        "trace-run",
+        help="Trace one exact run in debug-only mode",
+        description="Trace one exact run in debug-only mode.",
+        epilog=_render_help_epilog(
+            "Debug-only:",
+            "  this command reads one exact run and optional artifacts without decision or approval-flow behavior",
+            "",
+            "Example:",
+            "  factory trace-run --root . --run-id RUN-20260327T063724Z",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    trace_run_parser.add_argument("--root", default=".", help="Repository root path")
+    trace_run_parser.add_argument(
+        "--run-id",
+        required=True,
+        help="Exact run selector in the form RUN-...; no latest fallback or implicit selection",
+    )
 
     inspect_pr_plan_parser = subparsers.add_parser(
         "inspect-pr-plan",
@@ -1697,6 +1745,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif run_id is None:
             parser.error("inspect-run requires either --run-id <id> or --latest")
         print(_render_run_inspection(inspect_run(root_dir=Path(args.root), run_id=run_id)))
+        return 0
+
+    if args.command == "trace-run":
+        try:
+            print(_render_trace_run(trace_run(root_dir=Path(args.root), run_id=str(args.run_id))))
+        except (FileNotFoundError, ValueError) as exc:
+            parser.error(str(exc))
         return 0
 
     if args.command == "inspect-pr-plan":

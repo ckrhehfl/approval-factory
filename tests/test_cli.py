@@ -449,6 +449,14 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         self.assertIn("factory inspect-run --root . --run-id <run-id>", output)
         self.assertIn("factory trace-lineage --root . --run-id RUN-063", output)
 
+    def test_trace_run_help_includes_debug_only_description_and_example(self) -> None:
+        output = self._run_help("trace-run")
+
+        self.assertIn("Trace one exact run in debug-only mode.", output)
+        self.assertIn("Debug-only:", output)
+        self.assertIn("Example:", output)
+        self.assertIn("factory trace-run --root . --run-id RUN-20260327T063724Z", output)
+
     def test_create_goal_help_includes_description_next_step_and_example(self) -> None:
         output = self._run_help("create-goal")
 
@@ -6901,6 +6909,128 @@ class CleanupRehearsalCliTest(unittest.TestCase):
             self.assertIn("review artifact missing review status", output)
             self.assertIn("qa artifact missing qa_report mapping", output)
             self.assertIn("verification artifact invalid:", output)
+
+    def test_trace_run_reads_exact_run_without_mutation(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-810"
+            run_dir = root / "runs" / "latest" / run_id
+            artifacts = run_dir / "artifacts"
+            artifacts.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        f"  run_id: {run_id}",
+                        "  work_item_id: WI-810",
+                        "  pr_id: PR-810",
+                        "  state: approval_pending",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (artifacts / "approval-request.yaml").write_text("approval_request:\n  id: APR-RUN-810\n", encoding="utf-8")
+            draft_path = root / "runs" / "draft" / f"APPROVAL-DRAFT-{run_id}.yaml"
+            draft_path.parent.mkdir(parents=True, exist_ok=True)
+            draft_path.write_text("draft_approval_packet:\n  run_id: RUN-810\n", encoding="utf-8")
+            before = _snapshot_files(root)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["trace-run", "--root", str(root), "--run-id", run_id])
+
+            after = _snapshot_files(root)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(before, after)
+            self.assertEqual(
+                stdout.getvalue(),
+                "\n".join(
+                    [
+                        "Trace Run (debug-only)",
+                        "",
+                        "Run info:",
+                        "- run_id: RUN-810",
+                        f"- run_path: {(root / 'runs' / 'latest' / 'RUN-810').as_posix()}",
+                        "- pr_id: PR-810",
+                        "- work_item_id: WI-810",
+                        "- state: approval_pending",
+                        "",
+                        "Artifacts:",
+                        "- run.yaml: present",
+                        "- approval-request.yaml: present",
+                        "- draft-approval: present",
+                        "",
+                        "Note:",
+                        "- trace-only",
+                        "- not a decision surface",
+                        "",
+                    ]
+                ),
+            )
+
+    def test_trace_run_marks_optional_artifacts_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "runs" / "latest" / "RUN-811"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-811",
+                        "  work_item_id: WI-811",
+                        "  pr_id: PR-811",
+                        "  state: in_progress",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["trace-run", "--root", str(root), "--run-id", "RUN-811"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- approval-request.yaml: missing", output)
+            self.assertIn("- draft-approval: missing", output)
+            self.assertNotIn("next step", output.lower())
+            self.assertNotIn("recommended", output.lower())
+
+    def test_trace_run_fails_clearly_for_invalid_run_id_shape_without_traceback(self) -> None:
+        stderr = StringIO()
+        with redirect_stderr(stderr), self.assertRaises(SystemExit):
+            main(["trace-run", "--root", ".", "--run-id", "INVALID-RUN"])
+
+        error_output = stderr.getvalue()
+        self.assertNotIn("Traceback", error_output)
+        self.assertIn(
+            "trace-run requires an exact --run-id value in the form RUN-...; latest or inferred selectors are not supported",
+            error_output,
+        )
+
+    def test_trace_run_fails_clearly_when_run_is_missing_without_traceback(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr), self.assertRaises(SystemExit):
+                main(["trace-run", "--root", str(root), "--run-id", "RUN-812"])
+
+            error_output = stderr.getvalue()
+            self.assertNotIn("Traceback", error_output)
+            self.assertIn(
+                f"trace-run could not find run artifact: {(root / 'runs' / 'latest' / 'RUN-812' / 'run.yaml').as_posix()}",
+                error_output,
+            )
 
     def test_trace_lineage_latest_run_successfully(self) -> None:
         from pathlib import Path
