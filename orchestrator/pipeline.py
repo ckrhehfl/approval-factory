@@ -1150,6 +1150,43 @@ def inspect_run(*, root_dir: Path, run_id: str | None) -> dict[str, Any]:
     }
 
 
+def trace_run(*, root_dir: Path, run_id: str) -> dict[str, Any]:
+    normalized_run_id = run_id.strip()
+    if not is_exact_run_id(normalized_run_id):
+        raise ValueError(
+            "trace-run requires an exact --run-id value in the form RUN-...; latest or inferred selectors are not supported"
+        )
+
+    run_root = _run_root(root_dir, normalized_run_id)
+    run_path = run_root / "run.yaml"
+    if not run_path.exists():
+        raise FileNotFoundError(f"trace-run could not find run artifact: {run_path.as_posix()}")
+
+    run_payload, run_note = _safe_read_mapping(run_path, label="run artifact")
+    if run_note:
+        raise ValueError(f"trace-run could not read run artifact for {normalized_run_id}: {run_note}")
+
+    run_record = run_payload.get("run", {})
+    if not isinstance(run_record, dict) or not run_record:
+        raise ValueError(f"trace-run could not read run mapping for {normalized_run_id}")
+
+    approval_path = _artifact_path(root_dir, normalized_run_id, "approval-request.yaml")
+    draft_path = root_dir / "runs" / "draft" / f"APPROVAL-DRAFT-{normalized_run_id}.yaml"
+
+    return {
+        "run_id": normalized_run_id,
+        "run_path": run_root.as_posix(),
+        "pr_id": str(run_record.get("pr_id") or "none"),
+        "work_item_id": str(run_record.get("work_item_id") or "none"),
+        "state": str(run_record.get("state") or "none"),
+        "artifacts": {
+            "run.yaml": "present",
+            "approval-request.yaml": "present" if approval_path.exists() else "missing",
+            "draft-approval": "present" if draft_path.exists() else "missing",
+        },
+    }
+
+
 def _parse_pr_plan_linked_clarifications(sections: dict[str, str], notes: list[str]) -> list[str]:
     linked = sections.get("Linked Clarifications", "").strip()
     if not linked:

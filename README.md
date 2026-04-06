@@ -45,6 +45,7 @@
 - `inspect-orchestration`
 - `inspect-pr-plan`
 - `inspect-run`
+- `trace-run`
 - `trace-lineage`
 - `cleanup-rehearsal`
 - `start-execution`
@@ -220,6 +221,15 @@ approval queue visibility 규칙:
 - 출력은 operator-facing visibility only이며 queue eligibility, approval decision, gate 계산, approval lifecycle transition에 영향을 주지 않는다.
 - 최소 출력 항목: `run_id`, run path/existence/state, safely derivable latest relation 및 active PR relation, run-related operator artifact presence summary(`review`, `qa`, `docs-sync`, `verification`, `gate-check`, `approval-request`, `evidence-bundle`), degraded note.
 - 일부 artifact가 없거나 부분적으로 unreadable이어도 queue mutation, cleanup, auto-hide, auto-resolve 없이 degraded note로만 보여준다.
+
+`trace-run` 최소 계약:
+- `factory trace-run`은 exact `--run-id <RUN-...>` 하나만 받아 해당 run을 debug-only로 읽는다.
+- 입력 소스는 `runs/latest/<run-id>/run.yaml`, `runs/latest/<run-id>/artifacts/approval-request.yaml`, `runs/draft/APPROVAL-DRAFT-<run-id>.yaml`다.
+- run artifact가 없으면 명확히 실패한다.
+- 출력은 `Trace Run (debug-only)` 헤더, `Run info`, `Artifacts`, `Note` 섹션만 제공한다.
+- `Artifacts`는 `run.yaml`, `approval-request.yaml`, `draft-approval`의 present/missing만 보여준다.
+- 이 surface는 trace-only이며 not a decision surface다.
+- approval queue mutation, artifact write, selector expansion, inspect semantics 변경, approval flow 변경을 추가하지 않는다.
 
 `inspect-work-item` 최소 계약:
 - `factory inspect-work-item`은 `docs/work-items/<work-item-id>.md` work item artifact를 읽기 전용으로 inspection 출력한다.
