@@ -806,6 +806,150 @@ def inspect_approval(*, root_dir: Path, run_id: str | None) -> dict[str, Any]:
     }
 
 
+def _flatten_mapping_values(payload: dict[str, Any], *, prefix: str = "") -> dict[str, str]:
+    flattened: dict[str, str] = {}
+    for key in sorted(payload):
+        value = payload[key]
+        path = f"{prefix}.{key}" if prefix else str(key)
+        if isinstance(value, dict):
+            flattened.update(_flatten_mapping_values(value, prefix=path))
+        else:
+            flattened[path] = repr(value)
+    return flattened
+
+
+def inspect_draft_approval(*, root_dir: Path, run_id: str) -> dict[str, Any]:
+    normalized_run_id = run_id.strip()
+    if not is_exact_run_id(normalized_run_id):
+        raise ValueError(
+            "inspect-draft-approval requires an exact --run-id <RUN-...> selector; "
+            "latest-derived or inferred selectors are not supported"
+        )
+
+    draft_path = root_dir / "runs" / "draft" / f"APPROVAL-DRAFT-{normalized_run_id}.yaml"
+    if not draft_path.exists():
+        raise FileNotFoundError(
+            "draft approval artifact was not found "
+            f"at {draft_path.as_posix()} for run-id '{normalized_run_id}'"
+        )
+
+    run_path = _run_root(root_dir, normalized_run_id) / "run.yaml"
+    if not run_path.exists():
+        raise FileNotFoundError(
+            "canonical run artifact was not found "
+            f"at {run_path.as_posix()} for run-id '{normalized_run_id}'"
+        )
+
+    approval_path = _artifact_path(root_dir, normalized_run_id, "approval-request.yaml")
+    if not approval_path.exists():
+        raise FileNotFoundError(
+            "canonical approval request artifact was not found "
+            f"at {approval_path.as_posix()} for run-id '{normalized_run_id}'"
+        )
+
+    draft_payload, draft_note = _safe_read_mapping(draft_path, label="draft approval artifact")
+    if draft_note:
+        raise ValueError(f"cannot inspect draft approval for run {normalized_run_id}: {draft_note}")
+    run_payload, run_note = _safe_read_mapping(run_path, label="canonical run artifact")
+    if run_note:
+        raise ValueError(f"cannot inspect draft approval for run {normalized_run_id}: {run_note}")
+    approval_payload, approval_note = _safe_read_mapping(approval_path, label="canonical approval request artifact")
+    if approval_note:
+        raise ValueError(f"cannot inspect draft approval for run {normalized_run_id}: {approval_note}")
+
+    draft_packet = draft_payload.get("draft_approval_packet", {})
+    if not isinstance(draft_packet, dict) or not draft_packet:
+        raise ValueError(
+            f"cannot inspect draft approval for run {normalized_run_id}: draft artifact is missing the draft_approval_packet mapping"
+        )
+    draft_request = draft_payload.get("approval_request", {})
+    if not isinstance(draft_request, dict) or not draft_request:
+        raise ValueError(
+            f"cannot inspect draft approval for run {normalized_run_id}: draft artifact is missing the approval_request mapping"
+        )
+    run_record = run_payload.get("run", {})
+    if not isinstance(run_record, dict) or not run_record:
+        raise ValueError(
+            f"cannot inspect draft approval for run {normalized_run_id}: canonical run artifact is missing the run mapping"
+        )
+    canonical_request = approval_payload.get("approval_request", {})
+    if not isinstance(canonical_request, dict) or not canonical_request:
+        raise ValueError(
+            f"cannot inspect draft approval for run {normalized_run_id}: canonical approval request artifact is missing the approval_request mapping"
+        )
+
+    required_fields = {
+        "draft_approval_packet.run_id": draft_packet.get("run_id"),
+        "draft_approval_packet.source_run_path": draft_packet.get("source_run_path"),
+        "draft_approval_packet.operator_note": draft_packet.get("operator_note"),
+        "draft_approval_packet.canonical": draft_packet.get("canonical"),
+        "draft.approval_request.id": draft_request.get("id"),
+        "draft.approval_request.work_item_id": draft_request.get("work_item_id"),
+        "draft.approval_request.pr_id": draft_request.get("pr_id"),
+        "draft.approval_request.summary": draft_request.get("summary"),
+        "canonical.run.run_id": run_record.get("run_id"),
+        "canonical.run.state": run_record.get("state"),
+        "canonical.approval_request.id": canonical_request.get("id"),
+        "canonical.approval_request.work_item_id": canonical_request.get("work_item_id"),
+        "canonical.approval_request.pr_id": canonical_request.get("pr_id"),
+        "canonical.approval_request.summary": canonical_request.get("summary"),
+    }
+    missing_fields = [name for name, value in required_fields.items() if value in (None, "", [])]
+    if missing_fields:
+        raise ValueError(
+            f"cannot inspect draft approval for run {normalized_run_id}: required fields are missing: {', '.join(missing_fields)}"
+        )
+
+    run_id_match = (
+        str(draft_packet.get("run_id")) == normalized_run_id
+        and str(run_record.get("run_id")) == normalized_run_id
+    )
+    if not run_id_match:
+        raise ValueError(
+            f"cannot inspect draft approval for run {normalized_run_id}: run_id mismatch between selector, draft, and canonical run artifacts"
+        )
+
+    draft_flat = _flatten_mapping_values(draft_request, prefix="approval_request")
+    canonical_flat = _flatten_mapping_values(canonical_request, prefix="approval_request")
+    diff_entries: list[dict[str, str]] = []
+    for path in sorted(set(draft_flat) | set(canonical_flat)):
+        draft_value = draft_flat.get(path)
+        canonical_value = canonical_flat.get(path)
+        if draft_value == canonical_value:
+            continue
+        diff_entries.append(
+            {
+                "field": path,
+                "draft": draft_value or "<missing>",
+                "canonical": canonical_value or "<missing>",
+            }
+        )
+
+    return {
+        "run_id": normalized_run_id,
+        "draft_path": draft_path.as_posix(),
+        "canonical_run_path": run_path.as_posix(),
+        "canonical_approval_request_path": approval_path.as_posix(),
+        "draft_summary": {
+            "draft_status": str(draft_packet.get("draft_status", "unknown")),
+            "canonical": bool(draft_packet.get("canonical")),
+            "approval_id": str(draft_request.get("id")),
+            "work_item_id": str(draft_request.get("work_item_id")),
+            "pr_id": str(draft_request.get("pr_id")),
+            "operator_note": str(draft_packet.get("operator_note")),
+        },
+        "sanity_check": {
+            "run_id_match": run_id_match,
+            "required_fields_present": True,
+        },
+        "diff_summary": diff_entries,
+        "operator_note": {
+            "assist_only": "assist only",
+            "no_decision": "no decision",
+        },
+    }
+
+
 def _inspect_run_artifact(*, root_dir: Path, run_id: str, artifact_name: str, filename: str) -> dict[str, Any]:
     artifact_path = _artifact_path(root_dir, run_id, filename)
     note_parts: list[str] = []

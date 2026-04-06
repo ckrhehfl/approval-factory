@@ -23,6 +23,7 @@ from orchestrator.pipeline import (
     get_factory_status,
     get_work_item_readiness,
     inspect_approval,
+    inspect_draft_approval,
     inspect_approval_queue,
     inspect_clarification,
     inspect_goal,
@@ -190,6 +191,58 @@ def _render_approval_inspection(inspection: dict[str, object]) -> str:
     lines.append(f"- evidence_bundle_exists: {inspection['evidence_bundle_exists']}")
     lines.append(f"- readiness_summary: {inspection.get('readiness_summary') or 'none'}")
     lines.append(f"- degraded_note: {inspection.get('degraded_note') or 'none'}")
+    return "\n".join(lines)
+
+
+def _render_draft_approval_inspection(inspection: dict[str, object]) -> str:
+    lines = ["Draft Summary"]
+    draft_summary = inspection.get("draft_summary")
+    if isinstance(draft_summary, dict):
+        lines.append(f"- run_id: {inspection.get('run_id') or 'none'}")
+        lines.append(f"- draft_path: {inspection.get('draft_path') or 'none'}")
+        lines.append(f"- canonical_run_path: {inspection.get('canonical_run_path') or 'none'}")
+        lines.append(
+            f"- canonical_approval_request_path: {inspection.get('canonical_approval_request_path') or 'none'}"
+        )
+        lines.append(f"- draft_status: {draft_summary.get('draft_status') or 'none'}")
+        lines.append(f"- canonical: {draft_summary.get('canonical')}")
+        lines.append(f"- approval_id: {draft_summary.get('approval_id') or 'none'}")
+        lines.append(f"- work_item_id: {draft_summary.get('work_item_id') or 'none'}")
+        lines.append(f"- pr_id: {draft_summary.get('pr_id') or 'none'}")
+    else:
+        lines.append("- none")
+
+    lines.append("")
+    lines.append("Sanity Check")
+    sanity_check = inspection.get("sanity_check")
+    if isinstance(sanity_check, dict):
+        lines.append(f"- run_id_match: {sanity_check.get('run_id_match')}")
+        lines.append(f"- required_fields_present: {sanity_check.get('required_fields_present')}")
+    else:
+        lines.append("- none")
+
+    lines.append("")
+    lines.append("Diff Summary")
+    diff_summary = inspection.get("diff_summary")
+    if isinstance(diff_summary, list) and diff_summary:
+        for entry in diff_summary:
+            if not isinstance(entry, dict):
+                continue
+            lines.append(f"- field: {entry.get('field') or 'unknown'}")
+            lines.append(f"  draft: {entry.get('draft') or 'none'}")
+            lines.append(f"  canonical: {entry.get('canonical') or 'none'}")
+    else:
+        lines.append("- none")
+
+    lines.append("")
+    lines.append("Operator Note")
+    operator_note = inspection.get("operator_note")
+    if isinstance(operator_note, dict):
+        lines.append(f"- {operator_note.get('assist_only') or 'assist only'}")
+        lines.append(f"- {operator_note.get('no_decision') or 'no decision'}")
+    else:
+        lines.append("- assist only")
+        lines.append("- no decision")
     return "\n".join(lines)
 
 
@@ -953,6 +1006,26 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_approval_parser.add_argument("--root", default=".", help="Repository root path")
     _add_run_selector_arguments(inspect_approval_parser)
 
+    inspect_draft_approval_parser = subparsers.add_parser(
+        "inspect-draft-approval",
+        help="Inspect one exact draft approval artifact against canonical run artifacts in assist-only mode",
+        description="Inspect one exact draft approval artifact against canonical run artifacts in assist-only mode.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  review the exact differences as operator assist only; this command does not make approval decisions or mutate canonical artifacts",
+            "",
+            "Example:",
+            "  factory inspect-draft-approval --root . --run-id RUN-20260327T063724Z",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    inspect_draft_approval_parser.add_argument("--root", default=".", help="Repository root path")
+    inspect_draft_approval_parser.add_argument(
+        "--run-id",
+        required=True,
+        help="Exact run selector in the form RUN-...; no latest fallback or implicit selection",
+    )
+
     inspect_run_parser = subparsers.add_parser(
         "inspect-run",
         help="Inspect run-scoped execution artifacts in visibility-only mode",
@@ -1562,6 +1635,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif run_id is None:
             parser.error("inspect-approval requires either --run-id <id> or --latest")
         print(_render_approval_inspection(inspect_approval(root_dir=Path(args.root), run_id=run_id)))
+        return 0
+
+    if args.command == "inspect-draft-approval":
+        print(
+            _render_draft_approval_inspection(
+                inspect_draft_approval(root_dir=Path(args.root), run_id=str(args.run_id))
+            )
+        )
         return 0
 
     if args.command == "inspect-run":
