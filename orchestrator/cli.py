@@ -1672,11 +1672,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.command == "inspect-draft-approval":
-        print(
-            _render_draft_approval_inspection(
-                inspect_draft_approval(root_dir=Path(args.root), run_id=str(args.run_id))
-            )
-        )
+        try:
+            inspection = inspect_draft_approval(root_dir=Path(args.root), run_id=str(args.run_id))
+        except (FileNotFoundError, ValueError) as exc:
+            parser.error(str(exc))
+        print(_render_draft_approval_inspection(inspection))
         return 0
 
     if args.command == "review-approval":

@@ -818,33 +818,65 @@ def _flatten_mapping_values(payload: dict[str, Any], *, prefix: str = "") -> dic
     return flattened
 
 
+def _format_assist_only_error(*, problem: str, expected_path: Path, next_step: str) -> str:
+    return "\n".join(
+        [
+            f"[Problem] {problem}",
+            f"[Expected location] {expected_path.as_posix()}",
+            f"[Next step (manual)] {next_step}",
+        ]
+    )
+
+
+def _format_assist_only_constraint(*, problem: str, constraint: str, next_step: str) -> str:
+    return "\n".join(
+        [
+            f"[Problem] {problem}",
+            f"[Constraint] {constraint}",
+            f"[Next step (manual)] {next_step}",
+        ]
+    )
+
+
 def inspect_draft_approval(*, root_dir: Path, run_id: str) -> dict[str, Any]:
     normalized_run_id = run_id.strip()
     if not is_exact_run_id(normalized_run_id):
         raise ValueError(
-            "inspect-draft-approval requires an exact --run-id <RUN-...> selector; "
-            "latest-derived or inferred selectors are not supported"
+            _format_assist_only_constraint(
+                problem="Exact run-id selector is required for inspect-draft-approval.",
+                constraint="Use --run-id <RUN-...>; latest-derived or inferred selectors are not supported.",
+                next_step="Retry with an exact run-id from runs/latest/.",
+            )
         )
 
     draft_path = root_dir / "runs" / "draft" / f"APPROVAL-DRAFT-{normalized_run_id}.yaml"
     if not draft_path.exists():
         raise FileNotFoundError(
-            "draft approval artifact was not found "
-            f"at {draft_path.as_posix()} for run-id '{normalized_run_id}'"
+            _format_assist_only_error(
+                problem=f"Draft approval artifact not found for run-id '{normalized_run_id}'.",
+                expected_path=draft_path,
+                next_step=f"python -m factory draft-approval-packet --root . --run-id {normalized_run_id}",
+            )
         )
 
     run_path = _run_root(root_dir, normalized_run_id) / "run.yaml"
     if not run_path.exists():
         raise FileNotFoundError(
-            "canonical run artifact was not found "
-            f"at {run_path.as_posix()} for run-id '{normalized_run_id}'"
+            _format_assist_only_error(
+                problem=f"Canonical run artifact not found for run-id '{normalized_run_id}'.",
+                expected_path=run_path,
+                next_step="python -m factory status --root .",
+            )
         )
 
     approval_path = _artifact_path(root_dir, normalized_run_id, "approval-request.yaml")
     if not approval_path.exists():
         raise FileNotFoundError(
-            "canonical approval request artifact was not found "
-            f"at {approval_path.as_posix()} for run-id '{normalized_run_id}'"
+            _format_assist_only_error(
+                problem=f"Canonical approval request artifact not found for run-id '{normalized_run_id}'.",
+                expected_path=approval_path,
+                next_step=f"python -m factory build-approval --root . --run-id {normalized_run_id}",
+            )
         )
 
     draft_payload, draft_note = _safe_read_mapping(draft_path, label="draft approval artifact")
@@ -2228,15 +2260,21 @@ def draft_approval_packet(*, root_dir: Path, run_id: str) -> Path:
     run_path = _run_root(root_dir, normalized_run_id) / "run.yaml"
     if not run_path.exists():
         raise FileNotFoundError(
-            "cannot draft approval packet because the run artifact was not found "
-            f"at {run_path.as_posix()} for run-id '{normalized_run_id}'"
+            _format_assist_only_error(
+                problem=f"Run artifact not found for run-id '{normalized_run_id}'.",
+                expected_path=run_path,
+                next_step="python -m factory status --root .",
+            )
         )
 
     draft_path = root_dir / "runs" / "draft" / f"APPROVAL-DRAFT-{normalized_run_id}.yaml"
     if draft_path.exists():
         raise FileExistsError(
-            "approval packet draft artifact already exists "
-            f"for run-id '{normalized_run_id}': {draft_path.as_posix()}"
+            _format_assist_only_error(
+                problem=f"Approval packet draft already exists for run-id '{normalized_run_id}'.",
+                expected_path=draft_path,
+                next_step=f"python -m factory review-approval --root . --run-id {normalized_run_id}",
+            )
         )
 
     run_payload = _load_run(root_dir, normalized_run_id)
