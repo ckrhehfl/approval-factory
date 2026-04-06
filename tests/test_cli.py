@@ -8124,6 +8124,32 @@ class BuildApprovalCliReadinessTest(unittest.TestCase):
             0,
         )
 
+    def test_draft_approval_packet_stdout_includes_manual_build_hint_only(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-DRAFT-CLI"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_ready_artifacts(root, run_id)
+            self.assertEqual(main(["build-approval", "--root", str(root), "--run-id", run_id]), 0)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["draft-approval-packet", "--root", str(root), "--run-id", run_id])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Approval Packet Draft Created:", output)
+            self.assertIn("- operator_assist_only: review the exact draft before taking any canonical approval action", output)
+            self.assertIn(
+                "- next_step_manual_hint: this is a suggestion only; no approval command was executed automatically",
+                output,
+            )
+            self.assertIn("- Next step (manual):", output)
+            self.assertIn(f"  python -m factory build-approval --root . --run-id {run_id}", output)
+
     def test_build_approval_output_includes_readiness_summary_and_count(self) -> None:
         from pathlib import Path
 

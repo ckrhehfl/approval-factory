@@ -553,9 +553,10 @@ def _render_draft_approval_packet_summary(path: Path, run_id: str) -> str:
     lines.append(f"- path: {path.as_posix()}")
     lines.append("- draft_status: draft-only")
     lines.append("- canonical: false")
-    lines.append(
-        f"- next: review the exact draft, then run factory build-approval --root . --run-id {run_id} if canonical approval artifacts are still needed"
-    )
+    lines.append("- operator_assist_only: review the exact draft before taking any canonical approval action")
+    lines.append("- next_step_manual_hint: this is a suggestion only; no approval command was executed automatically")
+    lines.append("- Next step (manual):")
+    lines.append(f"  python -m factory build-approval --root . --run-id {run_id}")
     return "\n".join(lines)
 
 
