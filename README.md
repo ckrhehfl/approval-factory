@@ -65,6 +65,7 @@
 - `record-verification`
 - `gate-check`
 - `build-approval`
+- `draft-approval-packet`
 - `resolve-approval`
 
 도움말:
@@ -116,6 +117,10 @@ factory <command> --help
   - `evidence-bundle.yaml`과 `approval-request.yaml`을 최신 상태로 만든다.
   - 가능하면 source work item readiness context도 approval artifact에 함께 기록한다.
   - 조건 충족 시 `approval_queue/pending/APR-<run-id>.yaml`를 생성/갱신한다.
+- `draft-approval-packet`:
+  - exact selector `--run-id <RUN-...>`만 받는다.
+  - `runs/draft/APPROVAL-DRAFT-<run-id>.yaml`에 non-canonical draft-only artifact만 생성한다.
+  - `approval_queue/`와 `runs/latest/<run-id>/artifacts/approval-request.yaml`를 변경하지 않는다.
 
 approval artifact readiness visibility:
 - `build-approval`는 source PR/work item readiness context를 읽을 수 있으면 `evidence-bundle.yaml`과 `approval-request.yaml`에 함께 남긴다.

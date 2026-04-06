@@ -18,6 +18,7 @@ from orchestrator.pipeline import (
     create_goal,
     create_pr_plan,
     create_work_item,
+    draft_approval_packet,
     evaluate_gates,
     get_factory_status,
     get_work_item_readiness,
@@ -542,6 +543,18 @@ def _render_draft_pr_plan_summary(path: Path, work_item_id: str) -> str:
     lines.append(f"- path: {path.as_posix()}")
     lines.append(
         f"- next: review the draft, then promote it with factory promote-pr-plan-draft --root . --work-item-id {work_item_id}"
+    )
+    return "\n".join(lines)
+
+
+def _render_draft_approval_packet_summary(path: Path, run_id: str) -> str:
+    lines = ["Approval Packet Draft Created:"]
+    lines.append(f"- run_id: {run_id}")
+    lines.append(f"- path: {path.as_posix()}")
+    lines.append("- draft_status: draft-only")
+    lines.append("- canonical: false")
+    lines.append(
+        f"- next: review the exact draft, then run factory build-approval --root . --run-id {run_id} if canonical approval artifacts are still needed"
     )
     return "\n".join(lines)
 
@@ -1186,6 +1199,22 @@ def build_parser() -> argparse.ArgumentParser:
     build_approval_parser.add_argument("--root", default=".", help="Repository root path")
     _add_run_selector_arguments(build_approval_parser)
 
+    draft_approval_packet_parser = subparsers.add_parser(
+        "draft-approval-packet",
+        help="Create a non-canonical approval packet draft for one exact run without queue mutation",
+        description="Create a non-canonical approval packet draft for one exact run without queue mutation.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  review the exact draft file, then run factory build-approval --root . --run-id <run-id> only if canonical approval artifacts are still needed",
+            "",
+            "Example:",
+            "  factory draft-approval-packet --root . --run-id RUN-20260327T063724Z",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    draft_approval_packet_parser.add_argument("--root", default=".", help="Repository root path")
+    draft_approval_packet_parser.add_argument("--run-id", required=True, help="Exact run selector in the form RUN-...")
+
     create_goal_parser = subparsers.add_parser(
         "create-goal",
         help="Create a goal intake artifact",
@@ -1684,6 +1713,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         approval_payload = read_yaml(approval_path).get("approval_request", {})
         readiness_context = approval_payload.get("readiness_context", {})
         print(_render_build_approval_summary(run_id, approval_path, queue_path, readiness_context))
+        return 0
+
+    if args.command == "draft-approval-packet":
+        try:
+            path = draft_approval_packet(root_dir=Path(args.root), run_id=args.run_id)
+        except (FileNotFoundError, FileExistsError, ValueError) as exc:
+            parser.error(str(exc))
+        print(_render_draft_approval_packet_summary(path, args.run_id))
         return 0
 
     if args.command == "create-goal":

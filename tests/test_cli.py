@@ -179,6 +179,18 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         )
         self.assertIn("factory draft-pr-plan --root . --work-item-id WI-038", output)
 
+    def test_draft_approval_packet_help_includes_exact_run_usage(self) -> None:
+        output = self._run_help("draft-approval-packet")
+
+        self.assertIn("Create a non-canonical approval packet draft for one exact run without queue mutation.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn(
+            "review the exact draft file, then run factory build-approval --root . --run-id <run-id> only if canonical approval artifacts are still needed",
+            output,
+        )
+        self.assertIn("factory draft-approval-packet --root . --run-id RUN-20260327T063724Z", output)
+        self.assertNotIn("--latest", output)
+
     def test_promote_pr_plan_draft_help_includes_next_step_and_example(self) -> None:
         output = self._run_help("promote-pr-plan-draft")
 
