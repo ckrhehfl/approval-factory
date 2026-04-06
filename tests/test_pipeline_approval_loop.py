@@ -200,7 +200,7 @@ class PipelineApprovalLoopTest(unittest.TestCase):
 
             self.assertEqual(evidence["evidence_bundle"]["checks"]["type_check"]["status"], "pass")
             self.assertEqual(gate["gate_status"]["gates"]["merge_approval"], "ready")
-            self.assertEqual(approval["approval_request"]["recommended_decision"], "approve")
+            self.assertNotIn("recommended_decision", approval["approval_request"])
             self.assertTrue((root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").exists())
 
     def test_lint_fail(self) -> None:
@@ -357,7 +357,7 @@ class PipelineApprovalLoopTest(unittest.TestCase):
 
             pending = root / "approval_queue" / "pending"
             (pending / f"APR-{run_id}.yaml").write_text(
-                "approval_request:\n  id: APR-RUN-COLLISION\n  recommended_decision: reject\n",
+                "approval_request:\n  id: APR-RUN-COLLISION\n",
                 encoding="utf-8",
             )
 
@@ -695,7 +695,7 @@ class PipelineApprovalLoopTest(unittest.TestCase):
             self.assertEqual(payload["draft_approval_packet"]["draft_status"], "draft-only")
             self.assertFalse(payload["draft_approval_packet"]["canonical"])
             self.assertEqual(payload["approval_request"]["id"], f"APR-{run_id}")
-            self.assertEqual(payload["approval_request"]["recommended_decision"], "operator_review_required")
+            self.assertNotIn("recommended_decision", payload["approval_request"])
             self.assertEqual(
                 {
                     path.relative_to(root).as_posix(): path.read_text(encoding="utf-8")

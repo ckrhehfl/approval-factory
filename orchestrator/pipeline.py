@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from datetime import datetime, timezone
 from enum import StrEnum
 from pathlib import Path
@@ -941,8 +942,12 @@ def inspect_draft_approval(*, root_dir: Path, run_id: str) -> dict[str, Any]:
             f"cannot inspect draft approval for run {normalized_run_id}: run_id mismatch between selector, draft, and canonical run artifacts"
         )
 
-    draft_flat = _flatten_mapping_values(draft_request, prefix="approval_request")
-    canonical_flat = _flatten_mapping_values(canonical_request, prefix="approval_request")
+    draft_request_for_diff = copy.deepcopy(draft_request)
+    canonical_request_for_diff = copy.deepcopy(canonical_request)
+    draft_request_for_diff.pop("recommended_decision", None)
+    canonical_request_for_diff.pop("recommended_decision", None)
+    draft_flat = _flatten_mapping_values(draft_request_for_diff, prefix="approval_request")
+    canonical_flat = _flatten_mapping_values(canonical_request_for_diff, prefix="approval_request")
     diff_entries: list[dict[str, str]] = []
     for path in sorted(set(draft_flat) | set(canonical_flat)):
         draft_value = draft_flat.get(path)
@@ -977,7 +982,6 @@ def inspect_draft_approval(*, root_dir: Path, run_id: str) -> dict[str, Any]:
         "diff_summary": diff_entries,
         "operator_note": {
             "assist_only": "assist only",
-            "no_decision": "no decision",
         },
     }
 
@@ -2381,7 +2385,7 @@ def draft_approval_packet(*, root_dir: Path, run_id: str) -> Path:
             },
             "operator_note": (
                 "Non-canonical operator prep artifact only. "
-                "It does not change approval_queue, canonical approval artifacts, selectors, or approval decisions."
+                "It does not change approval_queue, canonical approval artifacts, selectors, or approval flow."
             ),
         },
         "approval_request": {
@@ -2396,7 +2400,7 @@ def draft_approval_packet(*, root_dir: Path, run_id: str) -> Path:
                 "approve_with_exception",
             ],
             "summary": {
-                "problem": f"PR {run.get('pr_id')} approval decision",
+                "problem": f"PR {run.get('pr_id')} approval request",
                 "proposed_change": "draft-only approval packet preparation for operator review",
                 "user_impact": f"merge gate status={merge_gate}",
             },
@@ -2415,7 +2419,6 @@ def draft_approval_packet(*, root_dir: Path, run_id: str) -> Path:
             "changed_files": [],
             "adr_refs": [],
             "evidence_bundle": evidence_path.as_posix(),
-            "recommended_decision": "operator_review_required",
             "readiness_context": readiness_context,
         },
     }
@@ -3615,7 +3618,6 @@ def bootstrap_run(
                 "changed_files": [],
                 "adr_refs": [],
                 "evidence_bundle": "",
-                "recommended_decision": "",
                 "readiness_context": {
                     "status": "unavailable",
                     "reason": "source work item readiness has not been evaluated yet",
@@ -3938,15 +3940,6 @@ def build_approval_request(*, root_dir: Path, run_id: str) -> tuple[Path, Path |
     if merge_gate == "exception_required":
         exceptions.append("failed quality prerequisite requires exception approval")
 
-    if review.get("status") == "fail" or qa.get("status") == "fail":
-        recommended_decision = "request_changes"
-    elif merge_gate == "exception_required":
-        recommended_decision = "approve_with_exception"
-    elif merge_gate == "ready":
-        recommended_decision = "approve"
-    else:
-        recommended_decision = "reject"
-
     if not evidence:
         raise ValueError("cannot build approval request without evidence bundle")
 
@@ -3964,7 +3957,7 @@ def build_approval_request(*, root_dir: Path, run_id: str) -> tuple[Path, Path |
                 "approve_with_exception",
             ],
             "summary": {
-                "problem": f"PR {run['pr_id']} approval decision",
+                "problem": f"PR {run['pr_id']} approval request",
                 "proposed_change": "minimal approval loop artifacts and gate evaluation",
                 "user_impact": f"merge gate status={merge_gate}",
             },
@@ -3983,7 +3976,6 @@ def build_approval_request(*, root_dir: Path, run_id: str) -> tuple[Path, Path |
             "changed_files": [],
             "adr_refs": [],
             "evidence_bundle": evidence_path.as_posix(),
-            "recommended_decision": recommended_decision,
             "readiness_context": readiness_context,
         }
     }
@@ -4003,7 +3995,6 @@ def build_approval_request(*, root_dir: Path, run_id: str) -> tuple[Path, Path |
         run_id,
         "build_approval",
         {
-            "recommended_decision": recommended_decision,
             "merge_approval": merge_gate,
             "queued": queue_path.as_posix() if queue_path is not None else "",
         },

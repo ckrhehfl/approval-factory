@@ -8288,9 +8288,9 @@ class BuildApprovalCliReadinessTest(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             output = stdout.getvalue()
             self.assertIn("Approval Packet Draft Created:", output)
-            self.assertIn("- operator_assist_only: review the exact draft before taking any canonical approval action", output)
+            self.assertIn("- operator_assist_only: review the exact draft before updating canonical artifacts", output)
             self.assertIn(
-                "- next_step_manual_hint: this is a suggestion only; no approval command was executed automatically",
+                "- next_step_manual_hint: manual follow-up only; no command was executed automatically",
                 output,
             )
             self.assertIn("- Next step (manual):", output)
@@ -8374,8 +8374,12 @@ class BuildApprovalCliReadinessTest(unittest.TestCase):
             self.assertIn("Operator Note", output)
             self.assertIn("Next step (manual):", output)
             self.assertIn(f"python -m factory build-approval --root . --run-id {run_id}", output)
-            self.assertIn("this is a suggestion only", output)
+            self.assertIn("manual follow-up only", output)
             self.assertIn("no approval command was executed", output)
+            self.assertNotIn("recommended_decision", output)
+            self.assertNotIn("decision_required", output)
+            self.assertNotIn("decision", output.lower())
+            self.assertNotIn("no decision", output.lower())
             self.assertEqual(
                 (root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").read_text(encoding="utf-8"),
                 queue_before,
@@ -8410,6 +8414,29 @@ class BuildApprovalCliReadinessTest(unittest.TestCase):
                 f"[Next step (manual)] python -m factory draft-approval-packet --root . --run-id {run_id}",
                 error_output,
             )
+
+    def test_inspect_draft_approval_output_omits_decision_like_fields(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-INSPECT-CLI"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_ready_artifacts(root, run_id)
+            self.assertEqual(main(["build-approval", "--root", str(root), "--run-id", run_id]), 0)
+            self.assertEqual(main(["draft-approval-packet", "--root", str(root), "--run-id", run_id]), 0)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-draft-approval", "--root", str(root), "--run-id", run_id])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue().lower()
+            self.assertNotIn("recommended_decision", output)
+            self.assertNotIn("decision_required", output)
+            self.assertNotIn("decision", output)
+            self.assertNotIn("no decision", output)
 
     def test_review_approval_fails_clearly_when_canonical_artifact_is_missing(self) -> None:
         from pathlib import Path

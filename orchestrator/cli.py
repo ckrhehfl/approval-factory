@@ -240,10 +240,8 @@ def _render_draft_approval_inspection(inspection: dict[str, object]) -> str:
     operator_note = inspection.get("operator_note")
     if isinstance(operator_note, dict):
         lines.append(f"- {operator_note.get('assist_only') or 'assist only'}")
-        lines.append(f"- {operator_note.get('no_decision') or 'no decision'}")
     else:
         lines.append("- assist only")
-        lines.append("- no decision")
     return "\n".join(lines)
 
 
@@ -254,7 +252,7 @@ def _render_review_approval_summary(inspection: dict[str, object], run_id: str) 
             "",
             "Next step (manual):",
             f"python -m factory build-approval --root . --run-id {run_id}",
-            "this is a suggestion only",
+            "manual follow-up only",
             "no approval command was executed",
         ]
     )
@@ -647,8 +645,8 @@ def _render_draft_approval_packet_summary(path: Path, run_id: str) -> str:
     lines.append(f"- path: {path.as_posix()}")
     lines.append("- draft_status: draft-only")
     lines.append("- canonical: false")
-    lines.append("- operator_assist_only: review the exact draft before taking any canonical approval action")
-    lines.append("- next_step_manual_hint: this is a suggestion only; no approval command was executed automatically")
+    lines.append("- operator_assist_only: review the exact draft before updating canonical artifacts")
+    lines.append("- next_step_manual_hint: manual follow-up only; no command was executed automatically")
     lines.append("- Next step (manual):")
     lines.append(f"  python -m factory build-approval --root . --run-id {run_id}")
     return "\n".join(lines)

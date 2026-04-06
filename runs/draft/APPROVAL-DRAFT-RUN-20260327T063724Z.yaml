@@ -11,7 +11,7 @@ draft_approval_packet:
     docs_sync_report: runs/latest/RUN-20260327T063724Z/artifacts/docs-sync-report.yaml
     verification_report: runs/latest/RUN-20260327T063724Z/artifacts/verification-report.yaml
   operator_note: Non-canonical operator prep artifact only. It does not change approval_queue,
-    canonical approval artifacts, selectors, or approval decisions.
+    canonical approval artifacts, selectors, or approval flow.
 approval_request:
   id: APR-RUN-20260327T063724Z
   work_item_id: WI-004
@@ -23,7 +23,7 @@ approval_request:
   - request_changes
   - approve_with_exception
   summary:
-    problem: PR PR-004 approval decision
+    problem: PR PR-004 approval request
     proposed_change: draft-only approval packet preparation for operator review
     user_impact: merge gate status=ready
   checks:
@@ -40,7 +40,6 @@ approval_request:
   changed_files: []
   adr_refs: []
   evidence_bundle: runs/latest/RUN-20260327T063724Z/artifacts/evidence-bundle.yaml
-  recommended_decision: operator_review_required
   readiness_context:
     status: unavailable
     reason: 'cannot read work item readiness because the work item artifact was not
