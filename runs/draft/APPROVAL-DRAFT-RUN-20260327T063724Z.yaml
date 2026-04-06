@@ -1,0 +1,51 @@
+draft_approval_packet:
+  draft_status: draft-only
+  canonical: false
+  run_id: RUN-20260327T063724Z
+  source_run_path: runs/latest/RUN-20260327T063724Z/run.yaml
+  source_artifacts:
+    evidence_bundle: runs/latest/RUN-20260327T063724Z/artifacts/evidence-bundle.yaml
+    gate_status: runs/latest/RUN-20260327T063724Z/artifacts/gate-status.yaml
+    review_report: runs/latest/RUN-20260327T063724Z/artifacts/review-report.yaml
+    qa_report: runs/latest/RUN-20260327T063724Z/artifacts/qa-report.yaml
+    docs_sync_report: runs/latest/RUN-20260327T063724Z/artifacts/docs-sync-report.yaml
+    verification_report: runs/latest/RUN-20260327T063724Z/artifacts/verification-report.yaml
+  operator_note: Non-canonical operator prep artifact only. It does not change approval_queue,
+    canonical approval artifacts, selectors, or approval decisions.
+approval_request:
+  id: APR-RUN-20260327T063724Z
+  work_item_id: WI-004
+  pr_id: PR-004
+  gate_type: merge_approval
+  decision_required:
+  - approve
+  - reject
+  - request_changes
+  - approve_with_exception
+  summary:
+    problem: PR PR-004 approval decision
+    proposed_change: draft-only approval packet preparation for operator review
+    user_impact: merge gate status=ready
+  checks:
+    lint: pass
+    tests: pass
+    type_check: pass
+    build: pass
+    review: pass
+    qa: pass
+    docs_sync: complete
+  risks: []
+  exceptions: []
+  changed_docs: []
+  changed_files: []
+  adr_refs: []
+  evidence_bundle: runs/latest/RUN-20260327T063724Z/artifacts/evidence-bundle.yaml
+  recommended_decision: operator_review_required
+  readiness_context:
+    status: unavailable
+    reason: 'cannot read work item readiness because the work item artifact was not
+      found at docs/work-items/WI-004.md. Next action: check the work-item-id or create
+      the artifact first.'
+    readiness_source:
+      work_item_id: WI-004
+      pr_id: PR-004

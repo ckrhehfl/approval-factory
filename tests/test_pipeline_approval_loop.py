@@ -666,6 +666,89 @@ class PipelineApprovalLoopTest(unittest.TestCase):
             self.assertEqual(gate["gate_status"]["gates"]["merge_approval"], "ready")
             self.assertTrue((root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").exists())
 
+    def test_draft_approval_packet_creates_non_canonical_draft_without_mutating_queue_or_run_artifacts(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-DRAFT-PACKET"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+            self._build_approval(root, run_id)
+
+            queue_before = {
+                path.relative_to(root).as_posix(): path.read_text(encoding="utf-8")
+                for path in sorted((root / "approval_queue").rglob("*"))
+                if path.is_file()
+            }
+            canonical_before = {
+                path.relative_to(root).as_posix(): path.read_text(encoding="utf-8")
+                for path in sorted((root / "runs" / "latest" / run_id).rglob("*"))
+                if path.is_file()
+            }
+
+            self.assertEqual(main(["draft-approval-packet", "--root", str(root), "--run-id", run_id]), 0)
+
+            draft_path = root / "runs" / "draft" / f"APPROVAL-DRAFT-{run_id}.yaml"
+            self.assertTrue(draft_path.exists())
+            payload = read_yaml(draft_path)
+            self.assertEqual(payload["draft_approval_packet"]["draft_status"], "draft-only")
+            self.assertFalse(payload["draft_approval_packet"]["canonical"])
+            self.assertEqual(payload["approval_request"]["id"], f"APR-{run_id}")
+            self.assertEqual(payload["approval_request"]["recommended_decision"], "operator_review_required")
+            self.assertEqual(
+                {
+                    path.relative_to(root).as_posix(): path.read_text(encoding="utf-8")
+                    for path in sorted((root / "approval_queue").rglob("*"))
+                    if path.is_file()
+                },
+                queue_before,
+            )
+            self.assertEqual(
+                {
+                    path.relative_to(root).as_posix(): path.read_text(encoding="utf-8")
+                    for path in sorted((root / "runs" / "latest" / run_id).rglob("*"))
+                    if path.is_file()
+                },
+                canonical_before,
+            )
+            self.assertTrue((root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").exists())
+
+    def test_draft_approval_packet_fails_when_run_is_missing(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._prepare_root(root)
+
+            with self.assertRaises(SystemExit):
+                main(["draft-approval-packet", "--root", str(root), "--run-id", "RUN-404"])
+
+    def test_draft_approval_packet_fails_when_artifacts_are_incomplete(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-DRAFT-INCOMPLETE"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+
+            with self.assertRaises(SystemExit):
+                main(["draft-approval-packet", "--root", str(root), "--run-id", run_id])
+
+    def test_draft_approval_packet_fails_if_target_draft_exists(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-DRAFT-EXISTS"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+            self.assertEqual(main(["gate-check", "--root", str(root), "--run-id", run_id]), 0)
+
+            draft_path = root / "runs" / "draft" / f"APPROVAL-DRAFT-{run_id}.yaml"
+            draft_path.parent.mkdir(parents=True, exist_ok=True)
+            draft_path.write_text("draft_approval_packet:\n  draft_status: draft-only\n", encoding="utf-8")
+
+            with self.assertRaises(SystemExit):
+                main(["draft-approval-packet", "--root", str(root), "--run-id", run_id])
+
 
 if __name__ == "__main__":
     unittest.main()

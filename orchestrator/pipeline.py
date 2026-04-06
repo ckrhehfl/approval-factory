@@ -2073,6 +2073,138 @@ def _require_build_approval_prerequisites(root_dir: Path, run_id: str) -> dict[s
     }
 
 
+def draft_approval_packet(*, root_dir: Path, run_id: str) -> Path:
+    normalized_run_id = run_id.strip()
+    if not is_exact_run_id(normalized_run_id):
+        raise ValueError(
+            "draft-approval-packet requires an exact --run-id <RUN-...> selector; "
+            "latest-derived or inferred selectors are not supported"
+        )
+
+    run_path = _run_root(root_dir, normalized_run_id) / "run.yaml"
+    if not run_path.exists():
+        raise FileNotFoundError(
+            "cannot draft approval packet because the run artifact was not found "
+            f"at {run_path.as_posix()} for run-id '{normalized_run_id}'"
+        )
+
+    draft_path = root_dir / "runs" / "draft" / f"APPROVAL-DRAFT-{normalized_run_id}.yaml"
+    if draft_path.exists():
+        raise FileExistsError(
+            "approval packet draft artifact already exists "
+            f"for run-id '{normalized_run_id}': {draft_path.as_posix()}"
+        )
+
+    run_payload = _load_run(root_dir, normalized_run_id)
+    run = run_payload.get("run", {})
+    if not isinstance(run, dict) or not run:
+        raise ValueError(f"cannot draft approval packet for run {normalized_run_id}: run.yaml is missing the run mapping")
+
+    prerequisites = _require_build_approval_prerequisites(root_dir, normalized_run_id)
+    evidence_path = _artifact_path(root_dir, normalized_run_id, "evidence-bundle.yaml")
+    gate_path = _artifact_path(root_dir, normalized_run_id, "gate-status.yaml")
+
+    if not evidence_path.exists():
+        raise ValueError(
+            f"cannot draft approval packet for run {normalized_run_id}: missing evidence-bundle.yaml at {evidence_path.as_posix()}"
+        )
+    if not gate_path.exists():
+        raise ValueError(
+            f"cannot draft approval packet for run {normalized_run_id}: missing gate-status.yaml at {gate_path.as_posix()}"
+        )
+
+    evidence_bundle = read_yaml(evidence_path).get("evidence_bundle", {})
+    gate_status = read_yaml(gate_path).get("gate_status", {})
+    if not isinstance(evidence_bundle, dict) or not evidence_bundle:
+        raise ValueError(
+            f"cannot draft approval packet for run {normalized_run_id}: evidence-bundle.yaml is missing the evidence_bundle mapping"
+        )
+    if evidence_bundle.get("status") != "complete":
+        raise ValueError(
+            f"cannot draft approval packet for run {normalized_run_id}: evidence bundle is incomplete "
+            f"(status={evidence_bundle.get('status')!r})"
+        )
+    if not isinstance(gate_status, dict) or not gate_status:
+        raise ValueError(
+            f"cannot draft approval packet for run {normalized_run_id}: gate-status.yaml is missing the gate_status mapping"
+        )
+
+    gates = gate_status.get("gates", {})
+    if not isinstance(gates, dict) or "merge_approval" not in gates:
+        raise ValueError(
+            f"cannot draft approval packet for run {normalized_run_id}: gate-status.yaml is missing gates.merge_approval"
+        )
+
+    verification = prerequisites["verification"]
+    review = prerequisites["review"]
+    qa = prerequisites["qa"]
+    docs_sync = prerequisites["docs_sync"]
+    merge_gate = str(gates["merge_approval"])
+    readiness_context = _build_readiness_context(
+        root_dir=root_dir,
+        work_item_id=str(run.get("work_item_id", "")),
+        pr_id=str(run.get("pr_id", "")),
+    )
+
+    draft_payload = {
+        "draft_approval_packet": {
+            "draft_status": "draft-only",
+            "canonical": False,
+            "run_id": normalized_run_id,
+            "source_run_path": run_path.as_posix(),
+            "source_artifacts": {
+                "evidence_bundle": evidence_path.as_posix(),
+                "gate_status": gate_path.as_posix(),
+                "review_report": _artifact_path(root_dir, normalized_run_id, "review-report.yaml").as_posix(),
+                "qa_report": _artifact_path(root_dir, normalized_run_id, "qa-report.yaml").as_posix(),
+                "docs_sync_report": _artifact_path(root_dir, normalized_run_id, "docs-sync-report.yaml").as_posix(),
+                "verification_report": _artifact_path(root_dir, normalized_run_id, "verification-report.yaml").as_posix(),
+            },
+            "operator_note": (
+                "Non-canonical operator prep artifact only. "
+                "It does not change approval_queue, canonical approval artifacts, selectors, or approval decisions."
+            ),
+        },
+        "approval_request": {
+            "id": f"APR-{normalized_run_id}",
+            "work_item_id": run.get("work_item_id"),
+            "pr_id": run.get("pr_id"),
+            "gate_type": "exception_approval" if merge_gate == "exception_required" else "merge_approval",
+            "decision_required": [
+                "approve",
+                "reject",
+                "request_changes",
+                "approve_with_exception",
+            ],
+            "summary": {
+                "problem": f"PR {run.get('pr_id')} approval decision",
+                "proposed_change": "draft-only approval packet preparation for operator review",
+                "user_impact": f"merge gate status={merge_gate}",
+            },
+            "checks": {
+                "lint": _verification_status(verification.get("lint")),
+                "tests": _verification_status(verification.get("tests")),
+                "type_check": _verification_status(verification.get("type_check")),
+                "build": _verification_status(verification.get("build")),
+                "review": review.get("status", "pending"),
+                "qa": qa.get("status", "pending"),
+                "docs_sync": str(docs_sync.get("status", "pending")),
+            },
+            "risks": evidence_bundle.get("residual_risks", []),
+            "exceptions": [],
+            "changed_docs": docs_sync.get("changed_docs", []),
+            "changed_files": [],
+            "adr_refs": [],
+            "evidence_bundle": evidence_path.as_posix(),
+            "recommended_decision": "operator_review_required",
+            "readiness_context": readiness_context,
+        },
+    }
+
+    write_yaml(draft_path, draft_payload)
+    return draft_path
+
+
 def _read_markdown_section(path: Path, heading: str) -> str:
     content = path.read_text(encoding="utf-8")
     pattern = rf"^## {re.escape(heading)}\n(.*?)(?=^## |\Z)"
