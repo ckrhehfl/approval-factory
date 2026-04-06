@@ -121,6 +121,8 @@ factory <command> --help
   - exact selector `--run-id <RUN-...>`만 받는다.
   - `runs/draft/APPROVAL-DRAFT-<run-id>.yaml`에 non-canonical draft-only artifact만 생성한다.
   - `approval_queue/`와 `runs/latest/<run-id>/artifacts/approval-request.yaml`를 변경하지 않는다.
+  - 성공 출력에는 operator assist only 성격의 manual next-step hint만 포함되며 `python -m factory build-approval --root . --run-id <RUN-...>`를 제안만 한다.
+  - draft 생성만으로 approval를 자동화하지 않으며 canonical approval 실행 여부는 여전히 operator가 결정한다.
 
 approval artifact readiness visibility:
 - `build-approval`는 source PR/work item readiness context를 읽을 수 있으면 `evidence-bundle.yaml`과 `approval-request.yaml`에 함께 남긴다.
