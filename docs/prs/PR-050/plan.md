@@ -3,8 +3,8 @@
 ## input refs
 - AGENTS.md v2026-04-03
 - `git log --oneline --decorate --graph --max-count=20` output observed on 2026-04-03
-- [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md)
-- [docs/prs/PR-039/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-039/plan.md)
+- [docs/prs/README.md](/docs/prs/README.md)
+- [docs/prs/PR-039/plan.md](/docs/prs/PR-039/plan.md)
 - `rg --files docs/prs docs/work-items` output observed on 2026-04-03
 - `find docs/prs -maxdepth 2 -type f | sort` output observed on 2026-04-03
 
@@ -25,10 +25,10 @@
 - The log includes merge commits down through `7a61956`, titled `Merge pull request #36 from ckrhehfl/pr/040-pr-plan-draft-next-step-ux`.
 - `rg --files docs/prs docs/work-items` and `find docs/prs -maxdepth 2 -type f | sort` show `docs/prs` currently stops at `docs/prs/PR-039/plan.md`.
 - The same file listings show `docs/work-items` currently stops at `docs/work-items/WI-039-promote-pr-plan-draft.md`.
-- [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md) states that each PR has seven documents: `scope.md`, `plan.md`, `review.md`, `qa.md`, `docs-sync.md`, `evidence.md`, and `decision.md`.
+- [docs/prs/README.md](/docs/prs/README.md) states that each PR has seven documents: `scope.md`, `plan.md`, `review.md`, `qa.md`, `docs-sync.md`, `evidence.md`, and `decision.md`.
 - The actual `docs/prs` tree has mixed historical formats.
-- Early entries such as [docs/prs/PR-001/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-001/plan.md) sit alongside full 7-document PR directories such as `PR-001`, `PR-002`, `PR-003`, `PR-004`, `PR-005`, and `PR-006`.
-- Many later entries, including [docs/prs/PR-039/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-039/plan.md), exist as `plan.md`-only directories.
+- Early entries such as [docs/prs/PR-001/plan.md](/docs/prs/PR-001/plan.md) sit alongside full 7-document PR directories such as `PR-001`, `PR-002`, `PR-003`, `PR-004`, `PR-005`, and `PR-006`.
+- Many later entries, including [docs/prs/PR-039/plan.md](/docs/prs/PR-039/plan.md), exist as `plan.md`-only directories.
 - No `docs/prs/PR-040` through `docs/prs/PR-049` files appear in the current repo tree listing.
 
 ## interpretations

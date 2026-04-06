@@ -7,11 +7,11 @@
 - `inspect-approval-queue --root .`
 - `git --no-pager log --oneline -n 10`
 - `pytest -q tests/test_cli.py -k 'approval_queue or inspect'`
-- [docs/prs/PR-070/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-070/plan.md)
-- [docs/prs/PR-070/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-070/proposal.md)
-- [docs/prs/PR-071/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-071/plan.md)
-- [docs/prs/PR-072/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-072/plan.md)
-- [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md)
+- [docs/prs/PR-070/plan.md](/docs/prs/PR-070/plan.md)
+- [docs/prs/PR-070/proposal.md](/docs/prs/PR-070/proposal.md)
+- [docs/prs/PR-071/plan.md](/docs/prs/PR-071/plan.md)
+- [docs/prs/PR-072/plan.md](/docs/prs/PR-072/plan.md)
+- [docs/prs/README.md](/docs/prs/README.md)
 
 ## scope
 - Summarize the verified handoff context for PR-070 through PR-072 only.

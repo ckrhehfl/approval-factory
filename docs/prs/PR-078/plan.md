@@ -7,21 +7,21 @@
 - `inspect-approval-queue --root .`
 - `git status -sb`
 - `git --no-pager log --oneline -n 10`
-- [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md)
-- [docs/contracts/status-contract.md](/mnt/c/dev/approval-factory/docs/contracts/status-contract.md)
-- [docs/adr/ADR-003-file-based-approval-queue.md](/mnt/c/dev/approval-factory/docs/adr/ADR-003-file-based-approval-queue.md)
-- [docs/prs/PR-074/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-074/plan.md)
-- [docs/prs/PR-074/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-074/proposal.md)
-- [docs/prs/PR-075/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-075/plan.md)
-- [docs/prs/PR-075/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-075/proposal.md)
-- [docs/prs/PR-076/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-076/plan.md)
-- [docs/prs/PR-076/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-076/proposal.md)
-- [docs/prs/PR-077/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-077/plan.md)
-- [docs/prs/PR-077/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-077/proposal.md)
-- [runs/latest/RUN-20260327T055614Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T055614Z/run.yaml)
-- [runs/latest/RUN-20260327T063724Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T063724Z/run.yaml)
-- [approval_queue/pending/APR-RUN-20260327T055614Z.yaml](/mnt/c/dev/approval-factory/approval_queue/pending/APR-RUN-20260327T055614Z.yaml)
-- [approval_queue/pending/APR-RUN-20260327T063724Z.yaml](/mnt/c/dev/approval-factory/approval_queue/pending/APR-RUN-20260327T063724Z.yaml)
+- [docs/prs/README.md](/docs/prs/README.md)
+- [docs/contracts/status-contract.md](/docs/contracts/status-contract.md)
+- [docs/adr/ADR-003-file-based-approval-queue.md](/docs/adr/ADR-003-file-based-approval-queue.md)
+- [docs/prs/PR-074/plan.md](/docs/prs/PR-074/plan.md)
+- [docs/prs/PR-074/proposal.md](/docs/prs/PR-074/proposal.md)
+- [docs/prs/PR-075/plan.md](/docs/prs/PR-075/plan.md)
+- [docs/prs/PR-075/proposal.md](/docs/prs/PR-075/proposal.md)
+- [docs/prs/PR-076/plan.md](/docs/prs/PR-076/plan.md)
+- [docs/prs/PR-076/proposal.md](/docs/prs/PR-076/proposal.md)
+- [docs/prs/PR-077/plan.md](/docs/prs/PR-077/plan.md)
+- [docs/prs/PR-077/proposal.md](/docs/prs/PR-077/proposal.md)
+- [runs/latest/RUN-20260327T055614Z/run.yaml](/runs/latest/RUN-20260327T055614Z/run.yaml)
+- [runs/latest/RUN-20260327T063724Z/run.yaml](/runs/latest/RUN-20260327T063724Z/run.yaml)
+- [approval_queue/pending/APR-RUN-20260327T055614Z.yaml](/approval_queue/pending/APR-RUN-20260327T055614Z.yaml)
+- [approval_queue/pending/APR-RUN-20260327T063724Z.yaml](/approval_queue/pending/APR-RUN-20260327T063724Z.yaml)
 
 ## scope
 - PR-078 is docs-only and proposal-only.
@@ -33,11 +33,11 @@
 - No apply implementation.
 - No expansion of `stale` or `latest` into cleanup semantics or selector semantics.
 - Explicit target, dry-run-first, and separate apply remain required.
-- This PR must leave [docs/prs/PR-078/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-078/plan.md) in place before merge.
+- This PR must leave [docs/prs/PR-078/plan.md](/docs/prs/PR-078/plan.md) in place before merge.
 
 ## output summary
-- Add [docs/prs/PR-078/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-078/plan.md) as the PR-local contract and snapshot note.
-- Add [docs/prs/PR-078/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-078/proposal.md) as the parser and selector validation proposal.
+- Add [docs/prs/PR-078/plan.md](/docs/prs/PR-078/plan.md) as the PR-local contract and snapshot note.
+- Add [docs/prs/PR-078/proposal.md](/docs/prs/PR-078/proposal.md) as the parser and selector validation proposal.
 - Pin selector families, parser refusal rules, canonical identity resolution, safe-fail cases, and follow-up implementation split without approving any implementation work.
 
 ## current repo snapshot
@@ -47,8 +47,8 @@
 - Approval queue pending total: `2`.
 - `factory status --root .` reports `stale_pending_count: 1` and `stale_pending_run_ids: RUN-20260327T055614Z`.
 - `inspect-approval-queue --root .` reports relation counts latest `1`, stale `1`, no-latest-run `0`, unparseable `0`.
-- Pending item `APR-RUN-20260327T055614Z.yaml` maps to [runs/latest/RUN-20260327T055614Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T055614Z/run.yaml), which records `pr_id: PR-003` and `state: approval_pending`.
-- Pending item `APR-RUN-20260327T063724Z.yaml` maps to [runs/latest/RUN-20260327T063724Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T063724Z/run.yaml), which records `pr_id: PR-004` and `state: approval_pending`.
+- Pending item `APR-RUN-20260327T055614Z.yaml` maps to [runs/latest/RUN-20260327T055614Z/run.yaml](/runs/latest/RUN-20260327T055614Z/run.yaml), which records `pr_id: PR-003` and `state: approval_pending`.
+- Pending item `APR-RUN-20260327T063724Z.yaml` maps to [runs/latest/RUN-20260327T063724Z/run.yaml](/runs/latest/RUN-20260327T063724Z/run.yaml), which records `pr_id: PR-004` and `state: approval_pending`.
 - The repo therefore currently shows two visible pending approval artifacts across different run and PR histories, so selector parsing must refuse heuristic or multi-target interpretation.
 
 ## contract to pin in this PR

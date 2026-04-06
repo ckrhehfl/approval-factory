@@ -5,10 +5,10 @@
 - User task for PR-081 Stage 2 dry-run support
 - `python -m factory status --root .`
 - `python -m factory inspect-approval-queue --root .`
-- [orchestrator/cli.py](/mnt/c/dev/approval-factory/orchestrator/cli.py)
-- [orchestrator/pipeline.py](/mnt/c/dev/approval-factory/orchestrator/pipeline.py)
-- [tests/test_cli.py](/mnt/c/dev/approval-factory/tests/test_cli.py)
-- [docs/prs/PR-080/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-080/plan.md)
+- [orchestrator/cli.py](/orchestrator/cli.py)
+- [orchestrator/pipeline.py](/orchestrator/pipeline.py)
+- [tests/test_cli.py](/tests/test_cli.py)
+- [docs/prs/PR-080/plan.md](/docs/prs/PR-080/plan.md)
 
 ## scope
 - Add Stage 2 dry-run support for `factory hygiene-approval-queue`.

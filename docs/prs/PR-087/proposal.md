@@ -5,9 +5,9 @@
 - `git status -sb`
 - `python -m factory status --root .`
 - `python -m factory inspect-approval-queue --root .`
-- [docs/prs/PR-085/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-085/plan.md)
-- [docs/prs/PR-085/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-085/proposal.md)
-- [docs/prs/PR-086/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-086/plan.md)
+- [docs/prs/PR-085/plan.md](/docs/prs/PR-085/plan.md)
+- [docs/prs/PR-085/proposal.md](/docs/prs/PR-085/proposal.md)
+- [docs/prs/PR-086/plan.md](/docs/prs/PR-086/plan.md)
 
 ## scope
 - Proposal-only clarification for wording verification and operator misread risk around `queue_hygiene_audit`.

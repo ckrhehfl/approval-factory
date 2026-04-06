@@ -3,9 +3,9 @@
 ## Input Refs
 - AGENTS.md working-copy version observed on 2026-04-05
 - User task for `pr/092-orchestration-degraded-boundary-proposal`
-- [docs/prs/PR-089/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-089/plan.md)
-- [docs/prs/PR-090/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-090/plan.md)
-- [docs/prs/PR-091/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-091/plan.md)
+- [docs/prs/PR-089/plan.md](/docs/prs/PR-089/plan.md)
+- [docs/prs/PR-090/plan.md](/docs/prs/PR-090/plan.md)
+- [docs/prs/PR-091/plan.md](/docs/prs/PR-091/plan.md)
 - Repo source-of-truth reviewed from `orchestrator/cli.py`, `tests/test_cli.py`, and current branch state
 
 ## Scope

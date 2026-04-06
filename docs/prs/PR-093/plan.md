@@ -3,9 +3,9 @@
 ## Input Refs
 - AGENTS.md working-copy version observed on 2026-04-06
 - User task for `pr/093-orchestration-next-step-suppression-fix`
-- [docs/prs/PR-092/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-092/plan.md)
-- [orchestrator/pipeline.py](/mnt/c/dev/approval-factory/orchestrator/pipeline.py)
-- [tests/test_cli.py](/mnt/c/dev/approval-factory/tests/test_cli.py)
+- [docs/prs/PR-092/plan.md](/docs/prs/PR-092/plan.md)
+- [orchestrator/pipeline.py](/orchestrator/pipeline.py)
+- [tests/test_cli.py](/tests/test_cli.py)
 - Current branch runtime and focused CLI tests reviewed in repo source-of-truth
 
 ## Scope

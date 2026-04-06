@@ -4,9 +4,9 @@
 - AGENTS.md working-copy version observed on 2026-04-05
 - User task for PR-089 proposal-only inspect-style surface boundary
 - `git status --short`
-- [docs/prs/PR-084/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-084/proposal.md)
-- [docs/prs/PR-087/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-087/proposal.md)
-- [docs/prs/PR-088/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-088/plan.md)
+- [docs/prs/PR-084/proposal.md](/docs/prs/PR-084/proposal.md)
+- [docs/prs/PR-087/proposal.md](/docs/prs/PR-087/proposal.md)
+- [docs/prs/PR-088/plan.md](/docs/prs/PR-088/plan.md)
 
 ## scope
 - Proposal-only contract for a dedicated inspect-style orchestration summary / next-step assist surface.

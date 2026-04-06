@@ -6,7 +6,7 @@
 - `python -m factory inspect-approval-queue --root .`
 - `PYTHONPATH=. pytest -q`
 - recent git log and current repo state observations
-- [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md)
+- [docs/prs/README.md](/docs/prs/README.md)
 - User direction that `docs/prs` is history and audit trail, not runtime source of truth
 - User direction that repo/log output must override docs packs and prior notes
 
@@ -16,7 +16,7 @@
 - No runtime behavior, code paths, test behavior, CLI behavior, or approval semantics are changed.
 
 ## output summary
-- PR-067 adds only this plan note under [docs/prs/PR-067/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-067/plan.md).
+- PR-067 adds only this plan note under [docs/prs/PR-067/plan.md](/docs/prs/PR-067/plan.md).
 - The note narrows future discussion to operator hygiene, visibility, and manual workflow boundaries around stale pending approval queue entries.
 - The note does not propose or accept any runtime or approval semantic change.
 
@@ -28,8 +28,8 @@
 - Stale pending run id is `RUN-20260327T055614Z`.
 - `python -m factory inspect-approval-queue --root .` distinguishes stale versus latest by `latest_relation`.
 - Reported queue relations are `RUN-20260327T055614Z => latest_relation: stale` and `RUN-20260327T063724Z => latest_relation: latest`.
-- The matching stale run path exists at [runs/latest/RUN-20260327T055614Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T055614Z/run.yaml) and its recorded state is `approval_pending`.
-- The matching latest run path exists at [runs/latest/RUN-20260327T063724Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T063724Z/run.yaml) and its recorded state is `approval_pending`.
+- The matching stale run path exists at [runs/latest/RUN-20260327T055614Z/run.yaml](/runs/latest/RUN-20260327T055614Z/run.yaml) and its recorded state is `approval_pending`.
+- The matching latest run path exists at [runs/latest/RUN-20260327T063724Z/run.yaml](/runs/latest/RUN-20260327T063724Z/run.yaml) and its recorded state is `approval_pending`.
 - Tests currently pass: `196 passed`.
 
 ## interpretation

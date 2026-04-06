@@ -4,16 +4,16 @@
 - AGENTS.md working-copy version observed on 2026-04-04
 - `factory status --root .`
 - `inspect-approval-queue --root .`
-- [docs/contracts/status-contract.md](/mnt/c/dev/approval-factory/docs/contracts/status-contract.md)
-- [docs/adr/ADR-003-file-based-approval-queue.md](/mnt/c/dev/approval-factory/docs/adr/ADR-003-file-based-approval-queue.md)
-- [docs/prs/PR-074/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-074/proposal.md)
-- [docs/prs/PR-075/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-075/proposal.md)
-- [docs/prs/PR-076/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-076/proposal.md)
-- [docs/prs/PR-077/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-077/proposal.md)
-- [runs/latest/RUN-20260327T055614Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T055614Z/run.yaml)
-- [runs/latest/RUN-20260327T063724Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T063724Z/run.yaml)
-- [approval_queue/pending/APR-RUN-20260327T055614Z.yaml](/mnt/c/dev/approval-factory/approval_queue/pending/APR-RUN-20260327T055614Z.yaml)
-- [approval_queue/pending/APR-RUN-20260327T063724Z.yaml](/mnt/c/dev/approval-factory/approval_queue/pending/APR-RUN-20260327T063724Z.yaml)
+- [docs/contracts/status-contract.md](/docs/contracts/status-contract.md)
+- [docs/adr/ADR-003-file-based-approval-queue.md](/docs/adr/ADR-003-file-based-approval-queue.md)
+- [docs/prs/PR-074/proposal.md](/docs/prs/PR-074/proposal.md)
+- [docs/prs/PR-075/proposal.md](/docs/prs/PR-075/proposal.md)
+- [docs/prs/PR-076/proposal.md](/docs/prs/PR-076/proposal.md)
+- [docs/prs/PR-077/proposal.md](/docs/prs/PR-077/proposal.md)
+- [runs/latest/RUN-20260327T055614Z/run.yaml](/runs/latest/RUN-20260327T055614Z/run.yaml)
+- [runs/latest/RUN-20260327T063724Z/run.yaml](/runs/latest/RUN-20260327T063724Z/run.yaml)
+- [approval_queue/pending/APR-RUN-20260327T055614Z.yaml](/approval_queue/pending/APR-RUN-20260327T055614Z.yaml)
+- [approval_queue/pending/APR-RUN-20260327T063724Z.yaml](/approval_queue/pending/APR-RUN-20260327T063724Z.yaml)
 
 ## scope
 - Proposal-only parser and selector validation note for the manual approval queue hygiene command.
@@ -32,8 +32,8 @@
 ## observed repo facts
 - `factory status --root .` reports latest run `RUN-20260327T063724Z`, pending total `2`, and one stale pending item.
 - `inspect-approval-queue --root .` reports relation counts latest `1`, stale `1`, no-latest-run `0`, and unparseable `0`.
-- Pending item `APR-RUN-20260327T055614Z.yaml` maps to [runs/latest/RUN-20260327T055614Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T055614Z/run.yaml), which records `pr_id: PR-003` and `state: approval_pending`.
-- Pending item `APR-RUN-20260327T063724Z.yaml` maps to [runs/latest/RUN-20260327T063724Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T063724Z/run.yaml), which records `pr_id: PR-004` and `state: approval_pending`.
+- Pending item `APR-RUN-20260327T055614Z.yaml` maps to [runs/latest/RUN-20260327T055614Z/run.yaml](/runs/latest/RUN-20260327T055614Z/run.yaml), which records `pr_id: PR-003` and `state: approval_pending`.
+- Pending item `APR-RUN-20260327T063724Z.yaml` maps to [runs/latest/RUN-20260327T063724Z/run.yaml](/runs/latest/RUN-20260327T063724Z/run.yaml), which records `pr_id: PR-004` and `state: approval_pending`.
 - The repo therefore currently contains two visible queue artifacts that both look real enough to require exact selector parsing and one-canonical-artifact resolution.
 - Existing repo contracts already say that status paths, relation labels, and inspection summaries are visibility only and not selector semantics.
 

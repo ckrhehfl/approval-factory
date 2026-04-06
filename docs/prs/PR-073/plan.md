@@ -8,13 +8,13 @@
 - `git status -sb`
 - `git --no-pager log --oneline -n 10`
 - `pytest -q tests/test_cli.py -k 'approval_queue or inspect'`
-- [docs/prs/PR-070/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-070/plan.md)
-- [docs/prs/PR-070/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-070/proposal.md)
-- [docs/prs/PR-071/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-071/plan.md)
-- [docs/prs/PR-072/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-072/plan.md)
-- [docs/prs/PR-069/delta.md](/mnt/c/dev/approval-factory/docs/prs/PR-069/delta.md)
-- [docs/prs/PR-069/start-prompt.md](/mnt/c/dev/approval-factory/docs/prs/PR-069/start-prompt.md)
-- [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md)
+- [docs/prs/PR-070/plan.md](/docs/prs/PR-070/plan.md)
+- [docs/prs/PR-070/proposal.md](/docs/prs/PR-070/proposal.md)
+- [docs/prs/PR-071/plan.md](/docs/prs/PR-071/plan.md)
+- [docs/prs/PR-072/plan.md](/docs/prs/PR-072/plan.md)
+- [docs/prs/PR-069/delta.md](/docs/prs/PR-069/delta.md)
+- [docs/prs/PR-069/start-prompt.md](/docs/prs/PR-069/start-prompt.md)
+- [docs/prs/README.md](/docs/prs/README.md)
 
 ## scope
 - PR-073 is a docs-only handoff refresh for the verified PR-070 through PR-072 slice.
@@ -23,9 +23,9 @@
 - Do not mutate runtime code, queue artifacts, approval state, or prior PR documents.
 
 ## output summary
-- Add [docs/prs/PR-073/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-073/plan.md) as the PR-local contract and refresh record.
-- Add [docs/prs/PR-073/delta.md](/mnt/c/dev/approval-factory/docs/prs/PR-073/delta.md) to capture the verified PR-070 through PR-072 changes, current repo snapshot, and external-pack boundary note.
-- Add [docs/prs/PR-073/start-prompt.md](/mnt/c/dev/approval-factory/docs/prs/PR-073/start-prompt.md) as the short restart prompt for the next conversation.
+- Add [docs/prs/PR-073/plan.md](/docs/prs/PR-073/plan.md) as the PR-local contract and refresh record.
+- Add [docs/prs/PR-073/delta.md](/docs/prs/PR-073/delta.md) to capture the verified PR-070 through PR-072 changes, current repo snapshot, and external-pack boundary note.
+- Add [docs/prs/PR-073/start-prompt.md](/docs/prs/PR-073/start-prompt.md) as the short restart prompt for the next conversation.
 - Leave master-pack style documents unchanged because the recent slice changed visibility and entrypoint UX only, not permanent semantics.
 
 ## non-goals

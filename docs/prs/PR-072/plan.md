@@ -7,16 +7,16 @@
 - `PYTHONPATH=. python -m factory inspect-approval-queue --root .`
 - `git status -sb`
 - `git --no-pager log --oneline -n 5`
-- [pyproject.toml](/mnt/c/dev/approval-factory/pyproject.toml)
-- [orchestrator/cli.py](/mnt/c/dev/approval-factory/orchestrator/cli.py)
-- [tests/test_cli.py](/mnt/c/dev/approval-factory/tests/test_cli.py)
+- [pyproject.toml](/pyproject.toml)
+- [orchestrator/cli.py](/orchestrator/cli.py)
+- [tests/test_cli.py](/tests/test_cli.py)
 
 ## scope
 - PR-072 only reduces the UX/runtime entrypoint mismatch for approval queue inspection.
 - Add a direct `inspect-approval-queue` console entrypoint as a thin shim over the existing CLI subcommand.
 - Reuse the current `inspect-approval-queue` implementation and renderer without output format changes.
 - Queue mutation, approval mutation, readiness gating, stale/latest interpretation, and cleanup semantics remain unchanged.
-- Leave this plan note at [docs/prs/PR-072/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-072/plan.md).
+- Leave this plan note at [docs/prs/PR-072/plan.md](/docs/prs/PR-072/plan.md).
 
 ## output summary
 - Register `inspect-approval-queue` as a direct console script in packaging metadata.

@@ -2,9 +2,9 @@
 
 ## input refs
 - AGENTS.md v2026-04-03
-- [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md)
-- [docs/design/architecture.md](/mnt/c/dev/approval-factory/docs/design/architecture.md)
-- [docs/ops/how-we-work.md](/mnt/c/dev/approval-factory/docs/ops/how-we-work.md)
+- [docs/prs/README.md](/docs/prs/README.md)
+- [docs/design/architecture.md](/docs/design/architecture.md)
+- [docs/ops/how-we-work.md](/docs/ops/how-we-work.md)
 - User request for PR-060 observed on 2026-04-03
 
 ## scope

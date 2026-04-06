@@ -2,11 +2,11 @@
 
 ## input refs
 - AGENTS.md v2026-04-03
-- [docs/prs/PR-050/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-050/plan.md)
-- [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md)
-- [docs/design/architecture.md](/mnt/c/dev/approval-factory/docs/design/architecture.md)
-- [docs/contracts/work-item-contract.md](/mnt/c/dev/approval-factory/docs/contracts/work-item-contract.md)
-- [docs/contracts/pr-contract.md](/mnt/c/dev/approval-factory/docs/contracts/pr-contract.md)
+- [docs/prs/PR-050/plan.md](/docs/prs/PR-050/plan.md)
+- [docs/prs/README.md](/docs/prs/README.md)
+- [docs/design/architecture.md](/docs/design/architecture.md)
+- [docs/contracts/work-item-contract.md](/docs/contracts/work-item-contract.md)
+- [docs/contracts/pr-contract.md](/docs/contracts/pr-contract.md)
 - `git log --oneline --decorate -n 40` output observed on 2026-04-03
 - `find docs/prs -maxdepth 2 -type f | sort` output observed on 2026-04-03
 

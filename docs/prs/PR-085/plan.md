@@ -6,12 +6,12 @@
 - `git status -sb`
 - `python -m factory status --root .`
 - `python -m factory inspect-approval-queue --root .`
-- [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md)
-- [docs/prs/PR-084/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-084/plan.md)
-- [docs/prs/PR-084/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-084/proposal.md)
-- [orchestrator/cli.py](/mnt/c/dev/approval-factory/orchestrator/cli.py)
-- [orchestrator/pipeline.py](/mnt/c/dev/approval-factory/orchestrator/pipeline.py)
-- [tests/test_cli.py](/mnt/c/dev/approval-factory/tests/test_cli.py)
+- [docs/prs/README.md](/docs/prs/README.md)
+- [docs/prs/PR-084/plan.md](/docs/prs/PR-084/plan.md)
+- [docs/prs/PR-084/proposal.md](/docs/prs/PR-084/proposal.md)
+- [orchestrator/cli.py](/orchestrator/cli.py)
+- [orchestrator/pipeline.py](/orchestrator/pipeline.py)
+- [tests/test_cli.py](/tests/test_cli.py)
 
 ## scope
 - PR-085 is proposal-only and docs-only.
@@ -22,7 +22,7 @@
 
 ## output summary
 - Add this PR-local plan as the scope and validation contract for the visibility proposal.
-- Add [docs/prs/PR-085/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-085/proposal.md) to define the recommended visibility surface, wording, and implementation split.
+- Add [docs/prs/PR-085/proposal.md](/docs/prs/PR-085/proposal.md) to define the recommended visibility surface, wording, and implementation split.
 - Keep the proposal narrow: `inspect-approval-queue` item-local visibility only, no `factory status` exposure for now.
 
 ## current repo snapshot

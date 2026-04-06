@@ -4,9 +4,9 @@
 - AGENTS.md working-copy version observed on 2026-04-04
 - User task for PR-068 read-only visibility assist
 - `python -m factory inspect-approval-queue --root .`
-- [orchestrator/pipeline.py](/mnt/c/dev/approval-factory/orchestrator/pipeline.py)
-- [orchestrator/cli.py](/mnt/c/dev/approval-factory/orchestrator/cli.py)
-- [tests/test_cli.py](/mnt/c/dev/approval-factory/tests/test_cli.py)
+- [orchestrator/pipeline.py](/orchestrator/pipeline.py)
+- [orchestrator/cli.py](/orchestrator/cli.py)
+- [tests/test_cli.py](/tests/test_cli.py)
 
 ## scope
 - PR-068 is a small read-only visibility assist.

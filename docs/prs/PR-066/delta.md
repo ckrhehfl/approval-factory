@@ -2,13 +2,13 @@
 
 ## input refs
 - AGENTS.md v2026-04-03
-- [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md)
-- [docs/design/architecture.md](/mnt/c/dev/approval-factory/docs/design/architecture.md)
-- [docs/prs/PR-061/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-061/plan.md)
-- [docs/prs/PR-062/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-062/plan.md)
-- [docs/prs/PR-063/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-063/plan.md)
-- [docs/prs/PR-064/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-064/plan.md)
-- [docs/prs/PR-065/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-065/plan.md)
+- [docs/prs/README.md](/docs/prs/README.md)
+- [docs/design/architecture.md](/docs/design/architecture.md)
+- [docs/prs/PR-061/plan.md](/docs/prs/PR-061/plan.md)
+- [docs/prs/PR-062/plan.md](/docs/prs/PR-062/plan.md)
+- [docs/prs/PR-063/plan.md](/docs/prs/PR-063/plan.md)
+- [docs/prs/PR-064/plan.md](/docs/prs/PR-064/plan.md)
+- [docs/prs/PR-065/plan.md](/docs/prs/PR-065/plan.md)
 - `git log --oneline --decorate -n 15` observed on 2026-04-03
 - `git show --stat --summary 8deb8cb`
 - `git show --stat --summary 45746e8`
@@ -60,7 +60,7 @@
 - Run `python -m factory status --root .` to confirm the latest visibility snapshot before making any new operator decision.
 - Run `python -m factory inspect-approval-queue --root . --latest-run` or the equivalent `factory` command to inspect the two current pending entries without inferring auto-handling.
 - If the next task is CLI UX work, check both `python -m factory --help` and `factory --help` so the module entrypoint and console entrypoint stay aligned.
-- If a reader questions missing older `docs/prs` entries, check [README.md](/mnt/c/dev/approval-factory/README.md) and [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md) first to keep the history-gap interpretation anchored in current contract wording.
+- If a reader questions missing older `docs/prs` entries, check [README.md](/README.md) and [docs/prs/README.md](/docs/prs/README.md) first to keep the history-gap interpretation anchored in current contract wording.
 
 ## verification lessons
 - For docs-only delta refreshes, git history and current repo output are the source of truth; earlier summaries should be treated as secondary until re-verified.

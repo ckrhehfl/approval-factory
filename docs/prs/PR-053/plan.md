@@ -2,7 +2,7 @@
 
 ## input refs
 - AGENTS.md v2026-04-03
-- [docs/prs/PR-060/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-060/plan.md)
+- [docs/prs/PR-060/plan.md](/docs/prs/PR-060/plan.md)
 - `git show --stat --name-only --format=fuller a8e94a0` observed on 2026-04-03
 - `git show --stat --name-only --format=fuller fefae5e` observed on 2026-04-03
 - User request for PR-061 docs-only backfill batch A observed on 2026-04-03
