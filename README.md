@@ -37,6 +37,7 @@
 - `inspect-approval-queue`
 - `hygiene-approval-queue`
 - `inspect-approval`
+- `inspect-draft-approval`
 - `inspect-goal`
 - `inspect-clarification`
 - `inspect-work-item`
@@ -123,6 +124,12 @@ factory <command> --help
   - `approval_queue/`와 `runs/latest/<run-id>/artifacts/approval-request.yaml`를 변경하지 않는다.
   - 성공 출력에는 operator assist only 성격의 manual next-step hint만 포함되며 `python -m factory build-approval --root . --run-id <RUN-...>`를 제안만 한다.
   - draft 생성만으로 approval를 자동화하지 않으며 canonical approval 실행 여부는 여전히 operator가 결정한다.
+- `inspect-draft-approval`:
+  - exact selector `--run-id <RUN-...>`만 받는다.
+  - `runs/draft/APPROVAL-DRAFT-<run-id>.yaml`, `runs/latest/<run-id>/run.yaml`, `runs/latest/<run-id>/artifacts/approval-request.yaml`를 읽기 전용으로 비교한다.
+  - 출력은 `Draft Summary`, `Sanity Check`, `Diff Summary`, `Operator Note` 섹션만 제공한다.
+  - inspect/assist only surface이며 canonical artifact, approval queue, selector, approval decision을 바꾸지 않는다.
+  - draft 또는 canonical artifact가 없거나 required fields가 누락되면 명확히 실패한다.
 
 approval artifact readiness visibility:
 - `build-approval`는 source PR/work item readiness context를 읽을 수 있으면 `evidence-bundle.yaml`과 `approval-request.yaml`에 함께 남긴다.
