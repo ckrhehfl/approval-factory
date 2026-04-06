@@ -38,6 +38,7 @@
 - `hygiene-approval-queue`
 - `inspect-approval`
 - `inspect-draft-approval`
+- `review-approval`
 - `inspect-goal`
 - `inspect-clarification`
 - `inspect-work-item`
@@ -130,6 +131,11 @@ factory <command> --help
   - 출력은 `Draft Summary`, `Sanity Check`, `Diff Summary`, `Operator Note` 섹션만 제공한다.
   - inspect/assist only surface이며 canonical artifact, approval queue, selector, approval decision을 바꾸지 않는다.
   - draft 또는 canonical artifact가 없거나 required fields가 누락되면 명확히 실패한다.
+- `review-approval`:
+  - exact selector `--run-id <RUN-...>`만 받는 thin wrapper command다.
+  - 내부적으로 기존 `inspect-draft-approval` 출력만 재사용하고, 그 뒤에 수동 `build-approval` next-step hint만 덧붙인다.
+  - assist only surface이며 approval decision을 자동화하지 않고 어떤 approval command도 실행하지 않는다.
+  - draft가 없으면 latest fallback 없이 명확히 실패한다.
 
 approval artifact readiness visibility:
 - `build-approval`는 source PR/work item readiness context를 읽을 수 있으면 `evidence-bundle.yaml`과 `approval-request.yaml`에 함께 남긴다.

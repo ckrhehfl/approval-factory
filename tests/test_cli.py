@@ -191,6 +191,22 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         self.assertIn("factory draft-approval-packet --root . --run-id RUN-20260327T063724Z", output)
         self.assertNotIn("--latest", output)
 
+    def test_review_approval_help_marks_wrapper_assist_only(self) -> None:
+        output = self._run_help("review-approval")
+
+        self.assertIn(
+            "Review one exact approval draft via the existing inspection output plus a manual next-step hint.",
+            output,
+        )
+        self.assertIn("Next step:", output)
+        self.assertIn(
+            "this wrapper is assist only; inspect output is preserved and no approval decision or build command is executed",
+            output,
+        )
+        self.assertIn("python -m factory build-approval --root . --run-id <run-id>", output)
+        self.assertIn("factory review-approval --root . --run-id RUN-20260327T063724Z", output)
+        self.assertNotIn("--latest", output)
+
     def test_promote_pr_plan_draft_help_includes_next_step_and_example(self) -> None:
         output = self._run_help("promote-pr-plan-draft")
 
@@ -8198,3 +8214,60 @@ class BuildApprovalCliReadinessTest(unittest.TestCase):
             self.assertIn("- run_id: RUN-CLI-UNAVAILABLE", output)
             self.assertIn("- readiness: unavailable", output)
             self.assertIn("- next: factory inspect-approval --root . --run-id RUN-CLI-UNAVAILABLE", output)
+
+    def test_review_approval_reuses_inspect_output_and_manual_hint_only(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-REVIEW-CLI"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_ready_artifacts(root, run_id)
+            self.assertEqual(main(["build-approval", "--root", str(root), "--run-id", run_id]), 0)
+            self.assertEqual(main(["draft-approval-packet", "--root", str(root), "--run-id", run_id]), 0)
+
+            queue_before = (root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").read_text(encoding="utf-8")
+            approval_before = (
+                root / "runs" / "latest" / run_id / "artifacts" / "approval-request.yaml"
+            ).read_text(encoding="utf-8")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["review-approval", "--root", str(root), "--run-id", run_id])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Draft Summary", output)
+            self.assertIn("Sanity Check", output)
+            self.assertIn("Diff Summary", output)
+            self.assertIn("Operator Note", output)
+            self.assertIn("Next step (manual):", output)
+            self.assertIn(f"python -m factory build-approval --root . --run-id {run_id}", output)
+            self.assertIn("this is a suggestion only", output)
+            self.assertIn("no approval command was executed", output)
+            self.assertEqual(
+                (root / "approval_queue" / "pending" / f"APR-{run_id}.yaml").read_text(encoding="utf-8"),
+                queue_before,
+            )
+            self.assertEqual(
+                (root / "runs" / "latest" / run_id / "artifacts" / "approval-request.yaml").read_text(encoding="utf-8"),
+                approval_before,
+            )
+
+    def test_review_approval_fails_clearly_when_draft_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-REVIEW-MISSING"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_ready_artifacts(root, run_id)
+            self.assertEqual(main(["build-approval", "--root", str(root), "--run-id", run_id]), 0)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr), self.assertRaises(SystemExit):
+                main(["review-approval", "--root", str(root), "--run-id", run_id])
+
+            self.assertIn("draft approval artifact was not found", stderr.getvalue())

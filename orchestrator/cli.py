@@ -246,6 +246,19 @@ def _render_draft_approval_inspection(inspection: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def _render_review_approval_summary(inspection: dict[str, object], run_id: str) -> str:
+    return "\n".join(
+        [
+            _render_draft_approval_inspection(inspection),
+            "",
+            "Next step (manual):",
+            f"python -m factory build-approval --root . --run-id {run_id}",
+            "this is a suggestion only",
+            "no approval command was executed",
+        ]
+    )
+
+
 def _render_run_inspection(inspection: dict[str, object]) -> str:
     lines = ["Run Inspection:"]
     lines.append(f"- run_id: {inspection.get('run_id') or 'none'}")
@@ -1026,6 +1039,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exact run selector in the form RUN-...; no latest fallback or implicit selection",
     )
 
+    review_approval_parser = subparsers.add_parser(
+        "review-approval",
+        help="Review one exact approval draft via the existing inspection output plus a manual next-step hint",
+        description="Review one exact approval draft via the existing inspection output plus a manual next-step hint.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  this wrapper is assist only; inspect output is preserved and no approval decision or build command is executed",
+            "  python -m factory build-approval --root . --run-id <run-id>",
+            "",
+            "Example:",
+            "  factory review-approval --root . --run-id RUN-20260327T063724Z",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    review_approval_parser.add_argument("--root", default=".", help="Repository root path")
+    review_approval_parser.add_argument(
+        "--run-id",
+        required=True,
+        help="Exact run selector in the form RUN-...; no latest fallback or implicit selection",
+    )
+
     inspect_run_parser = subparsers.add_parser(
         "inspect-run",
         help="Inspect run-scoped execution artifacts in visibility-only mode",
@@ -1643,6 +1677,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 inspect_draft_approval(root_dir=Path(args.root), run_id=str(args.run_id))
             )
         )
+        return 0
+
+    if args.command == "review-approval":
+        try:
+            inspection = inspect_draft_approval(root_dir=Path(args.root), run_id=str(args.run_id))
+        except (FileNotFoundError, ValueError) as exc:
+            parser.error(str(exc))
+        print(_render_review_approval_summary(inspection, str(args.run_id)))
         return 0
 
     if args.command == "inspect-run":
