@@ -8270,4 +8270,126 @@ class BuildApprovalCliReadinessTest(unittest.TestCase):
             with redirect_stderr(stderr), self.assertRaises(SystemExit):
                 main(["review-approval", "--root", str(root), "--run-id", run_id])
 
-            self.assertIn("draft approval artifact was not found", stderr.getvalue())
+            error_output = stderr.getvalue()
+            self.assertIn("[Problem] Draft approval artifact not found", error_output)
+            self.assertIn(
+                f"[Expected location] {(root / 'runs' / 'draft' / f'APPROVAL-DRAFT-{run_id}.yaml').as_posix()}",
+                error_output,
+            )
+            self.assertIn(
+                f"[Next step (manual)] python -m factory draft-approval-packet --root . --run-id {run_id}",
+                error_output,
+            )
+
+    def test_review_approval_fails_clearly_when_canonical_artifact_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-REVIEW-CANONICAL-MISSING"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_ready_artifacts(root, run_id)
+            self.assertEqual(main(["build-approval", "--root", str(root), "--run-id", run_id]), 0)
+            self.assertEqual(main(["draft-approval-packet", "--root", str(root), "--run-id", run_id]), 0)
+            (root / "runs" / "latest" / run_id / "artifacts" / "approval-request.yaml").unlink()
+
+            stderr = StringIO()
+            with redirect_stderr(stderr), self.assertRaises(SystemExit):
+                main(["review-approval", "--root", str(root), "--run-id", run_id])
+
+            error_output = stderr.getvalue()
+            self.assertIn("[Problem] Canonical approval request artifact not found", error_output)
+            self.assertIn(
+                f"[Expected location] {(root / 'runs' / 'latest' / run_id / 'artifacts' / 'approval-request.yaml').as_posix()}",
+                error_output,
+            )
+            self.assertIn(
+                f"[Next step (manual)] python -m factory build-approval --root . --run-id {run_id}",
+                error_output,
+            )
+
+    def test_draft_approval_packet_fails_clearly_when_run_is_missing(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-404"
+            self._prepare_root(root)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr), self.assertRaises(SystemExit):
+                main(["draft-approval-packet", "--root", str(root), "--run-id", run_id])
+
+            error_output = stderr.getvalue()
+            self.assertIn("[Problem] Run artifact not found", error_output)
+            self.assertIn(
+                f"[Expected location] {(root / 'runs' / 'latest' / run_id / 'run.yaml').as_posix()}",
+                error_output,
+            )
+            self.assertIn("[Next step (manual)] python -m factory status --root .", error_output)
+
+    def test_draft_approval_packet_fails_clearly_when_draft_exists(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-DRAFT-EXISTS-CLI"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_ready_artifacts(root, run_id)
+            self.assertEqual(main(["build-approval", "--root", str(root), "--run-id", run_id]), 0)
+            self.assertEqual(main(["draft-approval-packet", "--root", str(root), "--run-id", run_id]), 0)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr), self.assertRaises(SystemExit):
+                main(["draft-approval-packet", "--root", str(root), "--run-id", run_id])
+
+            error_output = stderr.getvalue()
+            self.assertIn("[Problem] Approval packet draft already exists", error_output)
+            self.assertIn(
+                f"[Expected location] {(root / 'runs' / 'draft' / f'APPROVAL-DRAFT-{run_id}.yaml').as_posix()}",
+                error_output,
+            )
+            self.assertIn(
+                f"[Next step (manual)] python -m factory review-approval --root . --run-id {run_id}",
+                error_output,
+            )
+
+    def test_inspect_draft_approval_fails_clearly_for_invalid_run_id_shape_without_traceback(self) -> None:
+        stderr = StringIO()
+        with redirect_stderr(stderr), self.assertRaises(SystemExit):
+            main(["inspect-draft-approval", "--root", ".", "--run-id", "INVALID-RUN"])
+
+        error_output = stderr.getvalue()
+        self.assertNotIn("Traceback", error_output)
+        self.assertIn("[Problem] Exact run-id selector is required for inspect-draft-approval.", error_output)
+        self.assertIn(
+            "[Constraint] Use --run-id <RUN-...>; latest-derived or inferred selectors are not supported.",
+            error_output,
+        )
+        self.assertIn("[Next step (manual)] Retry with an exact run-id from runs/latest/.", error_output)
+
+    def test_inspect_draft_approval_fails_clearly_when_draft_is_missing_without_traceback(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-DOES-NOT-EXIST"
+            self._prepare_root(root)
+
+            stderr = StringIO()
+            with redirect_stderr(stderr), self.assertRaises(SystemExit):
+                main(["inspect-draft-approval", "--root", str(root), "--run-id", run_id])
+
+            error_output = stderr.getvalue()
+            self.assertNotIn("Traceback", error_output)
+            self.assertIn("[Problem] Draft approval artifact not found", error_output)
+            self.assertIn(
+                f"[Expected location] {(root / 'runs' / 'draft' / f'APPROVAL-DRAFT-{run_id}.yaml').as_posix()}",
+                error_output,
+            )
+            self.assertIn(
+                f"[Next step (manual)] python -m factory draft-approval-packet --root . --run-id {run_id}",
+                error_output,
+            )
