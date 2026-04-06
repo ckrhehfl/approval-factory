@@ -2,14 +2,14 @@
 
 ## input refs
 - AGENTS.md v2026-04-03
-- [docs/prs/PR-063/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-063/plan.md)
-- [orchestrator/cli.py](/mnt/c/dev/approval-factory/orchestrator/cli.py)
-- [tests/test_cli.py](/mnt/c/dev/approval-factory/tests/test_cli.py)
+- [docs/prs/PR-063/plan.md](/docs/prs/PR-063/plan.md)
+- [orchestrator/cli.py](/orchestrator/cli.py)
+- [tests/test_cli.py](/tests/test_cli.py)
 - User request for PR-064 observed on 2026-04-03
 
 ## scope
 - Add small operator-assist help discoverability for `create-goal`, `create-clarification`, `resolve-clarification`, `create-work-item`, `work-item-readiness`, `cleanup-rehearsal`, and `bootstrap-run`.
-- Limit changes to `orchestrator/cli.py`, `tests/test_cli.py`, and this [plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-064/plan.md).
+- Limit changes to `orchestrator/cli.py`, `tests/test_cli.py`, and this [plan.md](/docs/prs/PR-064/plan.md).
 - Preserve runtime behavior and command semantics.
 - Add only help-layer `description`, `epilog`, `Next step:`, `Example:`, and focused help-output tests.
 - Keep manual/create surfaces framed as operator-managed commands, not as automatic orchestration.
@@ -17,9 +17,9 @@
 - Keep `bootstrap-run` and `cleanup-rehearsal` framed as operator-managed repo-local flow support only.
 
 ## output summary
-- [cli.py](/mnt/c/dev/approval-factory/orchestrator/cli.py) adds descriptions and `Next step:` / `Example:` help epilogs for the seven scoped commands.
+- [cli.py](/orchestrator/cli.py) adds descriptions and `Next step:` / `Example:` help epilogs for the seven scoped commands.
 - The new help text keeps operator hints explicit without implying auto-execution or semantics changes.
-- [test_cli.py](/mnt/c/dev/approval-factory/tests/test_cli.py) adds the seven requested help-output tests covering description, `Next step:`, and `Example:`.
+- [test_cli.py](/tests/test_cli.py) adds the seven requested help-output tests covering description, `Next step:`, and `Example:`.
 - PR-064 records its own scope and guardrails in this plan artifact.
 
 ## risks

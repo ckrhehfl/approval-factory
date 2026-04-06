@@ -7,22 +7,22 @@
 - `factory inspect-approval-queue --root .`
 - `git status -sb`
 - `git --no-pager log --oneline -n 5`
-- [docs/prs/PR-067/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-067/plan.md)
-- [docs/prs/PR-068/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-068/plan.md)
-- [docs/prs/PR-069/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-069/plan.md)
-- [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md)
-- [runs/latest/RUN-20260327T055614Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T055614Z/run.yaml)
-- [runs/latest/RUN-20260327T063724Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T063724Z/run.yaml)
+- [docs/prs/PR-067/plan.md](/docs/prs/PR-067/plan.md)
+- [docs/prs/PR-068/plan.md](/docs/prs/PR-068/plan.md)
+- [docs/prs/PR-069/plan.md](/docs/prs/PR-069/plan.md)
+- [docs/prs/README.md](/docs/prs/README.md)
+- [runs/latest/RUN-20260327T055614Z/run.yaml](/runs/latest/RUN-20260327T055614Z/run.yaml)
+- [runs/latest/RUN-20260327T063724Z/run.yaml](/runs/latest/RUN-20260327T063724Z/run.yaml)
 
 ## scope
 - PR-070 is docs-only.
 - PR-070 records a proposal-only clarification for stale pending and approval queue hygiene.
 - Runtime, code, tests, CLI semantics, approval semantics, and queue behavior remain unchanged.
-- This PR must leave [docs/prs/PR-070/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-070/plan.md) in place before merge.
+- This PR must leave [docs/prs/PR-070/plan.md](/docs/prs/PR-070/plan.md) in place before merge.
 
 ## output summary
-- Add [docs/prs/PR-070/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-070/plan.md) as the PR-local contract and snapshot note.
-- Add [docs/prs/PR-070/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-070/proposal.md) as the proposal-only clarification note.
+- Add [docs/prs/PR-070/plan.md](/docs/prs/PR-070/plan.md) as the PR-local contract and snapshot note.
+- Add [docs/prs/PR-070/proposal.md](/docs/prs/PR-070/proposal.md) as the proposal-only clarification note.
 - Record the current repo-observed approval queue state without proposing mutation behavior.
 
 ## current repo snapshot
@@ -30,8 +30,8 @@
 - Latest run: `RUN-20260327T063724Z`.
 - Pending total: `2`.
 - Relation summary: latest `1`, stale `1`, no_latest_run `0`, unparseable `0`.
-- Stale pending item `RUN-20260327T055614Z` has a matching run at [runs/latest/RUN-20260327T055614Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T055614Z/run.yaml) and that run state is `approval_pending`.
-- Latest pending item `RUN-20260327T063724Z` has a matching run at [runs/latest/RUN-20260327T063724Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T063724Z/run.yaml) and that run state is `approval_pending`.
+- Stale pending item `RUN-20260327T055614Z` has a matching run at [runs/latest/RUN-20260327T055614Z/run.yaml](/runs/latest/RUN-20260327T055614Z/run.yaml) and that run state is `approval_pending`.
+- Latest pending item `RUN-20260327T063724Z` has a matching run at [runs/latest/RUN-20260327T063724Z/run.yaml](/runs/latest/RUN-20260327T063724Z/run.yaml) and that run state is `approval_pending`.
 - The stale item belongs to `PR-003`.
 - The latest item belongs to `PR-004`.
 - These are different PR/run pairs and both remain visible in the pending approval queue snapshot.

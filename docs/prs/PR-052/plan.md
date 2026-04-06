@@ -2,9 +2,9 @@
 
 ## input refs
 - AGENTS.md v2026-04-03
-- [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md)
-- [docs/design/architecture.md](/mnt/c/dev/approval-factory/docs/design/architecture.md)
-- [docs/prs/PR-051/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-051/plan.md)
+- [docs/prs/README.md](/docs/prs/README.md)
+- [docs/design/architecture.md](/docs/design/architecture.md)
+- [docs/prs/PR-051/plan.md](/docs/prs/PR-051/plan.md)
 - `grep -RInE 'docs/prs|prs/active|prs/archive|docs/work-items|runtime source of truth|canonical role|audit trail|official PR plan artifact|official work item artifact|planning surface|history' docs/ops docs/policies docs/contracts docs/design AGENTS.md` observed on 2026-04-03
 
 ## scope

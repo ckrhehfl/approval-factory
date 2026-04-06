@@ -4,10 +4,10 @@
 - AGENTS.md working-copy version observed on 2026-04-04
 - `factory status --root .`
 - `factory inspect-approval-queue --root .`
-- [runs/latest/RUN-20260327T055614Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T055614Z/run.yaml)
-- [runs/latest/RUN-20260327T063724Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T063724Z/run.yaml)
-- [approval_queue/pending/APR-RUN-20260327T055614Z.yaml](/mnt/c/dev/approval-factory/approval_queue/pending/APR-RUN-20260327T055614Z.yaml)
-- [approval_queue/pending/APR-RUN-20260327T063724Z.yaml](/mnt/c/dev/approval-factory/approval_queue/pending/APR-RUN-20260327T063724Z.yaml)
+- [runs/latest/RUN-20260327T055614Z/run.yaml](/runs/latest/RUN-20260327T055614Z/run.yaml)
+- [runs/latest/RUN-20260327T063724Z/run.yaml](/runs/latest/RUN-20260327T063724Z/run.yaml)
+- [approval_queue/pending/APR-RUN-20260327T055614Z.yaml](/approval_queue/pending/APR-RUN-20260327T055614Z.yaml)
+- [approval_queue/pending/APR-RUN-20260327T063724Z.yaml](/approval_queue/pending/APR-RUN-20260327T063724Z.yaml)
 
 ## scope
 - Proposal-only clarification for stale pending visibility and approval queue hygiene.
@@ -24,8 +24,8 @@
 - `factory inspect-approval-queue --root .` reports relation counts `latest: 1`, `stale: 1`, `no_latest_run: 0`, and `unparseable: 0`.
 - Pending item `APR-RUN-20260327T055614Z.yaml` parses to run `RUN-20260327T055614Z`, relation `stale`, matching run present, matching run state `approval_pending`.
 - Pending item `APR-RUN-20260327T063724Z.yaml` parses to run `RUN-20260327T063724Z`, relation `latest`, matching run present, matching run state `approval_pending`.
-- [runs/latest/RUN-20260327T055614Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T055614Z/run.yaml) records `pr_id: PR-003`.
-- [runs/latest/RUN-20260327T063724Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T063724Z/run.yaml) records `pr_id: PR-004`.
+- [runs/latest/RUN-20260327T055614Z/run.yaml](/runs/latest/RUN-20260327T055614Z/run.yaml) records `pr_id: PR-003`.
+- [runs/latest/RUN-20260327T063724Z/run.yaml](/runs/latest/RUN-20260327T063724Z/run.yaml) records `pr_id: PR-004`.
 - The queue therefore contains two distinct pending approvals for two different PR/run histories.
 
 ## proposal

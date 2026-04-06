@@ -5,14 +5,14 @@
 - `git status -sb`
 - `python -m factory status --root .`
 - `python -m factory inspect-approval-queue --root .`
-- [README.md](/mnt/c/dev/approval-factory/README.md)
-- [docs/prs/PR-080/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-080/plan.md)
-- [docs/prs/PR-081/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-081/plan.md)
-- [docs/prs/PR-082/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-082/plan.md)
-- [docs/prs/PR-083/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-083/plan.md)
-- [orchestrator/cli.py](/mnt/c/dev/approval-factory/orchestrator/cli.py)
-- [orchestrator/pipeline.py](/mnt/c/dev/approval-factory/orchestrator/pipeline.py)
-- [tests/test_cli.py](/mnt/c/dev/approval-factory/tests/test_cli.py)
+- [README.md](/README.md)
+- [docs/prs/PR-080/plan.md](/docs/prs/PR-080/plan.md)
+- [docs/prs/PR-081/plan.md](/docs/prs/PR-081/plan.md)
+- [docs/prs/PR-082/plan.md](/docs/prs/PR-082/plan.md)
+- [docs/prs/PR-083/plan.md](/docs/prs/PR-083/plan.md)
+- [orchestrator/cli.py](/orchestrator/cli.py)
+- [orchestrator/pipeline.py](/orchestrator/pipeline.py)
+- [tests/test_cli.py](/tests/test_cli.py)
 
 ## scope
 - Proposal-only note that freezes the current semantics of `queue_hygiene` metadata.

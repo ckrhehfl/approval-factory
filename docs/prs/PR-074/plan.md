@@ -7,26 +7,26 @@
 - `inspect-approval-queue --root .`
 - `git status -sb`
 - `git --no-pager log --oneline -n 10`
-- [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md)
-- [docs/contracts/status-contract.md](/mnt/c/dev/approval-factory/docs/contracts/status-contract.md)
-- [docs/ops/runbook.md](/mnt/c/dev/approval-factory/docs/ops/runbook.md)
-- [docs/prs/PR-070/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-070/plan.md)
-- [docs/prs/PR-070/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-070/proposal.md)
-- [runs/latest/RUN-20260327T055614Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T055614Z/run.yaml)
-- [runs/latest/RUN-20260327T063724Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T063724Z/run.yaml)
-- [approval_queue/pending/APR-RUN-20260327T055614Z.yaml](/mnt/c/dev/approval-factory/approval_queue/pending/APR-RUN-20260327T055614Z.yaml)
-- [approval_queue/pending/APR-RUN-20260327T063724Z.yaml](/mnt/c/dev/approval-factory/approval_queue/pending/APR-RUN-20260327T063724Z.yaml)
+- [docs/prs/README.md](/docs/prs/README.md)
+- [docs/contracts/status-contract.md](/docs/contracts/status-contract.md)
+- [docs/ops/runbook.md](/docs/ops/runbook.md)
+- [docs/prs/PR-070/plan.md](/docs/prs/PR-070/plan.md)
+- [docs/prs/PR-070/proposal.md](/docs/prs/PR-070/proposal.md)
+- [runs/latest/RUN-20260327T055614Z/run.yaml](/runs/latest/RUN-20260327T055614Z/run.yaml)
+- [runs/latest/RUN-20260327T063724Z/run.yaml](/runs/latest/RUN-20260327T063724Z/run.yaml)
+- [approval_queue/pending/APR-RUN-20260327T055614Z.yaml](/approval_queue/pending/APR-RUN-20260327T055614Z.yaml)
+- [approval_queue/pending/APR-RUN-20260327T063724Z.yaml](/approval_queue/pending/APR-RUN-20260327T063724Z.yaml)
 
 ## scope
 - PR-074 is docs-only and proposal-only.
 - Topic: explicit manual approval queue hygiene command proposal.
 - No implementation, runtime, code, test, CLI, queue mutation, or approval behavior change.
 - No expansion of `stale` or `latest` into cleanup semantics.
-- This PR must leave [docs/prs/PR-074/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-074/plan.md) in place before merge.
+- This PR must leave [docs/prs/PR-074/plan.md](/docs/prs/PR-074/plan.md) in place before merge.
 
 ## output summary
-- Add [docs/prs/PR-074/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-074/plan.md) as the PR-local contract and snapshot note.
-- Add [docs/prs/PR-074/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-074/proposal.md) as the proposal note for an explicit manual hygiene command.
+- Add [docs/prs/PR-074/plan.md](/docs/prs/PR-074/plan.md) as the PR-local contract and snapshot note.
+- Add [docs/prs/PR-074/proposal.md](/docs/prs/PR-074/proposal.md) as the proposal note for an explicit manual hygiene command.
 - Record why any future hygiene work must begin as a manual, explicit, dry-run-first proposal instead of an implementation PR.
 
 ## current repo snapshot
@@ -34,8 +34,8 @@
 - Latest run: `RUN-20260327T063724Z`.
 - Approval queue pending total: `2`.
 - Relation summary: latest `1`, stale `1`, no_latest_run `0`, unparseable `0`.
-- Stale pending item `RUN-20260327T055614Z` still has a matching run at [runs/latest/RUN-20260327T055614Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T055614Z/run.yaml) and that run state is `approval_pending`.
-- Latest pending item `RUN-20260327T063724Z` has a matching run at [runs/latest/RUN-20260327T063724Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T063724Z/run.yaml) and that run state is `approval_pending`.
+- Stale pending item `RUN-20260327T055614Z` still has a matching run at [runs/latest/RUN-20260327T055614Z/run.yaml](/runs/latest/RUN-20260327T055614Z/run.yaml) and that run state is `approval_pending`.
+- Latest pending item `RUN-20260327T063724Z` has a matching run at [runs/latest/RUN-20260327T063724Z/run.yaml](/runs/latest/RUN-20260327T063724Z/run.yaml) and that run state is `approval_pending`.
 - The stale item belongs to `PR-003`.
 - The latest item belongs to `PR-004`.
 - The repo therefore currently shows simultaneous visible pending approvals for different PR/run histories without any cleanup behavior.

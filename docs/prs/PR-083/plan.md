@@ -6,11 +6,11 @@
 - `git status -sb`
 - `python -m factory status --root .`
 - `python -m factory inspect-approval-queue --root .`
-- [orchestrator/cli.py](/mnt/c/dev/approval-factory/orchestrator/cli.py)
-- [tests/test_cli.py](/mnt/c/dev/approval-factory/tests/test_cli.py)
-- [README.md](/mnt/c/dev/approval-factory/README.md)
-- [docs/design/architecture.md](/mnt/c/dev/approval-factory/docs/design/architecture.md)
-- [docs/prs/PR-082/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-082/plan.md)
+- [orchestrator/cli.py](/orchestrator/cli.py)
+- [tests/test_cli.py](/tests/test_cli.py)
+- [README.md](/README.md)
+- [docs/design/architecture.md](/docs/design/architecture.md)
+- [docs/prs/PR-082/plan.md](/docs/prs/PR-082/plan.md)
 
 ## scope
 - Tighten user-facing help, read-only guidance, and focused tests for the already-implemented `factory hygiene-approval-queue` Stage 1/2/3 behavior.

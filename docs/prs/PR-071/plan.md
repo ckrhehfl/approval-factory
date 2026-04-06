@@ -7,17 +7,17 @@
 - `PYTHONPATH=. python -m factory inspect-approval-queue --root .`
 - `git status -sb`
 - `git --no-pager log --oneline -n 5`
-- [orchestrator/pipeline.py](/mnt/c/dev/approval-factory/orchestrator/pipeline.py)
-- [orchestrator/cli.py](/mnt/c/dev/approval-factory/orchestrator/cli.py)
-- [tests/test_cli.py](/mnt/c/dev/approval-factory/tests/test_cli.py)
-- [runs/latest/RUN-20260327T055614Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T055614Z/run.yaml)
-- [runs/latest/RUN-20260327T063724Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T063724Z/run.yaml)
+- [orchestrator/pipeline.py](/orchestrator/pipeline.py)
+- [orchestrator/cli.py](/orchestrator/cli.py)
+- [tests/test_cli.py](/tests/test_cli.py)
+- [runs/latest/RUN-20260327T055614Z/run.yaml](/runs/latest/RUN-20260327T055614Z/run.yaml)
+- [runs/latest/RUN-20260327T063724Z/run.yaml](/runs/latest/RUN-20260327T063724Z/run.yaml)
 
 ## scope
 - PR-071 adds only `matching_pr_id` visibility to `inspect-approval-queue` pending item output.
 - The change is read-only assist only and reads from existing matching run metadata.
 - Queue mutation, approval mutation, readiness gating, cleanup semantics, and Relation Summary semantics remain unchanged.
-- PR-071 leaves this plan note at [docs/prs/PR-071/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-071/plan.md).
+- PR-071 leaves this plan note at [docs/prs/PR-071/plan.md](/docs/prs/PR-071/plan.md).
 
 ## output summary
 - Extend approval queue inspection item payload/rendering with `matching_pr_id` when a matching run exists and exposes `pr_id`.
@@ -28,8 +28,8 @@
 ## current repo snapshot
 - `factory status --root .` reports latest run `RUN-20260327T063724Z`, pending total `2`, and one stale pending item.
 - `PYTHONPATH=. python -m factory inspect-approval-queue --root .` reports stale `RUN-20260327T055614Z` and latest `RUN-20260327T063724Z`.
-- [runs/latest/RUN-20260327T055614Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T055614Z/run.yaml) records `pr_id: PR-003`.
-- [runs/latest/RUN-20260327T063724Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T063724Z/run.yaml) records `pr_id: PR-004`.
+- [runs/latest/RUN-20260327T055614Z/run.yaml](/runs/latest/RUN-20260327T055614Z/run.yaml) records `pr_id: PR-003`.
+- [runs/latest/RUN-20260327T063724Z/run.yaml](/runs/latest/RUN-20260327T063724Z/run.yaml) records `pr_id: PR-004`.
 - This is operator visibility assist for the case where stale and latest can belong to different PRs.
 
 ## risks

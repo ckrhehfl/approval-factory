@@ -6,14 +6,14 @@
 - `git status -sb`
 - `python -m factory status --root .`
 - `python -m factory inspect-approval-queue --root .`
-- [README.md](/mnt/c/dev/approval-factory/README.md)
-- [docs/design/architecture.md](/mnt/c/dev/approval-factory/docs/design/architecture.md)
-- [docs/prs/PR-085/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-085/plan.md)
-- [docs/prs/PR-085/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-085/proposal.md)
-- [docs/prs/PR-086/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-086/plan.md)
-- [docs/prs/PR-087/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-087/plan.md)
-- [docs/prs/PR-087/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-087/proposal.md)
-- [tests/test_cli.py](/mnt/c/dev/approval-factory/tests/test_cli.py)
+- [README.md](/README.md)
+- [docs/design/architecture.md](/docs/design/architecture.md)
+- [docs/prs/PR-085/plan.md](/docs/prs/PR-085/plan.md)
+- [docs/prs/PR-085/proposal.md](/docs/prs/PR-085/proposal.md)
+- [docs/prs/PR-086/plan.md](/docs/prs/PR-086/plan.md)
+- [docs/prs/PR-087/plan.md](/docs/prs/PR-087/plan.md)
+- [docs/prs/PR-087/proposal.md](/docs/prs/PR-087/proposal.md)
+- [tests/test_cli.py](/tests/test_cli.py)
 
 ## scope
 - PR-088 is docs/help/tests-only verification for `queue_hygiene_audit` wording.

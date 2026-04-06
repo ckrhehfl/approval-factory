@@ -6,9 +6,9 @@
 - `git status -sb`
 - `python -m factory status --root .`
 - `python -m factory inspect-approval-queue --root .`
-- [docs/prs/PR-085/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-085/plan.md)
-- [docs/prs/PR-085/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-085/proposal.md)
-- [docs/prs/PR-086/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-086/plan.md)
+- [docs/prs/PR-085/plan.md](/docs/prs/PR-085/plan.md)
+- [docs/prs/PR-085/proposal.md](/docs/prs/PR-085/proposal.md)
+- [docs/prs/PR-086/plan.md](/docs/prs/PR-086/plan.md)
 
 ## scope
 - PR-087 is proposal-only and docs-only.
@@ -20,7 +20,7 @@
 
 ## output summary
 - Add this PR-local plan as the contract for a wording-verification-only proposal.
-- Add [docs/prs/PR-087/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-087/proposal.md) to define safe vs unsafe wording patterns, required anti-misread coverage, and future evidence requirements.
+- Add [docs/prs/PR-087/proposal.md](/docs/prs/PR-087/proposal.md) to define safe vs unsafe wording patterns, required anti-misread coverage, and future evidence requirements.
 - Keep any future output wording refinement separate from semantics expansion and separate from this proposal PR.
 
 ## current repo snapshot

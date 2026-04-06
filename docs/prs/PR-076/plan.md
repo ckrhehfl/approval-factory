@@ -7,17 +7,17 @@
 - `inspect-approval-queue --root .`
 - `git status -sb`
 - `git --no-pager log --oneline -n 10`
-- [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md)
-- [docs/contracts/status-contract.md](/mnt/c/dev/approval-factory/docs/contracts/status-contract.md)
-- [docs/ops/runbook.md](/mnt/c/dev/approval-factory/docs/ops/runbook.md)
-- [docs/prs/PR-074/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-074/plan.md)
-- [docs/prs/PR-074/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-074/proposal.md)
-- [docs/prs/PR-075/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-075/plan.md)
-- [docs/prs/PR-075/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-075/proposal.md)
-- [runs/latest/RUN-20260327T055614Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T055614Z/run.yaml)
-- [runs/latest/RUN-20260327T063724Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T063724Z/run.yaml)
-- [approval_queue/pending/APR-RUN-20260327T055614Z.yaml](/mnt/c/dev/approval-factory/approval_queue/pending/APR-RUN-20260327T055614Z.yaml)
-- [approval_queue/pending/APR-RUN-20260327T063724Z.yaml](/mnt/c/dev/approval-factory/approval_queue/pending/APR-RUN-20260327T063724Z.yaml)
+- [docs/prs/README.md](/docs/prs/README.md)
+- [docs/contracts/status-contract.md](/docs/contracts/status-contract.md)
+- [docs/ops/runbook.md](/docs/ops/runbook.md)
+- [docs/prs/PR-074/plan.md](/docs/prs/PR-074/plan.md)
+- [docs/prs/PR-074/proposal.md](/docs/prs/PR-074/proposal.md)
+- [docs/prs/PR-075/plan.md](/docs/prs/PR-075/plan.md)
+- [docs/prs/PR-075/proposal.md](/docs/prs/PR-075/proposal.md)
+- [runs/latest/RUN-20260327T055614Z/run.yaml](/runs/latest/RUN-20260327T055614Z/run.yaml)
+- [runs/latest/RUN-20260327T063724Z/run.yaml](/runs/latest/RUN-20260327T063724Z/run.yaml)
+- [approval_queue/pending/APR-RUN-20260327T055614Z.yaml](/approval_queue/pending/APR-RUN-20260327T055614Z.yaml)
+- [approval_queue/pending/APR-RUN-20260327T063724Z.yaml](/approval_queue/pending/APR-RUN-20260327T063724Z.yaml)
 
 ## scope
 - PR-076 is docs-only and proposal-only.
@@ -26,11 +26,11 @@
 - No runtime, code, test, parser, apply-path, or CLI behavior change.
 - No expansion of `stale` or `latest` into cleanup semantics or selector semantics.
 - Explicit target, dry-run-first, and separate apply remain required.
-- This PR must leave [docs/prs/PR-076/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-076/plan.md) in place before merge.
+- This PR must leave [docs/prs/PR-076/plan.md](/docs/prs/PR-076/plan.md) in place before merge.
 
 ## output summary
-- Add [docs/prs/PR-076/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-076/plan.md) as the PR-local contract and snapshot note.
-- Add [docs/prs/PR-076/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-076/proposal.md) as the dry-run behavior proposal.
+- Add [docs/prs/PR-076/plan.md](/docs/prs/PR-076/plan.md) as the PR-local contract and snapshot note.
+- Add [docs/prs/PR-076/proposal.md](/docs/prs/PR-076/proposal.md) as the dry-run behavior proposal.
 - Pin the minimum dry-run output, safe-fail cases, and apply boundary without approving any mutation implementation.
 
 ## current repo snapshot
@@ -40,8 +40,8 @@
 - Approval queue pending total: `2`.
 - `factory status --root .` reports `stale_pending_count: 1` and `stale_pending_run_ids: RUN-20260327T055614Z`.
 - `inspect-approval-queue --root .` reports relation counts latest `1`, stale `1`, no-latest-run `0`, unparseable `0`.
-- Pending item `APR-RUN-20260327T055614Z.yaml` maps to [runs/latest/RUN-20260327T055614Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T055614Z/run.yaml), which records `pr_id: PR-003` and `state: approval_pending`.
-- Pending item `APR-RUN-20260327T063724Z.yaml` maps to [runs/latest/RUN-20260327T063724Z/run.yaml](/mnt/c/dev/approval-factory/runs/latest/RUN-20260327T063724Z/run.yaml), which records `pr_id: PR-004` and `state: approval_pending`.
+- Pending item `APR-RUN-20260327T055614Z.yaml` maps to [runs/latest/RUN-20260327T055614Z/run.yaml](/runs/latest/RUN-20260327T055614Z/run.yaml), which records `pr_id: PR-003` and `state: approval_pending`.
+- Pending item `APR-RUN-20260327T063724Z.yaml` maps to [runs/latest/RUN-20260327T063724Z/run.yaml](/runs/latest/RUN-20260327T063724Z/run.yaml), which records `pr_id: PR-004` and `state: approval_pending`.
 - The repo therefore currently shows two visible pending approval artifacts across different run and PR histories, so dry-run must stay preview-only and exact-target only.
 
 ## contract to pin in this PR

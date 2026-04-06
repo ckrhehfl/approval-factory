@@ -3,9 +3,9 @@
 ## input refs
 - AGENTS.md working-copy version observed on 2026-04-04
 - User task for PR-069 docs-only handoff refresh
-- [docs/prs/PR-067/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-067/plan.md)
-- [docs/prs/PR-068/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-068/plan.md)
-- [docs/prs/README.md](/mnt/c/dev/approval-factory/docs/prs/README.md)
+- [docs/prs/PR-067/plan.md](/docs/prs/PR-067/plan.md)
+- [docs/prs/PR-068/plan.md](/docs/prs/PR-068/plan.md)
+- [docs/prs/README.md](/docs/prs/README.md)
 - Observed repo/log facts supplied in task input
 
 ## scope

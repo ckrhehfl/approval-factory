@@ -6,11 +6,11 @@
 - `git status -sb`
 - `python -m factory status --root .`
 - `python -m factory inspect-approval-queue --root .`
-- [docs/prs/PR-085/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-085/plan.md)
-- [docs/prs/PR-085/proposal.md](/mnt/c/dev/approval-factory/docs/prs/PR-085/proposal.md)
-- [orchestrator/cli.py](/mnt/c/dev/approval-factory/orchestrator/cli.py)
-- [orchestrator/pipeline.py](/mnt/c/dev/approval-factory/orchestrator/pipeline.py)
-- [tests/test_cli.py](/mnt/c/dev/approval-factory/tests/test_cli.py)
+- [docs/prs/PR-085/plan.md](/docs/prs/PR-085/plan.md)
+- [docs/prs/PR-085/proposal.md](/docs/prs/PR-085/proposal.md)
+- [orchestrator/cli.py](/orchestrator/cli.py)
+- [orchestrator/pipeline.py](/orchestrator/pipeline.py)
+- [tests/test_cli.py](/tests/test_cli.py)
 
 ## scope
 - Implement PR-085 exactly as read-only queue hygiene visibility in `factory inspect-approval-queue` only.

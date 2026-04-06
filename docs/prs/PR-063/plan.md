@@ -2,10 +2,10 @@
 
 ## input refs
 - AGENTS.md v2026-04-03
-- [docs/prs/PR-059/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-059/plan.md)
-- [docs/prs/PR-060/plan.md](/mnt/c/dev/approval-factory/docs/prs/PR-060/plan.md)
-- [orchestrator/cli.py](/mnt/c/dev/approval-factory/orchestrator/cli.py)
-- [tests/test_cli.py](/mnt/c/dev/approval-factory/tests/test_cli.py)
+- [docs/prs/PR-059/plan.md](/docs/prs/PR-059/plan.md)
+- [docs/prs/PR-060/plan.md](/docs/prs/PR-060/plan.md)
+- [orchestrator/cli.py](/orchestrator/cli.py)
+- [tests/test_cli.py](/tests/test_cli.py)
 - User request for PR-063 observed on 2026-04-03
 
 ## scope

@@ -2,9 +2,9 @@
 
 ## input refs
 - AGENTS.md v2026-04-03
-- [pyproject.toml](/mnt/c/dev/approval-factory/pyproject.toml)
-- [orchestrator/cli.py](/mnt/c/dev/approval-factory/orchestrator/cli.py)
-- [tests/test_cli.py](/mnt/c/dev/approval-factory/tests/test_cli.py)
+- [pyproject.toml](/pyproject.toml)
+- [orchestrator/cli.py](/orchestrator/cli.py)
+- [tests/test_cli.py](/tests/test_cli.py)
 - User request for PR-065 observed on 2026-04-03
 
 ## scope
@@ -15,9 +15,9 @@
 - Limit documentation to this PR-local plan note.
 
 ## output summary
-- Add [factory/__main__.py](/mnt/c/dev/approval-factory/factory/__main__.py) as a thin module entrypoint that forwards argv to `orchestrator.cli.main`.
-- Add [factory/__init__.py](/mnt/c/dev/approval-factory/factory/__init__.py) and update [pyproject.toml](/mnt/c/dev/approval-factory/pyproject.toml) package discovery so the shim is importable and packageable.
-- Extend [tests/test_cli.py](/mnt/c/dev/approval-factory/tests/test_cli.py) with subprocess-based invocation checks for `python -m factory --help` and `python -m factory status --help`.
+- Add [factory/__main__.py](/factory/__main__.py) as a thin module entrypoint that forwards argv to `orchestrator.cli.main`.
+- Add [factory/__init__.py](/factory/__init__.py) and update [pyproject.toml](/pyproject.toml) package discovery so the shim is importable and packageable.
+- Extend [tests/test_cli.py](/tests/test_cli.py) with subprocess-based invocation checks for `python -m factory --help` and `python -m factory status --help`.
 - Record the unchanged runtime surface and minimal-shim scope in this plan artifact.
 
 ## risks
