@@ -944,6 +944,10 @@ def inspect_draft_approval(*, root_dir: Path, run_id: str) -> dict[str, Any]:
 
     draft_request_for_diff = copy.deepcopy(draft_request)
     canonical_request_for_diff = copy.deepcopy(canonical_request)
+    legacy_residue = {
+        "draft_present": "recommended_decision" in draft_request_for_diff,
+        "canonical_present": "recommended_decision" in canonical_request_for_diff,
+    }
     draft_request_for_diff.pop("recommended_decision", None)
     canonical_request_for_diff.pop("recommended_decision", None)
     draft_flat = _flatten_mapping_values(draft_request_for_diff, prefix="approval_request")
@@ -979,6 +983,7 @@ def inspect_draft_approval(*, root_dir: Path, run_id: str) -> dict[str, Any]:
             "run_id_match": run_id_match,
             "required_fields_present": True,
         },
+        "legacy_residue": legacy_residue,
         "diff_summary": diff_entries,
         "operator_note": {
             "assist_only": "assist only",

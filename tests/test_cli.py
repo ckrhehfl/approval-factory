@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from orchestrator.cli import inspect_approval_queue_main, main
-from orchestrator.yaml_io import read_yaml
+from orchestrator.yaml_io import read_yaml, write_yaml
 
 
 def _write_minimal_work_item(root, *, work_item_id: str, goal_id: str = "GOAL-TEST") -> None:
@@ -8437,6 +8437,40 @@ class BuildApprovalCliReadinessTest(unittest.TestCase):
             self.assertNotIn("decision_required", output)
             self.assertNotIn("decision", output)
             self.assertNotIn("no decision", output)
+
+    def test_inspect_draft_approval_shows_legacy_residue_without_decision_like_wording(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-INSPECT-LEGACY"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_ready_artifacts(root, run_id)
+            self.assertEqual(main(["build-approval", "--root", str(root), "--run-id", run_id]), 0)
+            self.assertEqual(main(["draft-approval-packet", "--root", str(root), "--run-id", run_id]), 0)
+
+            draft_path = root / "runs" / "draft" / f"APPROVAL-DRAFT-{run_id}.yaml"
+            canonical_path = root / "runs" / "latest" / run_id / "artifacts" / "approval-request.yaml"
+            draft_payload = read_yaml(draft_path)
+            canonical_payload = read_yaml(canonical_path)
+            draft_payload["approval_request"]["recommended_decision"] = "legacy"
+            canonical_payload["approval_request"]["recommended_decision"] = "legacy"
+            write_yaml(draft_path, draft_payload)
+            write_yaml(canonical_path, canonical_payload)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["inspect-draft-approval", "--root", str(root), "--run-id", run_id])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue().lower()
+            self.assertIn("legacy residue", output)
+            self.assertIn("- draft_present: true", output)
+            self.assertIn("- canonical_present: true", output)
+            self.assertNotIn("recommended_decision", output)
+            self.assertNotIn("decision_required", output)
+            self.assertNotIn("decision", output)
 
     def test_review_approval_fails_clearly_when_canonical_artifact_is_missing(self) -> None:
         from pathlib import Path

@@ -223,6 +223,21 @@ def _render_draft_approval_inspection(inspection: dict[str, object]) -> str:
         lines.append("- none")
 
     lines.append("")
+    lines.append("Legacy Residue")
+    legacy_residue = inspection.get("legacy_residue")
+    if isinstance(legacy_residue, dict):
+        draft_present = bool(legacy_residue.get("draft_present"))
+        canonical_present = bool(legacy_residue.get("canonical_present"))
+        if draft_present or canonical_present:
+            lines.append(f"- draft_present: {draft_present}")
+            lines.append(f"- canonical_present: {canonical_present}")
+            lines.append("- note: legacy approval field residue detected; compare and clean up manually")
+        else:
+            lines.append("- none")
+    else:
+        lines.append("- none")
+
+    lines.append("")
     lines.append("Diff Summary")
     diff_summary = inspection.get("diff_summary")
     if isinstance(diff_summary, list) and diff_summary:
