@@ -5,7 +5,8 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from orchestrator.cli import main
-from orchestrator.yaml_io import read_yaml
+from orchestrator.pipeline import inspect_draft_approval
+from orchestrator.yaml_io import read_yaml, write_yaml
 
 
 class PipelineApprovalLoopTest(unittest.TestCase):
@@ -721,6 +722,41 @@ class PipelineApprovalLoopTest(unittest.TestCase):
 
             with self.assertRaises(SystemExit):
                 main(["draft-approval-packet", "--root", str(root), "--run-id", "RUN-404"])
+
+    def test_inspect_draft_approval_reports_legacy_residue_even_when_diff_is_clean(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "RUN-DRAFT-LEGACY"
+            self._prepare_root(root)
+            self._bootstrap(root, run_id)
+            self._record_verification(root, run_id)
+            self._record_non_verification_ready(root, run_id)
+            self._build_approval(root, run_id)
+            self.assertEqual(main(["draft-approval-packet", "--root", str(root), "--run-id", run_id]), 0)
+
+            draft_path = root / "runs" / "draft" / f"APPROVAL-DRAFT-{run_id}.yaml"
+            canonical_path = root / "runs" / "latest" / run_id / "artifacts" / "approval-request.yaml"
+            draft_payload = read_yaml(draft_path)
+            canonical_payload = read_yaml(canonical_path)
+            draft_payload["approval_request"]["recommended_decision"] = "legacy"
+            canonical_payload["approval_request"]["recommended_decision"] = "legacy"
+            write_yaml(draft_path, draft_payload)
+            write_yaml(canonical_path, canonical_payload)
+
+            inspection = inspect_draft_approval(root_dir=root, run_id=run_id)
+
+            self.assertEqual(
+                inspection["legacy_residue"],
+                {
+                    "draft_present": True,
+                    "canonical_present": True,
+                },
+            )
+            self.assertTrue(inspection["diff_summary"])
+            self.assertNotIn(
+                "recommended_decision",
+                " ".join(str(entry.get("field", "")) for entry in inspection["diff_summary"]),
+            )
 
     def test_draft_approval_packet_fails_when_artifacts_are_incomplete(self) -> None:
         with TemporaryDirectory() as tmp:
