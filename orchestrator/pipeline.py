@@ -6,6 +6,7 @@ from enum import StrEnum
 from pathlib import Path
 import shutil
 import re
+import subprocess
 from typing import Any, Iterable
 
 from orchestrator.models import RunRecord
@@ -553,6 +554,20 @@ def _read_active_pr_summary(root_dir: Path) -> dict[str, str] | None:
         "work_item_id": sections.get("Work Item ID", "unknown"),
         "path": plans[0].as_posix(),
     }
+
+
+def _read_active_pr_summaries(root_dir: Path) -> list[dict[str, str]]:
+    summaries: list[dict[str, str]] = []
+    for path in sorted(_pr_active_dir(root_dir).glob("*.md")):
+        sections = _parse_markdown_sections(path)
+        summaries.append(
+            {
+                "pr_id": sections.get("PR ID", path.stem),
+                "work_item_id": sections.get("Work Item ID", "unknown"),
+                "path": path.as_posix(),
+            }
+        )
+    return summaries
 
 
 def _read_approval_summary(root_dir: Path, run_id: str | None) -> dict[str, str]:
@@ -2216,6 +2231,148 @@ def get_factory_status(root_dir: Path) -> dict[str, Any]:
         "approval": _read_approval_summary(root_dir, latest_run_id),
         "approval_queue": _read_approval_queue_visibility(root_dir, latest_run_id),
         "open_clarifications": _read_open_clarifications(root_dir),
+    }
+
+
+def _current_git_branch(root_dir: Path) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=root_dir,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    branch = result.stdout.strip()
+    return branch or None
+
+
+def _numeric_pr_number(value: str) -> int | None:
+    match = re.fullmatch(r"PR-(\d+)", value.strip())
+    if match is None:
+        return None
+    return int(match.group(1))
+
+
+def _suggested_pr_identity(root_dir: Path, branch_name: str | None) -> tuple[str, str]:
+    seen_numbers: list[int] = []
+    if branch_name:
+        branch_match = re.fullmatch(r"pr/(\d+)-[a-z0-9][a-z0-9-]*", branch_name.strip())
+        if branch_match is not None:
+            seen_numbers.append(int(branch_match.group(1)))
+    for candidate in (root_dir / "docs" / "prs").glob("PR-*"):
+        if candidate.is_dir():
+            number = _numeric_pr_number(candidate.name)
+            if number is not None:
+                seen_numbers.append(number)
+    for candidate in _pr_active_dir(root_dir).glob("PR-*.md"):
+        number = _numeric_pr_number(candidate.stem)
+        if number is not None:
+            seen_numbers.append(number)
+    for candidate in _pr_archive_dir(root_dir).glob("PR-*.md"):
+        number = _numeric_pr_number(candidate.stem)
+        if number is not None:
+            seen_numbers.append(number)
+
+    next_number = (max(seen_numbers) + 1) if seen_numbers else 1
+    suggested_pr_id = f"PR-{next_number:03d}"
+    suggested_branch = f"pr/{next_number:03d}-assist-only-next-pr"
+    return suggested_pr_id, suggested_branch
+
+
+def suggest_next_pr(root_dir: Path) -> dict[str, Any]:
+    status = get_factory_status(root_dir)
+    branch_name = _current_git_branch(root_dir)
+    active_pr = status.get("active_pr")
+    active_prs = _read_active_pr_summaries(root_dir)
+    latest_run = status.get("latest_run")
+    approval = status.get("approval")
+    approval_queue = status.get("approval_queue")
+    short_state_block = {
+        "branch": branch_name or "unavailable",
+        "active_pr": active_pr.get("pr_id") if isinstance(active_pr, dict) else "none",
+        "latest_run_id": latest_run.get("run_id") if isinstance(latest_run, dict) else "none",
+        "latest_run_state": latest_run.get("state") if isinstance(latest_run, dict) else "none",
+        "approval_status": approval.get("status") if isinstance(approval, dict) else "none",
+        "pending_total": approval_queue.get("pending_total") if isinstance(approval_queue, dict) else "none",
+        "stale_pending_count": approval_queue.get("stale_pending_count") if isinstance(approval_queue, dict) else "none",
+        "open_clarification_count": len(status.get("open_clarifications") or []),
+    }
+
+    if len(active_prs) > 1:
+        short_state_block["active_pr"] = "ambiguous"
+        return {
+            "mode": "active-pr-ambiguous",
+            "short_state_block": short_state_block,
+            "active_prs": active_prs,
+            "ambiguity_note": (
+                f"ambiguous active PR state surfaced explicitly: prs/active contains {len(active_prs)} PR plans; "
+                "this surface stays read-only and does not auto-select, clean up, or recover; human decision required"
+            ),
+            "assist_only_note": "read-only operator assist only; hard-stop with no new PR suggestion",
+            "flow_note": "short state block is sufficient for assist-only continuity when a full pack is absent",
+        }
+
+    if isinstance(active_pr, dict):
+        return {
+            "mode": "active-pr-present",
+            "short_state_block": short_state_block,
+            "active_pr": {
+                "pr_id": active_pr.get("pr_id") or "unknown",
+                "work_item_id": active_pr.get("work_item_id") or "unknown",
+                "path": active_pr.get("path") or "none",
+            },
+            "assist_only_note": (
+                "active PR is already present; this surface stays read-only and does not suggest another PR automatically; "
+                "human decision required"
+            ),
+            "flow_note": "short state block is sufficient for assist-only continuity when a full pack is absent",
+        }
+
+    suggested_pr_id, suggested_branch = _suggested_pr_identity(root_dir, branch_name)
+    scope: list[str] = []
+    if branch_name and branch_name == suggested_branch:
+        scope.append(f"finish the current assist-only slice on {suggested_branch} without widening semantics")
+    else:
+        scope.append("prepare one small assist-only slice without creating or mutating PR/runtime artifacts")
+    scope.append("keep changes limited to one operator-facing surface plus docs/tests sync")
+
+    validation_commands = [
+        "python -m factory suggest-next-pr --root .",
+        "PYTHONPATH=. pytest -q",
+    ]
+    current_branch_note: str | None = None
+    if branch_name:
+        current_branch_note = (
+            f"current branch remains continuity context only: {branch_name}; it is not reused as the suggested next PR branch"
+        )
+
+    return {
+        "mode": "suggested",
+        "short_state_block": short_state_block,
+        "suggested_pr": {
+            "pr_id": suggested_pr_id,
+            "branch": suggested_branch,
+        },
+        "minimum_execution_packet": {
+            "branch_name": suggested_branch,
+            "work_scope": scope[:2],
+            "validation_commands": validation_commands,
+            "closeout_log_format": (
+                "[assist-closeout] branch=<branch> scope=\"<scope-1>; <scope-2>\" "
+                "validation=\"python -m factory suggest-next-pr --root .; PYTHONPATH=. pytest -q\" "
+                "result=<pass|fail|not-run>"
+            ),
+        },
+        "assist_only_note": "read-only operator assist only; no branch creation, run creation, or queue mutation",
+        "flow_note": "short state block is sufficient for assist-only continuity when a full pack is absent",
+        "current_branch_note": current_branch_note,
     }
 
 

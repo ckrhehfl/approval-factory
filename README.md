@@ -35,6 +35,7 @@
 - `bootstrap-run`
 - `status`
 - `inspect-approval-queue`
+- `suggest-next-pr`
 - `hygiene-approval-queue`
 - `inspect-approval`
 - `inspect-draft-approval`
@@ -218,6 +219,16 @@ approval queue visibility 규칙:
 `inspect-run` 최소 계약:
 - `factory inspect-run`은 latest run 또는 지정된 run의 execution run 전체를 읽기 전용 inspection 출력한다.
 - 선택은 `--latest` 또는 `--run-id <id>`로 하며 latest run 선택 규칙은 `factory status`와 동일하다.
+
+`suggest-next-pr` 최소 계약:
+- `factory suggest-next-pr`는 현재 repo 상태를 읽기 전용으로 요약한 `Short State Block`과 assist-only `Minimum Execution Packet`을 출력한다.
+- active PR가 이미 있으면 새 PR 자동 제안 대신 안전하게 멈추고 active PR context만 보여준다.
+- `prs/active/`에 active PR가 여러 개 있으면 ambiguous active PR state를 명시적으로 surface하고, 새 PR suggestion 없이 hard-stop한다.
+- active PR가 없으면 repo와 현재 branch에서 관찰되는 numeric PR id 범위를 기준으로 다음 unused PR id/branch를 assist-only로 제안한다.
+- 현재 branch는 continuation context로만 함께 보일 수 있으며, 제안 대상과 같은 의미로 재사용하지 않는다.
+- 출력 패킷은 `branch_name`, `work_scope` 1~2개, `validation_command`, `closeout_log_format`만 포함한다.
+- short state block 기반 continuity assist일 뿐이며 full pack, branch 생성, run 생성, queue mutation, approval/review/decision semantics 변경은 포함하지 않는다.
+- ambiguous active PR state를 보여주더라도 자동 선택, 정리, 복구 semantics는 추가하지 않는다.
 - 출력은 operator-facing visibility only이며 queue eligibility, approval decision, gate 계산, approval lifecycle transition에 영향을 주지 않는다.
 - 최소 출력 항목: `run_id`, run path/existence/state, safely derivable latest relation 및 active PR relation, run-related operator artifact presence summary(`review`, `qa`, `docs-sync`, `verification`, `gate-check`, `approval-request`, `evidence-bundle`), degraded note.
 - 일부 artifact가 없거나 부분적으로 unreadable이어도 queue mutation, cleanup, auto-hide, auto-resolve 없이 degraded note로만 보여준다.
