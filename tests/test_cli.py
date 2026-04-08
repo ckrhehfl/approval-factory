@@ -3639,6 +3639,39 @@ class StatusCliTest(unittest.TestCase):
             self.assertIn("human decision required", output)
             self.assertNotIn("Minimum Execution Packet:", output)
 
+    def test_suggest_next_pr_surfaces_multi_active_pr_ambiguity_and_hard_stops(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            active_dir = root / "prs" / "active"
+            active_dir.mkdir(parents=True, exist_ok=True)
+            (active_dir / "PR-121.md").write_text(
+                "# PR-121\n\n## PR ID\nPR-121\n\n## Work Item ID\nWI-121\n\n## Title\nactive pr one\n",
+                encoding="utf-8",
+            )
+            (active_dir / "PR-122.md").write_text(
+                "# PR-122\n\n## PR ID\nPR-122\n\n## Work Item ID\nWI-122\n\n## Title\nactive pr two\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["suggest-next-pr", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Short State Block:", output)
+            self.assertIn("- active_pr: ambiguous", output)
+            self.assertIn("PR Suggestion:\n- none", output)
+            self.assertIn("ambiguous active PR state surfaced explicitly", output)
+            self.assertIn("hard-stop with no new PR suggestion", output)
+            self.assertIn("Active PR Context:", output)
+            self.assertIn("- active_pr_id: PR-121", output)
+            self.assertIn("- active_pr_id: PR-122", output)
+            self.assertIn("human decision required", output)
+            self.assertNotIn("Minimum Execution Packet:", output)
+
     def test_status_shows_active_pr_latest_run_approval_and_open_clarifications(self) -> None:
         from pathlib import Path
 

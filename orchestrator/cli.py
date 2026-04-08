@@ -201,16 +201,32 @@ def _render_suggest_next_pr(suggestion: dict[str, object]) -> str:
     lines.append(f"- assist_only_note: {suggestion.get('assist_only_note') or 'read-only operator assist only'}")
     if suggestion.get("current_branch_note"):
         lines.append(f"- current_branch_note: {suggestion.get('current_branch_note')}")
+    if suggestion.get("ambiguity_note"):
+        lines.append(f"- ambiguity_note: {suggestion.get('ambiguity_note')}")
 
-    if suggestion.get("mode") == "active-pr-present":
-        active_pr = suggestion.get("active_pr")
+    if suggestion.get("mode") in {"active-pr-present", "active-pr-ambiguous"}:
         lines.append("")
         lines.append("PR Suggestion:")
         lines.append("- none")
-        if isinstance(active_pr, dict):
-            lines.append(f"- active_pr_id: {active_pr.get('pr_id') or 'unknown'}")
-            lines.append(f"- work_item_id: {active_pr.get('work_item_id') or 'unknown'}")
-            lines.append(f"- path: {active_pr.get('path') or 'none'}")
+        if suggestion.get("mode") == "active-pr-ambiguous":
+            lines.append("")
+            lines.append("Active PR Context:")
+            active_prs = suggestion.get("active_prs")
+            if isinstance(active_prs, list) and active_prs:
+                for active_pr in active_prs:
+                    if not isinstance(active_pr, dict):
+                        continue
+                    lines.append(f"- active_pr_id: {active_pr.get('pr_id') or 'unknown'}")
+                    lines.append(f"  work_item_id: {active_pr.get('work_item_id') or 'unknown'}")
+                    lines.append(f"  path: {active_pr.get('path') or 'none'}")
+            else:
+                lines.append("- none")
+        else:
+            active_pr = suggestion.get("active_pr")
+            if isinstance(active_pr, dict):
+                lines.append(f"- active_pr_id: {active_pr.get('pr_id') or 'unknown'}")
+                lines.append(f"- work_item_id: {active_pr.get('work_item_id') or 'unknown'}")
+                lines.append(f"- path: {active_pr.get('path') or 'none'}")
         return "\n".join(lines)
 
     suggested_pr = suggestion.get("suggested_pr")

@@ -39,6 +39,8 @@
 
 - `factory suggest-next-pr`는 status와 같은 repo-local visibility inputs를 읽되, 별도의 assist-only surface로 `Short State Block`과 `Minimum Execution Packet`만 출력한다.
 - active PR가 있으면 새 PR 자동 제안 대신 안전하게 멈추고 active PR context만 보여준다.
+- `prs/active/`에 active PR plan이 여러 개 있으면 ambiguous active PR state를 명시적으로 surface하고 hard-stop한다.
 - active PR가 없으면 repo와 현재 branch에서 관찰되는 numeric PR id 범위를 기준으로 다음 unused PR id/branch를 assist-only로 제안할 수 있다.
 - 현재 branch는 continuity context only이며 suggested next PR identity와 같은 의미로 쓰지 않는다.
 - 이 assist surface도 read-only다. full pack, branch 생성, run 생성, queue mutation, selector semantics, approval/review semantics를 만들지 않는다.
+- ambiguous active PR state를 보여주더라도 auto-select, cleanup, recovery semantics는 만들지 않는다.

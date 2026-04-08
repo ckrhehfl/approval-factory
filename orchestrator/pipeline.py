@@ -556,6 +556,20 @@ def _read_active_pr_summary(root_dir: Path) -> dict[str, str] | None:
     }
 
 
+def _read_active_pr_summaries(root_dir: Path) -> list[dict[str, str]]:
+    summaries: list[dict[str, str]] = []
+    for path in sorted(_pr_active_dir(root_dir).glob("*.md")):
+        sections = _parse_markdown_sections(path)
+        summaries.append(
+            {
+                "pr_id": sections.get("PR ID", path.stem),
+                "work_item_id": sections.get("Work Item ID", "unknown"),
+                "path": path.as_posix(),
+            }
+        )
+    return summaries
+
+
 def _read_approval_summary(root_dir: Path, run_id: str | None) -> dict[str, str]:
     if not run_id:
         return {"status": "none"}
@@ -2276,6 +2290,7 @@ def suggest_next_pr(root_dir: Path) -> dict[str, Any]:
     status = get_factory_status(root_dir)
     branch_name = _current_git_branch(root_dir)
     active_pr = status.get("active_pr")
+    active_prs = _read_active_pr_summaries(root_dir)
     latest_run = status.get("latest_run")
     approval = status.get("approval")
     approval_queue = status.get("approval_queue")
@@ -2289,6 +2304,20 @@ def suggest_next_pr(root_dir: Path) -> dict[str, Any]:
         "stale_pending_count": approval_queue.get("stale_pending_count") if isinstance(approval_queue, dict) else "none",
         "open_clarification_count": len(status.get("open_clarifications") or []),
     }
+
+    if len(active_prs) > 1:
+        short_state_block["active_pr"] = "ambiguous"
+        return {
+            "mode": "active-pr-ambiguous",
+            "short_state_block": short_state_block,
+            "active_prs": active_prs,
+            "ambiguity_note": (
+                f"ambiguous active PR state surfaced explicitly: prs/active contains {len(active_prs)} PR plans; "
+                "this surface stays read-only and does not auto-select, clean up, or recover; human decision required"
+            ),
+            "assist_only_note": "read-only operator assist only; hard-stop with no new PR suggestion",
+            "flow_note": "short state block is sufficient for assist-only continuity when a full pack is absent",
+        }
 
     if isinstance(active_pr, dict):
         return {
