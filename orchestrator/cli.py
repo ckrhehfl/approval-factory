@@ -45,6 +45,7 @@ from orchestrator.pipeline import (
     resolve_latest_run_id,
     resolve_approval,
     start_execution,
+    suggest_next_pr,
     trace_run,
     trace_lineage,
 )
@@ -176,6 +177,72 @@ def _render_approval_queue_inspection(inspection: dict[str, object]) -> str:
                 "  queue_hygiene_note: read-only operator visibility only; exact stored audit fields only; not cleanup, resolve, approval decision, readiness/gate, selector, latest/stale relation, or Relation Summary state"
             )
         lines.append(f"  note: {item.get('note') or 'none'}")
+    return "\n".join(lines)
+
+
+def _render_suggest_next_pr(suggestion: dict[str, object]) -> str:
+    lines = ["Short State Block:"]
+    short_state = suggestion.get("short_state_block")
+    if isinstance(short_state, dict):
+        lines.append(f"- branch: {short_state.get('branch') or 'unavailable'}")
+        lines.append(f"- active_pr: {short_state.get('active_pr') or 'none'}")
+        lines.append(f"- latest_run_id: {short_state.get('latest_run_id') or 'none'}")
+        lines.append(f"- latest_run_state: {short_state.get('latest_run_state') or 'none'}")
+        lines.append(f"- approval_status: {short_state.get('approval_status') or 'none'}")
+        lines.append(f"- pending_total: {short_state.get('pending_total')}")
+        lines.append(f"- stale_pending_count: {short_state.get('stale_pending_count')}")
+        lines.append(f"- open_clarification_count: {short_state.get('open_clarification_count')}")
+    else:
+        lines.append("- none")
+
+    lines.append("")
+    lines.append("Assist-Only Flow:")
+    lines.append(f"- note: {suggestion.get('flow_note') or 'short state block only'}")
+    lines.append(f"- assist_only_note: {suggestion.get('assist_only_note') or 'read-only operator assist only'}")
+    if suggestion.get("current_branch_note"):
+        lines.append(f"- current_branch_note: {suggestion.get('current_branch_note')}")
+
+    if suggestion.get("mode") == "active-pr-present":
+        active_pr = suggestion.get("active_pr")
+        lines.append("")
+        lines.append("PR Suggestion:")
+        lines.append("- none")
+        if isinstance(active_pr, dict):
+            lines.append(f"- active_pr_id: {active_pr.get('pr_id') or 'unknown'}")
+            lines.append(f"- work_item_id: {active_pr.get('work_item_id') or 'unknown'}")
+            lines.append(f"- path: {active_pr.get('path') or 'none'}")
+        return "\n".join(lines)
+
+    suggested_pr = suggestion.get("suggested_pr")
+    lines.append("")
+    lines.append("PR Suggestion:")
+    if isinstance(suggested_pr, dict):
+        lines.append(f"- pr_id: {suggested_pr.get('pr_id') or 'none'}")
+        lines.append(f"- branch: {suggested_pr.get('branch') or 'none'}")
+    else:
+        lines.append("- none")
+
+    lines.append("")
+    lines.append("Minimum Execution Packet:")
+    packet = suggestion.get("minimum_execution_packet")
+    if isinstance(packet, dict):
+        lines.append(f"- branch_name: {packet.get('branch_name') or 'none'}")
+        work_scope = packet.get("work_scope")
+        if isinstance(work_scope, list) and work_scope:
+            for item in work_scope[:2]:
+                lines.append(f"- work_scope: {item}")
+        else:
+            lines.append("- work_scope: none")
+        validation_commands = packet.get("validation_commands")
+        if isinstance(validation_commands, list) and validation_commands:
+            for command in validation_commands:
+                lines.append(f"- validation_command: {command}")
+        else:
+            lines.append("- validation_command: none")
+        lines.append(f"- closeout_log_format: {packet.get('closeout_log_format') or 'none'}")
+    else:
+        lines.append("- none")
+
     return "\n".join(lines)
 
 
@@ -1007,6 +1074,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     inspect_approval_queue_parser.add_argument("--root", default=".", help="Repository root path")
 
+    suggest_next_pr_parser = subparsers.add_parser(
+        "suggest-next-pr",
+        help="Suggest one assist-only next PR candidate from current repo state without mutation",
+        description="Suggest one assist-only next PR candidate from current repo state in read-only mode.",
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  review the short state block and minimum execution packet as operator assist only; if an active PR already exists, this command stops instead of suggesting another PR",
+            "",
+            "Example:",
+            "  factory suggest-next-pr --root .",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    suggest_next_pr_parser.add_argument("--root", default=".", help="Repository root path")
+
     hygiene_approval_queue_parser = subparsers.add_parser(
         "hygiene-approval-queue",
         help="Preview or apply exact-target approval queue hygiene without cleanup semantics",
@@ -1694,6 +1776,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "inspect-approval-queue":
         print(_render_approval_queue_inspection(inspect_approval_queue(root_dir=Path(args.root))))
+        return 0
+
+    if args.command == "suggest-next-pr":
+        print(_render_suggest_next_pr(suggest_next_pr(root_dir=Path(args.root))))
         return 0
 
     if args.command == "hygiene-approval-queue":

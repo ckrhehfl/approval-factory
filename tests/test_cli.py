@@ -8,6 +8,7 @@ import subprocess
 import sys
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from orchestrator.cli import inspect_approval_queue_main, main
 from orchestrator.yaml_io import read_yaml, write_yaml
@@ -357,6 +358,16 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         self.assertIn("Example:", output)
         self.assertIn("factory inspect-approval --root . --run-id <run-id>", output)
         self.assertIn("factory inspect-approval-queue --root .", output)
+
+    def test_suggest_next_pr_help_includes_assist_only_boundary(self) -> None:
+        output = self._run_help("suggest-next-pr")
+
+        self.assertIn("Suggest one assist-only next PR candidate from current repo state in read-only mode.", output)
+        self.assertIn("Next step:", output)
+        self.assertIn("factory suggest-next-pr --root .", output)
+        self.assertNotIn("recommended action", output)
+        self.assertNotIn("approved path", output)
+        self.assertNotIn("next PR to run", output)
 
     def test_hygiene_approval_queue_help_includes_description_next_step_and_examples(self) -> None:
         output = self._run_help("hygiene-approval-queue")
@@ -3537,6 +3548,97 @@ class StartExecutionCliTest(unittest.TestCase):
 
 
 class StatusCliTest(unittest.TestCase):
+    def test_suggest_next_pr_surfaces_short_state_block_and_minimum_packet_when_no_active_pr_exists(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs" / "prs" / "PR-009").mkdir(parents=True, exist_ok=True)
+            run_dir = root / "runs" / "latest" / "RUN-901"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-901",
+                        "  state: approval_pending",
+                        "  created_at: '2026-04-08T09:00:00+00:00'",
+                        "  updated_at: '2026-04-08T09:05:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            _write_minimal_pending_approval(root, run_id="RUN-901")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["suggest-next-pr", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Short State Block:", output)
+            self.assertIn("- active_pr: none", output)
+            self.assertIn("- latest_run_id: RUN-901", output)
+            self.assertIn("- approval_status: pending", output)
+            self.assertIn("PR Suggestion:", output)
+            self.assertIn("- pr_id: PR-010", output)
+            self.assertIn("- branch: pr/010-assist-only-next-pr", output)
+            self.assertIn("Minimum Execution Packet:", output)
+            self.assertIn("- work_scope:", output)
+            self.assertIn("- validation_command: python -m factory suggest-next-pr --root .", output)
+            self.assertIn("- validation_command: PYTHONPATH=. pytest -q", output)
+            self.assertNotIn("recommended action", output)
+            self.assertNotIn("approved path", output)
+            self.assertNotIn("next PR to run", output)
+
+    def test_suggest_next_pr_uses_next_unused_identity_even_when_current_branch_has_pr_number(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs" / "prs" / "PR-106").mkdir(parents=True, exist_ok=True)
+
+            stdout = StringIO()
+            with patch("orchestrator.pipeline._current_git_branch", return_value="pr/108-fast-loop-next-pr-assist"):
+                with redirect_stdout(stdout):
+                    exit_code = main(["suggest-next-pr", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- branch: pr/108-fast-loop-next-pr-assist", output)
+            self.assertIn("- pr_id: PR-109", output)
+            self.assertIn("- branch: pr/109-assist-only-next-pr", output)
+            self.assertIn(
+                "- current_branch_note: current branch remains continuity context only: pr/108-fast-loop-next-pr-assist; it is not reused as the suggested next PR branch",
+                output,
+            )
+
+    def test_suggest_next_pr_stops_safely_when_active_pr_exists(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            active_pr = root / "prs" / "active" / "PR-120.md"
+            active_pr.parent.mkdir(parents=True, exist_ok=True)
+            active_pr.write_text(
+                "# PR-120\n\n## PR ID\nPR-120\n\n## Work Item ID\nWI-120\n\n## Title\nactive pr\n",
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["suggest-next-pr", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Short State Block:", output)
+            self.assertIn("- active_pr: PR-120", output)
+            self.assertIn("PR Suggestion:\n- none", output)
+            self.assertIn("- active_pr_id: PR-120", output)
+            self.assertIn("human decision required", output)
+            self.assertNotIn("Minimum Execution Packet:", output)
+
     def test_status_shows_active_pr_latest_run_approval_and_open_clarifications(self) -> None:
         from pathlib import Path
 
