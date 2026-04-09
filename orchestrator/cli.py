@@ -19,6 +19,7 @@ from orchestrator.pipeline import (
     create_pr_plan,
     create_work_item,
     draft_approval_packet,
+    draft_review_packet_assist,
     evaluate_gates,
     get_factory_status,
     get_work_item_readiness,
@@ -369,6 +370,66 @@ def _render_review_approval_summary(inspection: dict[str, object], run_id: str) 
             "no approval command was executed",
         ]
     )
+
+
+def _render_review_packet_assist(packet: dict[str, object]) -> str:
+    lines = ["Review Packet Assist:"]
+    lines.append(f"- mode: {packet.get('mode') or 'assist-only'}")
+    lines.append("- mutation: none")
+    lines.append("- decision: human review required")
+
+    lines.append("")
+    lines.append("Runtime Facts:")
+    runtime_facts = packet.get("runtime_facts")
+    if isinstance(runtime_facts, dict):
+        lines.append(f"- branch: {runtime_facts.get('branch') or 'unavailable'}")
+        lines.append(f"- active_pr: {runtime_facts.get('active_pr') or 'none'}")
+        lines.append(f"- latest_run_id: {runtime_facts.get('latest_run_id') or 'none'}")
+        lines.append(f"- latest_run_state: {runtime_facts.get('latest_run_state') or 'none'}")
+        lines.append(f"- approval_status: {runtime_facts.get('approval_status') or 'none'}")
+        lines.append(f"- pending_total: {runtime_facts.get('pending_total')}")
+        lines.append(f"- stale_pending_count: {runtime_facts.get('stale_pending_count')}")
+        lines.append(f"- open_clarification_count: {runtime_facts.get('open_clarification_count')}")
+        lines.append(f"- AGENTS.md: {runtime_facts.get('agents_md') or 'missing'}")
+        lines.append(f"- review_base: {runtime_facts.get('review_base') or 'origin/main...HEAD'}")
+    else:
+        lines.append("- none")
+
+    lines.append("")
+    lines.append("Review Command Block:")
+    commands = packet.get("review_command_block")
+    if isinstance(commands, list) and commands:
+        for command in commands:
+            lines.append(command)
+    else:
+        lines.append("none")
+
+    lines.append("")
+    lines.append("Review Prompt Draft:")
+    prompt_lines = packet.get("review_prompt_draft")
+    if isinstance(prompt_lines, list) and prompt_lines:
+        for line in prompt_lines:
+            lines.append(line)
+    else:
+        lines.append("none")
+
+    lines.append("")
+    lines.append("STATE BLOCK Draft:")
+    state_block_lines = packet.get("state_block_draft")
+    if isinstance(state_block_lines, list) and state_block_lines:
+        lines.extend(str(line) for line in state_block_lines)
+    else:
+        lines.append("- none")
+
+    lines.append("")
+    lines.append("Omission Note Draft:")
+    omission_lines = packet.get("omission_note_draft")
+    if isinstance(omission_lines, list) and omission_lines:
+        for line in omission_lines:
+            lines.append(f"- {line}")
+    else:
+        lines.append("- none")
+    return "\n".join(lines)
 
 
 def _render_run_inspection(inspection: dict[str, object]) -> str:
@@ -1128,6 +1189,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     suggest_next_pr_parser.add_argument("--root", default=".", help="Repository root path")
 
+    review_packet_assist_parser = subparsers.add_parser(
+        "review-packet-assist",
+        help="Draft a deterministic assist-only review packet for the current repo state and branch diff",
+        description=(
+            "Draft a deterministic assist-only review packet for the current repo state and current branch diff. "
+            "This surface is read-only and does not automate review conclusions, queue mutation, branch creation, or run creation."
+        ),
+        epilog=_render_help_epilog(
+            "Next step:",
+            "  run the emitted review command block directly, then hand the prompt/state/omission drafts to a human review session without turning this surface into a decision engine",
+            "",
+            "Example:",
+            "  factory review-packet-assist --root .",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    review_packet_assist_parser.add_argument("--root", default=".", help="Repository root path")
+
     hygiene_approval_queue_parser = subparsers.add_parser(
         "hygiene-approval-queue",
         help="Preview or apply exact-target approval queue hygiene without cleanup semantics",
@@ -1819,6 +1898,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "suggest-next-pr":
         print(_render_suggest_next_pr(suggest_next_pr(root_dir=Path(args.root))))
+        return 0
+
+    if args.command == "review-packet-assist":
+        print(_render_review_packet_assist(draft_review_packet_assist(root_dir=Path(args.root))))
         return 0
 
     if args.command == "hygiene-approval-queue":

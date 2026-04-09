@@ -376,6 +376,22 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
         self.assertNotIn("approved path", output)
         self.assertNotIn("next PR to run", output)
 
+    def test_review_packet_assist_help_includes_assist_only_boundary(self) -> None:
+        output = self._run_help("review-packet-assist")
+
+        self.assertIn(
+            "Draft a deterministic assist-only review packet for the current repo state and current branch diff.",
+            output,
+        )
+        self.assertIn("Next step:", output)
+        self.assertIn(
+            "run the emitted review command block directly, then hand the prompt/state/omission drafts to a human review session without turning this surface into a decision engine",
+            output,
+        )
+        self.assertIn("factory review-packet-assist --root .", output)
+        self.assertNotIn("recommended decision", output)
+        self.assertNotIn("auto-approve", output)
+
     def test_hygiene_approval_queue_help_includes_description_next_step_and_examples(self) -> None:
         output = self._run_help("hygiene-approval-queue")
 
@@ -3555,6 +3571,71 @@ class StartExecutionCliTest(unittest.TestCase):
 
 
 class StatusCliTest(unittest.TestCase):
+    def test_review_packet_assist_emits_deterministic_assist_only_packet_without_mutation(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "AGENTS.md").write_text("# agent\n", encoding="utf-8")
+            (root / "docs" / "prs" / "PR-109").mkdir(parents=True, exist_ok=True)
+            run_dir = root / "runs" / "latest" / "RUN-901"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-901",
+                        "  state: approval_pending",
+                        "  created_at: '2026-04-08T09:00:00+00:00'",
+                        "  updated_at: '2026-04-08T09:05:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            _write_minimal_pending_approval(root, run_id="RUN-901")
+            before = _snapshot_files(root)
+
+            stdout = StringIO()
+            with patch("orchestrator.pipeline._current_git_branch", return_value="pr/110-review-packet-assist"):
+                with redirect_stdout(stdout):
+                    exit_code = main(["review-packet-assist", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Review Packet Assist:", output)
+            self.assertIn("- mode: assist-only", output)
+            self.assertIn("- mutation: none", output)
+            self.assertIn("- decision: human review required", output)
+            self.assertIn("Runtime Facts:", output)
+            self.assertIn("- branch: pr/110-review-packet-assist", output)
+            self.assertIn("- latest_run_id: RUN-901", output)
+            self.assertIn("- latest_run_state: approval_pending", output)
+            self.assertIn("- approval_status: pending", output)
+            self.assertIn("- pending_total: 1", output)
+            self.assertIn("- stale_pending_count: 0", output)
+            self.assertIn("- AGENTS.md: present", output)
+            self.assertIn("Review Command Block:", output)
+            self.assertIn("python -m factory status --root .", output)
+            self.assertIn("python -m factory inspect-approval-queue --root .", output)
+            self.assertIn("git status -sb", output)
+            self.assertIn("git --no-pager log --oneline --decorate -10", output)
+            self.assertIn("test -f AGENTS.md && echo present || echo missing", output)
+            self.assertIn("python -m factory review-packet-assist --root .", output)
+            self.assertIn("PYTHONPATH=. pytest -q", output)
+            self.assertIn("git --no-pager diff --stat origin/main...HEAD", output)
+            self.assertIn("git --no-pager diff origin/main...HEAD", output)
+            self.assertIn("Review Prompt Draft:", output)
+            self.assertIn("Findings-first review for the current branch diff only.", output)
+            self.assertIn("1. List material bugs, behavioral regressions, or contract drift with file/line refs first.", output)
+            self.assertIn("STATE BLOCK Draft:", output)
+            self.assertIn("- review_base: origin/main...HEAD", output)
+            self.assertIn("Omission Note Draft:", output)
+            self.assertIn("- Omits review conclusion, approval decision, queue mutation, selector semantics, branch creation, run creation, and automatic next-action selection.", output)
+            self.assertNotIn("approved path", output)
+            self.assertNotIn("recommended decision", output)
+            self.assertEqual(_snapshot_files(root), before)
+
     def test_suggest_next_pr_surfaces_short_state_block_and_minimum_packet_when_no_active_pr_exists(self) -> None:
         from pathlib import Path
 

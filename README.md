@@ -36,6 +36,7 @@
 - `status`
 - `inspect-approval-queue`
 - `suggest-next-pr`
+- `review-packet-assist`
 - `hygiene-approval-queue`
 - `inspect-approval`
 - `inspect-draft-approval`
@@ -233,6 +234,15 @@ approval queue visibility 규칙:
 - 출력은 operator-facing visibility only이며 queue eligibility, approval decision, gate 계산, approval lifecycle transition에 영향을 주지 않는다.
 - 최소 출력 항목: `run_id`, run path/existence/state, safely derivable latest relation 및 active PR relation, run-related operator artifact presence summary(`review`, `qa`, `docs-sync`, `verification`, `gate-check`, `approval-request`, `evidence-bundle`), degraded note.
 - 일부 artifact가 없거나 부분적으로 unreadable이어도 queue mutation, cleanup, auto-hide, auto-resolve 없이 degraded note로만 보여준다.
+
+`review-packet-assist` 최소 계약:
+- `factory review-packet-assist`는 현재 repo 상태와 현재 branch diff review를 위한 deterministic assist-only packet draft를 읽기 전용으로 출력한다.
+- 출력은 `Review Command Block`, `Review Prompt Draft`, `STATE BLOCK Draft`, `Omission Note Draft`를 최소 포함한다.
+- `Review Command Block`은 최소한 `python -m factory status --root .`, `python -m factory inspect-approval-queue --root .`, `git status -sb`, `git --no-pager log --oneline --decorate -10`, `test -f AGENTS.md && echo present || echo missing`, relevant command under review, `PYTHONPATH=. pytest -q`, `git --no-pager diff --stat origin/main...HEAD`, `git --no-pager diff origin/main...HEAD`를 포함한다.
+- runtime facts는 현재 repo에서 deterministic하게 채우되, 최종 review verdict, merge 판단, approval/review conclusion은 자동화하지 않는다.
+- review prompt draft는 findings-first review 형식을 유지하고, material issue/risk/missing evidence를 요약보다 먼저 요구해야 한다.
+- 이 surface는 assist-only packet drafting이며 approval/review/queue semantics, decision boundary, selector semantics를 변경하지 않는다.
+- branch 생성, run 생성, queue mutation, review conclusion 자동화는 포함하지 않는다.
 
 `trace-run` 최소 계약:
 - `factory trace-run`은 exact `--run-id <RUN-...>` 하나만 받아 해당 run을 debug-only로 읽는다.
