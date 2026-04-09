@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
@@ -88,6 +89,46 @@ def _snapshot_files(root: Path) -> dict[str, str]:
     for path in sorted(candidate for candidate in root.rglob("*") if candidate.is_file()):
         snapshot[str(path.relative_to(root))] = path.read_text(encoding="utf-8")
     return snapshot
+
+
+def _run_git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def _init_git_repo(root: Path, *, branch_name: str) -> None:
+    result = _run_git(root, "init", "-b", branch_name)
+    assert result.returncode == 0, result.stderr
+    result = _run_git(root, "config", "user.name", "Test User")
+    assert result.returncode == 0, result.stderr
+    result = _run_git(root, "config", "user.email", "test@example.com")
+    assert result.returncode == 0, result.stderr
+
+
+def _write_minimal_review_packet_fixture(root: Path, *, run_id: str = "RUN-901", pr_id: str = "PR-111") -> None:
+    (root / "AGENTS.md").write_text("# agent\n", encoding="utf-8")
+    (root / "docs" / "prs" / pr_id).mkdir(parents=True, exist_ok=True)
+    run_dir = root / "runs" / "latest" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "run.yaml").write_text(
+        "\n".join(
+            [
+                "run:",
+                f"  run_id: {run_id}",
+                "  state: approval_pending",
+                "  created_at: '2026-04-08T09:00:00+00:00'",
+                "  updated_at: '2026-04-08T09:05:00+00:00'",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _write_minimal_pending_approval(root, run_id=run_id)
 
 
 def _assert_queue_hygiene_operator_safe_wording(output: str) -> None:
@@ -3571,6 +3612,76 @@ class StartExecutionCliTest(unittest.TestCase):
 
 
 class StatusCliTest(unittest.TestCase):
+    def test_review_packet_diff_context_uses_committed_range_for_clean_repo(self) -> None:
+        from orchestrator.pipeline import _review_packet_diff_context
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _init_git_repo(root, branch_name="pr/111-review-packet-assist-corrective")
+            (root / "tracked.txt").write_text("baseline\n", encoding="utf-8")
+            result = _run_git(root, "add", "tracked.txt")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            result = _run_git(root, "commit", "-m", "baseline")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+
+            context = _review_packet_diff_context(root)
+
+            self.assertEqual(
+                context,
+                {"review_mode": "committed-range", "review_base": "origin/main...HEAD"},
+            )
+
+    def test_review_packet_assist_clean_repo_uses_committed_range_commands_without_patching_context(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _init_git_repo(root, branch_name="pr/111-review-packet-assist-corrective")
+            (root / "tracked.txt").write_text("baseline\n", encoding="utf-8")
+            _write_minimal_review_packet_fixture(root)
+            result = _run_git(root, "add", ".")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            result = _run_git(root, "commit", "-m", "baseline")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            root_arg = shlex.quote(str(root))
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["review-packet-assist", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- review_mode: committed-range", output)
+            self.assertIn("- review_base: origin/main...HEAD", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff --stat origin/main...HEAD", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff origin/main...HEAD", output)
+            self.assertNotIn(f"git -C {root_arg} --no-pager diff --cached --stat", output)
+            self.assertNotIn(f"git -C {root_arg} --no-pager diff --no-index", output)
+
+    def test_review_packet_diff_context_detects_untracked_only_dirty_tree_even_when_status_hides_untracked(self) -> None:
+        from orchestrator.pipeline import _review_packet_diff_context
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _init_git_repo(root, branch_name="pr/111-review-packet-assist-corrective")
+            (root / "tracked.txt").write_text("baseline\n", encoding="utf-8")
+            result = _run_git(root, "add", "tracked.txt")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            result = _run_git(root, "commit", "-m", "baseline")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            result = _run_git(root, "config", "status.showUntrackedFiles", "no")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            (root / "hidden-untracked.txt").write_text("hidden\n", encoding="utf-8")
+
+            status_result = _run_git(root, "status", "--porcelain")
+            self.assertEqual(status_result.returncode, 0, msg=status_result.stderr)
+            self.assertEqual(status_result.stdout, "")
+
+            context = _review_packet_diff_context(root)
+
+            self.assertEqual(
+                context,
+                {"review_mode": "working-tree", "review_base": "working-tree"},
+            )
+
     def test_review_packet_assist_emits_deterministic_assist_only_packet_without_mutation(self) -> None:
         from pathlib import Path
 
@@ -3595,11 +3706,16 @@ class StatusCliTest(unittest.TestCase):
             )
             _write_minimal_pending_approval(root, run_id="RUN-901")
             before = _snapshot_files(root)
+            root_arg = shlex.quote(str(root))
 
             stdout = StringIO()
             with patch("orchestrator.pipeline._current_git_branch", return_value="pr/110-review-packet-assist"):
-                with redirect_stdout(stdout):
-                    exit_code = main(["review-packet-assist", "--root", str(root)])
+                with patch(
+                    "orchestrator.pipeline._review_packet_diff_context",
+                    return_value={"review_mode": "committed-range", "review_base": "origin/main...HEAD"},
+                ):
+                    with redirect_stdout(stdout):
+                        exit_code = main(["review-packet-assist", "--root", str(root)])
 
             self.assertEqual(exit_code, 0)
             output = stdout.getvalue()
@@ -3615,26 +3731,299 @@ class StatusCliTest(unittest.TestCase):
             self.assertIn("- pending_total: 1", output)
             self.assertIn("- stale_pending_count: 0", output)
             self.assertIn("- AGENTS.md: present", output)
+            self.assertIn("- review_mode: committed-range", output)
             self.assertIn("Review Command Block:", output)
-            self.assertIn("python -m factory status --root .", output)
-            self.assertIn("python -m factory inspect-approval-queue --root .", output)
-            self.assertIn("git status -sb", output)
-            self.assertIn("git --no-pager log --oneline --decorate -10", output)
-            self.assertIn("test -f AGENTS.md && echo present || echo missing", output)
-            self.assertIn("python -m factory review-packet-assist --root .", output)
-            self.assertIn("PYTHONPATH=. pytest -q", output)
-            self.assertIn("git --no-pager diff --stat origin/main...HEAD", output)
-            self.assertIn("git --no-pager diff origin/main...HEAD", output)
+            self.assertIn(f"python -m factory status --root {root_arg}", output)
+            self.assertIn(f"python -m factory inspect-approval-queue --root {root_arg}", output)
+            self.assertIn(f"git -C {root_arg} status -sb", output)
+            self.assertIn(f"git -C {root_arg} --no-pager log --oneline --decorate -10", output)
+            self.assertIn(f"test -f {root_arg}/AGENTS.md && echo present || echo missing", output)
+            self.assertIn(f"python -m factory review-packet-assist --root {root_arg}", output)
+            self.assertIn(f"PYTHONPATH={root_arg} pytest -q {root_arg}/tests", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff --stat origin/main...HEAD", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff origin/main...HEAD", output)
             self.assertIn("Review Prompt Draft:", output)
             self.assertIn("Findings-first review for the current branch diff only.", output)
+            self.assertIn(
+                "Scope: assess the current branch diff and any directly related README/CLI/tests sync, including semantics drift caused by this diff; do not widen into unrelated approval, queue, selector, or decision semantics review.",
+                output,
+            )
             self.assertIn("1. List material bugs, behavioral regressions, or contract drift with file/line refs first.", output)
             self.assertIn("STATE BLOCK Draft:", output)
+            self.assertIn("- review_mode: committed-range", output)
             self.assertIn("- review_base: origin/main...HEAD", output)
             self.assertIn("Omission Note Draft:", output)
             self.assertIn("- Omits review conclusion, approval decision, queue mutation, selector semantics, branch creation, run creation, and automatic next-action selection.", output)
             self.assertNotIn("approved path", output)
             self.assertNotIn("recommended decision", output)
             self.assertEqual(_snapshot_files(root), before)
+
+    def test_review_packet_assist_shell_quotes_non_dot_root_with_spaces_and_single_quote(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp) / "root with 'quote' and space"
+            (root / "docs" / "prs" / "PR-110").mkdir(parents=True, exist_ok=True)
+            (root / "AGENTS.md").write_text("# test\n", encoding="utf-8")
+            run_dir = root / "runs" / "latest" / "RUN-901"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-901",
+                        "  state: approval_pending",
+                        "  created_at: '2026-04-08T09:00:00+00:00'",
+                        "  updated_at: '2026-04-08T09:05:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            _write_minimal_pending_approval(root, run_id="RUN-901")
+            quoted_root = shlex.quote(str(root))
+
+            stdout = StringIO()
+            with patch("orchestrator.pipeline._current_git_branch", return_value="pr/111-review-packet-assist-corrective"):
+                with patch(
+                    "orchestrator.pipeline._review_packet_diff_context",
+                    return_value={"review_mode": "committed-range", "review_base": "origin/main...HEAD"},
+                ):
+                    with redirect_stdout(stdout):
+                        exit_code = main(["review-packet-assist", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn(f"python -m factory status --root {quoted_root}", output)
+            self.assertIn(f"python -m factory inspect-approval-queue --root {quoted_root}", output)
+            self.assertIn(f"git -C {quoted_root} status -sb", output)
+            self.assertIn(f"git -C {quoted_root} --no-pager log --oneline --decorate -10", output)
+            self.assertIn(f"test -f {quoted_root}/AGENTS.md && echo present || echo missing", output)
+            self.assertIn(f"python -m factory review-packet-assist --root {quoted_root}", output)
+            self.assertIn(f"PYTHONPATH={quoted_root} pytest -q {quoted_root}/tests", output)
+            self.assertIn(f"git -C {quoted_root} --no-pager diff --stat origin/main...HEAD", output)
+            self.assertIn(f"git -C {quoted_root} --no-pager diff origin/main...HEAD", output)
+            self.assertIn("- review_mode: committed-range", output)
+            self.assertIn(
+                "Scope: assess the current branch diff and any directly related README/CLI/tests sync, including semantics drift caused by this diff; do not widen into unrelated approval, queue, selector, or decision semantics review.",
+                output,
+            )
+
+    def test_review_packet_assist_uses_working_tree_diff_commands_when_review_mode_is_working_tree(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "AGENTS.md").write_text("# agent\n", encoding="utf-8")
+            (root / "docs" / "prs" / "PR-111").mkdir(parents=True, exist_ok=True)
+            run_dir = root / "runs" / "latest" / "RUN-901"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-901",
+                        "  state: approval_pending",
+                        "  created_at: '2026-04-08T09:00:00+00:00'",
+                        "  updated_at: '2026-04-08T09:05:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            _write_minimal_pending_approval(root, run_id="RUN-901")
+            root_arg = shlex.quote(str(root))
+
+            stdout = StringIO()
+            with patch("orchestrator.pipeline._current_git_branch", return_value="pr/111-review-packet-assist-corrective"):
+                with patch(
+                    "orchestrator.pipeline._review_packet_diff_context",
+                    return_value={"review_mode": "working-tree", "review_base": "working-tree"},
+                ):
+                    with redirect_stdout(stdout):
+                        exit_code = main(["review-packet-assist", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- review_mode: working-tree", output)
+            self.assertIn("- review_base: working-tree", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff --stat", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff --cached --stat", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff --cached", output)
+            self.assertNotIn(f"git -C {root_arg} --no-pager diff --stat origin/main...HEAD", output)
+            self.assertNotIn(f"git -C {root_arg} --no-pager diff origin/main...HEAD", output)
+            self.assertIn(
+                "Input refs: branch=pr/111-review-packet-assist-corrective, review_mode=working-tree, diff_base=working-tree, latest_run_id=RUN-901, approval_status=pending.",
+                output,
+            )
+
+    def test_review_packet_assist_working_tree_mode_renders_cached_diff_commands_from_context(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "AGENTS.md").write_text("# agent\n", encoding="utf-8")
+            (root / "docs" / "prs" / "PR-111").mkdir(parents=True, exist_ok=True)
+            run_dir = root / "runs" / "latest" / "RUN-901"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-901",
+                        "  state: approval_pending",
+                        "  created_at: '2026-04-08T09:00:00+00:00'",
+                        "  updated_at: '2026-04-08T09:05:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            _write_minimal_pending_approval(root, run_id="RUN-901")
+            root_arg = shlex.quote(str(root))
+
+            stdout = StringIO()
+            with patch("orchestrator.pipeline._current_git_branch", return_value="pr/111-review-packet-assist-corrective"):
+                with patch(
+                    "orchestrator.pipeline._review_packet_diff_context",
+                    return_value={"review_mode": "working-tree", "review_base": "working-tree"},
+                ):
+                    with redirect_stdout(stdout):
+                        exit_code = main(["review-packet-assist", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- review_mode: working-tree", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff --stat", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff --cached --stat", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff --cached", output)
+
+    def test_review_packet_assist_untracked_only_dirty_tree_adds_untracked_file_evidence_commands(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _init_git_repo(root, branch_name="pr/111-review-packet-assist-corrective")
+            (root / "tracked.txt").write_text("baseline\n", encoding="utf-8")
+            result = _run_git(root, "add", "tracked.txt")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            result = _run_git(root, "commit", "-m", "baseline")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            _write_minimal_review_packet_fixture(root)
+            untracked_rel = "new evidence.txt"
+            (root / untracked_rel).write_text("new body\nline 2\n", encoding="utf-8")
+            root_arg = shlex.quote(str(root))
+            quoted_untracked = shlex.quote(untracked_rel)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["review-packet-assist", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- review_mode: working-tree", output)
+            self.assertIn("- review_base: working-tree", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff --stat", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff --cached --stat", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff --cached", output)
+            self.assertIn(
+                f"git -C {root_arg} --no-pager diff --no-index --stat -- /dev/null {quoted_untracked}",
+                output,
+            )
+            self.assertIn(
+                f"git -C {root_arg} --no-pager diff --no-index -- /dev/null {quoted_untracked}",
+                output,
+            )
+            self.assertNotIn(f"git -C {root_arg} --no-pager diff --stat origin/main...HEAD", output)
+
+    def test_review_packet_assist_untracked_only_dirty_tree_with_hidden_status_still_uses_working_tree_commands(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _init_git_repo(root, branch_name="pr/111-review-packet-assist-corrective")
+            (root / "tracked.txt").write_text("baseline\n", encoding="utf-8")
+            result = _run_git(root, "add", "tracked.txt")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            result = _run_git(root, "commit", "-m", "baseline")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            result = _run_git(root, "config", "status.showUntrackedFiles", "no")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            _write_minimal_review_packet_fixture(root)
+            untracked_rel = "hidden evidence.txt"
+            (root / untracked_rel).write_text("hidden\n", encoding="utf-8")
+            root_arg = shlex.quote(str(root))
+            quoted_untracked = shlex.quote(untracked_rel)
+
+            status_result = _run_git(root, "status", "--porcelain")
+            self.assertEqual(status_result.returncode, 0, msg=status_result.stderr)
+            self.assertEqual(status_result.stdout, "")
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["review-packet-assist", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- review_mode: working-tree", output)
+            self.assertIn("- review_base: working-tree", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff --cached --stat", output)
+            self.assertIn(
+                f"git -C {root_arg} --no-pager diff --no-index -- /dev/null {quoted_untracked}",
+                output,
+            )
+            self.assertNotIn(f"git -C {root_arg} --no-pager diff --stat origin/main...HEAD", output)
+
+    def test_review_packet_assist_staged_only_dirty_tree_uses_working_tree_mode_with_cached_diff_evidence(self) -> None:
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _init_git_repo(root, branch_name="pr/111-review-packet-assist-corrective")
+            tracked = root / "tracked.txt"
+            tracked.write_text("baseline\n", encoding="utf-8")
+            (root / "AGENTS.md").write_text("# agent\n", encoding="utf-8")
+            (root / "docs" / "prs" / "PR-111").mkdir(parents=True, exist_ok=True)
+            run_dir = root / "runs" / "latest" / "RUN-901"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.yaml").write_text(
+                "\n".join(
+                    [
+                        "run:",
+                        "  run_id: RUN-901",
+                        "  state: approval_pending",
+                        "  created_at: '2026-04-08T09:00:00+00:00'",
+                        "  updated_at: '2026-04-08T09:05:00+00:00'",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            _write_minimal_pending_approval(root, run_id="RUN-901")
+            result = _run_git(root, "add", ".")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            result = _run_git(root, "commit", "-m", "baseline")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            tracked.write_text("baseline\nstaged change\n", encoding="utf-8")
+            result = _run_git(root, "add", "tracked.txt")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            root_arg = shlex.quote(str(root))
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["review-packet-assist", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("- review_mode: working-tree", output)
+            self.assertIn("- review_base: working-tree", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff --stat", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff --cached --stat", output)
+            self.assertIn(f"git -C {root_arg} --no-pager diff --cached", output)
+            self.assertNotIn(f"git -C {root_arg} --no-pager diff --no-index", output)
+            self.assertNotIn(f"git -C {root_arg} --no-pager diff --stat origin/main...HEAD", output)
 
     def test_suggest_next_pr_surfaces_short_state_block_and_minimum_packet_when_no_active_pr_exists(self) -> None:
         from pathlib import Path

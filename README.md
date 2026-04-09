@@ -238,9 +238,10 @@ approval queue visibility 규칙:
 `review-packet-assist` 최소 계약:
 - `factory review-packet-assist`는 현재 repo 상태와 현재 branch diff review를 위한 deterministic assist-only packet draft를 읽기 전용으로 출력한다.
 - 출력은 `Review Command Block`, `Review Prompt Draft`, `STATE BLOCK Draft`, `Omission Note Draft`를 최소 포함한다.
-- `Review Command Block`은 최소한 `python -m factory status --root .`, `python -m factory inspect-approval-queue --root .`, `git status -sb`, `git --no-pager log --oneline --decorate -10`, `test -f AGENTS.md && echo present || echo missing`, relevant command under review, `PYTHONPATH=. pytest -q`, `git --no-pager diff --stat origin/main...HEAD`, `git --no-pager diff origin/main...HEAD`를 포함한다.
+- runtime facts는 `review_mode`를 포함해야 하며, working-tree review면 `review_base: working-tree`, committed-range review면 `review_base: origin/main...HEAD`를 일관되게 보여야 한다.
+- `Review Command Block`은 최소한 requested `--root`를 shell-safe quoted form으로 반영한 status / queue inspection / self-review command와, same-root에서 그대로 실행 가능한 `git -C <root>` status/log/diff, AGENTS.md presence, rooted pytest 명령을 포함한다. working-tree review에서는 unstaged diff와 `diff --cached`를 함께 포함해 staged-only 변경까지 수집하고, untracked 신규 파일이 있으면 `git diff --no-index -- /dev/null <path>` evidence까지 포함해야 한다. committed-range review에서는 `base...HEAD` diff를 사용한다.
 - runtime facts는 현재 repo에서 deterministic하게 채우되, 최종 review verdict, merge 판단, approval/review conclusion은 자동화하지 않는다.
-- review prompt draft는 findings-first review 형식을 유지하고, material issue/risk/missing evidence를 요약보다 먼저 요구해야 한다.
+- review prompt draft는 findings-first review 형식을 유지하고, current branch diff가 초래한 semantics drift는 검토하되 unrelated semantics review로 widen하지 않으면서 material issue/risk/missing evidence를 요약보다 먼저 요구해야 한다.
 - 이 surface는 assist-only packet drafting이며 approval/review/queue semantics, decision boundary, selector semantics를 변경하지 않는다.
 - branch 생성, run 생성, queue mutation, review conclusion 자동화는 포함하지 않는다.
 

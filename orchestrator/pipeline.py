@@ -4,6 +4,7 @@ import copy
 from datetime import datetime, timezone
 from enum import StrEnum
 from pathlib import Path
+import shlex
 import shutil
 import re
 import subprocess
@@ -2268,6 +2269,69 @@ def _current_git_branch(root_dir: Path) -> str | None:
     return branch or None
 
 
+def _review_packet_diff_context(root_dir: Path) -> dict[str, str]:
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=all"],
+            cwd=root_dir,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return {
+            "review_mode": "committed-range",
+            "review_base": "origin/main...HEAD",
+        }
+
+    if result.returncode != 0:
+        return {
+            "review_mode": "committed-range",
+            "review_base": "origin/main...HEAD",
+        }
+
+    if result.stdout.strip():
+        return {
+            "review_mode": "working-tree",
+            "review_base": "working-tree",
+        }
+
+    return {
+        "review_mode": "committed-range",
+        "review_base": "origin/main...HEAD",
+    }
+
+
+def _review_packet_untracked_evidence_commands(root_dir: Path, *, root_arg: str) -> list[str]:
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+            cwd=root_dir,
+            text=False,
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return []
+
+    if result.returncode != 0 or not result.stdout:
+        return []
+
+    commands: list[str] = []
+    for raw_path in result.stdout.split(b"\x00"):
+        if not raw_path:
+            continue
+        relative_path = raw_path.decode("utf-8", errors="surrogateescape")
+        quoted_path = shlex.quote(relative_path)
+        commands.extend(
+            [
+                f"git -C {root_arg} --no-pager diff --no-index --stat -- /dev/null {quoted_path}",
+                f"git -C {root_arg} --no-pager diff --no-index -- /dev/null {quoted_path}",
+            ]
+        )
+    return commands
+
+
 def _numeric_pr_number(value: str) -> int | None:
     match = re.fullmatch(r"PR-(\d+)", value.strip())
     if match is None:
@@ -2412,10 +2476,12 @@ def suggest_next_pr(root_dir: Path) -> dict[str, Any]:
 def draft_review_packet_assist(root_dir: Path) -> dict[str, Any]:
     status = get_factory_status(root_dir)
     branch_name = _current_git_branch(root_dir)
+    diff_context = _review_packet_diff_context(root_dir)
     active_pr = status.get("active_pr")
     latest_run = status.get("latest_run")
     approval = status.get("approval")
     approval_queue = status.get("approval_queue")
+    root_arg = shlex.quote(str(root_dir))
 
     runtime_facts = {
         "branch": branch_name or "unavailable",
@@ -2427,26 +2493,40 @@ def draft_review_packet_assist(root_dir: Path) -> dict[str, Any]:
         "stale_pending_count": approval_queue.get("stale_pending_count") if isinstance(approval_queue, dict) else "none",
         "open_clarification_count": len(status.get("open_clarifications") or []),
         "agents_md": "present" if (root_dir / "AGENTS.md").exists() else "missing",
-        "review_base": "origin/main...HEAD",
+        "review_mode": diff_context["review_mode"],
+        "review_base": diff_context["review_base"],
         "review_surface": "review-packet-assist",
     }
 
+    if runtime_facts["review_mode"] == "working-tree":
+        diff_commands = [
+            f"git -C {root_arg} --no-pager diff --stat",
+            f"git -C {root_arg} --no-pager diff",
+            f"git -C {root_arg} --no-pager diff --cached --stat",
+            f"git -C {root_arg} --no-pager diff --cached",
+            *_review_packet_untracked_evidence_commands(root_dir, root_arg=root_arg),
+        ]
+    else:
+        diff_commands = [
+            f"git -C {root_arg} --no-pager diff --stat {runtime_facts['review_base']}",
+            f"git -C {root_arg} --no-pager diff {runtime_facts['review_base']}",
+        ]
+
     review_command_block = [
-        "python -m factory status --root .",
-        "python -m factory inspect-approval-queue --root .",
-        "git status -sb",
-        "git --no-pager log --oneline --decorate -10",
-        "test -f AGENTS.md && echo present || echo missing",
-        "python -m factory review-packet-assist --root .",
-        "PYTHONPATH=. pytest -q",
-        "git --no-pager diff --stat origin/main...HEAD",
-        "git --no-pager diff origin/main...HEAD",
+        f"python -m factory status --root {root_arg}",
+        f"python -m factory inspect-approval-queue --root {root_arg}",
+        f"git -C {root_arg} status -sb",
+        f"git -C {root_arg} --no-pager log --oneline --decorate -10",
+        f"test -f {root_arg}/AGENTS.md && echo present || echo missing",
+        f"python -m factory review-packet-assist --root {root_arg}",
+        f"PYTHONPATH={root_arg} pytest -q {root_arg}/tests",
+        *diff_commands,
     ]
 
     review_prompt_draft = [
         "Findings-first review for the current branch diff only.",
-        f"Input refs: branch={runtime_facts['branch']}, diff_base={runtime_facts['review_base']}, latest_run_id={runtime_facts['latest_run_id']}, approval_status={runtime_facts['approval_status']}.",
-        "Scope: assess only the assist-only review packet drafting surface plus README/tests sync; do not widen into approval, queue, selector, or decision semantics.",
+        f"Input refs: branch={runtime_facts['branch']}, review_mode={runtime_facts['review_mode']}, diff_base={runtime_facts['review_base']}, latest_run_id={runtime_facts['latest_run_id']}, approval_status={runtime_facts['approval_status']}.",
+        "Scope: assess the current branch diff and any directly related README/CLI/tests sync, including semantics drift caused by this diff; do not widen into unrelated approval, queue, selector, or decision semantics review.",
         "Review order:",
         "1. List material bugs, behavioral regressions, or contract drift with file/line refs first.",
         "2. Then list risks, missing evidence, or test gaps that could affect operator interpretation.",
@@ -2464,6 +2544,7 @@ def draft_review_packet_assist(root_dir: Path) -> dict[str, Any]:
         f"- stale_pending_count: {runtime_facts['stale_pending_count']}",
         f"- open_clarification_count: {runtime_facts['open_clarification_count']}",
         f"- AGENTS.md: {runtime_facts['agents_md']}",
+        f"- review_mode: {runtime_facts['review_mode']}",
         f"- review_base: {runtime_facts['review_base']}",
     ]
 
