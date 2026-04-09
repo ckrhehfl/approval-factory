@@ -570,6 +570,21 @@ def _read_active_pr_summaries(root_dir: Path) -> list[dict[str, str]]:
     return summaries
 
 
+def _active_pr_continuation_context(active_pr: dict[str, str]) -> str:
+    pr_path = active_pr.get("path")
+    if pr_path and pr_path != "none":
+        sections = _parse_markdown_sections(Path(pr_path))
+        title = sections.get("Title")
+        if title:
+            return f"{active_pr.get('pr_id') or 'unknown'}: {title}"
+
+    work_item_id = active_pr.get("work_item_id")
+    if work_item_id and work_item_id != "unknown":
+        return f"{active_pr.get('pr_id') or 'unknown'} linked to {work_item_id}"
+
+    return f"{active_pr.get('pr_id') or 'unknown'} active assist-only continuation"
+
+
 def _read_approval_summary(root_dir: Path, run_id: str | None) -> dict[str, str]:
     if not run_id:
         return {"status": "none"}
@@ -2320,17 +2335,35 @@ def suggest_next_pr(root_dir: Path) -> dict[str, Any]:
         }
 
     if isinstance(active_pr, dict):
+        active_pr_summary = {
+            "pr_id": active_pr.get("pr_id") or "unknown",
+            "work_item_id": active_pr.get("work_item_id") or "unknown",
+            "path": active_pr.get("path") or "none",
+        }
         return {
             "mode": "active-pr-present",
             "short_state_block": short_state_block,
-            "active_pr": {
-                "pr_id": active_pr.get("pr_id") or "unknown",
-                "work_item_id": active_pr.get("work_item_id") or "unknown",
-                "path": active_pr.get("path") or "none",
+            "active_pr": active_pr_summary,
+            "continuation_packet": {
+                "active_pr_id": active_pr_summary["pr_id"],
+                "active_pr_context": _active_pr_continuation_context(active_pr_summary),
+                "active_pr_path": active_pr_summary["path"],
+                "work_scope": [
+                    f"continue the current assist-only slice for {active_pr_summary['pr_id']} without widening semantics",
+                    "keep changes limited to active PR continuity plus docs/tests sync",
+                ],
+                "validation_commands": [
+                    "python -m factory suggest-next-pr --root .",
+                    "PYTHONPATH=. pytest -q",
+                ],
+                "closeout_log_format": (
+                    "[assist-closeout] active_pr=<pr-id> scope=\"<scope-1>; <scope-2>\" "
+                    "validation=\"python -m factory suggest-next-pr --root .; PYTHONPATH=. pytest -q\" "
+                    "result=<pass|fail|not-run>"
+                ),
             },
             "assist_only_note": (
-                "active PR is already present; this surface stays read-only and does not suggest another PR automatically; "
-                "human decision required"
+                "active PR continuation only; this surface stays read-only and does not create branch/run/queue changes"
             ),
             "flow_note": "short state block is sufficient for assist-only continuity when a full pack is absent",
         }

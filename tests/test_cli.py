@@ -362,8 +362,15 @@ class CliHelpDiscoverabilityTest(unittest.TestCase):
     def test_suggest_next_pr_help_includes_assist_only_boundary(self) -> None:
         output = self._run_help("suggest-next-pr")
 
-        self.assertIn("Suggest one assist-only next PR candidate from current repo state in read-only mode.", output)
+        self.assertIn("Read-only, assist-only PR continuity surface:", output)
+        self.assertIn("with no active PR, suggest the next unused PR", output)
+        self.assertIn("with one active PR, emit an Active PR Continuation Packet", output)
+        self.assertIn("with multiple active PRs, hard-stop on ambiguity", output)
+        self.assertIn("No branch creation, run creation, or queue mutation.", output)
         self.assertIn("Next step:", output)
+        self.assertIn("no active PR -> next unused PR suggestion", output)
+        self.assertIn("one active PR -> Active PR Continuation Packet", output)
+        self.assertIn("multiple active PRs -> ambiguity hard-stop", output)
         self.assertIn("factory suggest-next-pr --root .", output)
         self.assertNotIn("recommended action", output)
         self.assertNotIn("approved path", output)
@@ -3614,7 +3621,7 @@ class StatusCliTest(unittest.TestCase):
                 output,
             )
 
-    def test_suggest_next_pr_stops_safely_when_active_pr_exists(self) -> None:
+    def test_suggest_next_pr_surfaces_active_pr_continuation_packet_when_exactly_one_active_pr_exists(self) -> None:
         from pathlib import Path
 
         with TemporaryDirectory() as tmp:
@@ -3634,9 +3641,15 @@ class StatusCliTest(unittest.TestCase):
             output = stdout.getvalue()
             self.assertIn("Short State Block:", output)
             self.assertIn("- active_pr: PR-120", output)
-            self.assertIn("PR Suggestion:\n- none", output)
+            self.assertIn("Active PR Continuation Packet:", output)
             self.assertIn("- active_pr_id: PR-120", output)
-            self.assertIn("human decision required", output)
+            self.assertIn("- active_pr_context: PR-120: active pr", output)
+            self.assertIn(f"- active_pr_path: {active_pr.as_posix()}", output)
+            self.assertIn("- work_scope: continue the current assist-only slice for PR-120 without widening semantics", output)
+            self.assertIn("- validation_command: python -m factory suggest-next-pr --root .", output)
+            self.assertIn("- validation_command: PYTHONPATH=. pytest -q", output)
+            self.assertIn("- closeout_log_format: [assist-closeout] active_pr=<pr-id>", output)
+            self.assertNotIn("PR Suggestion:\n- none", output)
             self.assertNotIn("Minimum Execution Packet:", output)
 
     def test_suggest_next_pr_surfaces_multi_active_pr_ambiguity_and_hard_stops(self) -> None:

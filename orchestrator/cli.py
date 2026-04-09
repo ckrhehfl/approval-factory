@@ -206,9 +206,9 @@ def _render_suggest_next_pr(suggestion: dict[str, object]) -> str:
 
     if suggestion.get("mode") in {"active-pr-present", "active-pr-ambiguous"}:
         lines.append("")
-        lines.append("PR Suggestion:")
-        lines.append("- none")
         if suggestion.get("mode") == "active-pr-ambiguous":
+            lines.append("PR Suggestion:")
+            lines.append("- none")
             lines.append("")
             lines.append("Active PR Context:")
             active_prs = suggestion.get("active_prs")
@@ -222,11 +222,26 @@ def _render_suggest_next_pr(suggestion: dict[str, object]) -> str:
             else:
                 lines.append("- none")
         else:
-            active_pr = suggestion.get("active_pr")
-            if isinstance(active_pr, dict):
-                lines.append(f"- active_pr_id: {active_pr.get('pr_id') or 'unknown'}")
-                lines.append(f"- work_item_id: {active_pr.get('work_item_id') or 'unknown'}")
-                lines.append(f"- path: {active_pr.get('path') or 'none'}")
+            lines.append("Active PR Continuation Packet:")
+            continuation_packet = suggestion.get("continuation_packet")
+            if isinstance(continuation_packet, dict):
+                lines.append(f"- active_pr_id: {continuation_packet.get('active_pr_id') or 'unknown'}")
+                lines.append(f"- active_pr_context: {continuation_packet.get('active_pr_context') or 'none'}")
+                lines.append(f"- active_pr_path: {continuation_packet.get('active_pr_path') or 'none'}")
+                work_scope = continuation_packet.get("work_scope")
+                if isinstance(work_scope, list):
+                    for item in work_scope:
+                        lines.append(f"- work_scope: {item}")
+                validation_commands = continuation_packet.get("validation_commands")
+                if isinstance(validation_commands, list):
+                    for command in validation_commands:
+                        lines.append(f"- validation_command: {command}")
+                lines.append(
+                    "- closeout_log_format: "
+                    f"{continuation_packet.get('closeout_log_format') or 'unavailable'}"
+                )
+            else:
+                lines.append("- none")
         return "\n".join(lines)
 
     suggested_pr = suggestion.get("suggested_pr")
@@ -1092,11 +1107,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     suggest_next_pr_parser = subparsers.add_parser(
         "suggest-next-pr",
-        help="Suggest one assist-only next PR candidate from current repo state without mutation",
-        description="Suggest one assist-only next PR candidate from current repo state in read-only mode.",
+        help=(
+            "Read-only assist-only PR continuity surface: suggest next unused PR, "
+            "emit Active PR Continuation Packet, or hard-stop on ambiguity"
+        ),
+        description=(
+            "Read-only, assist-only PR continuity surface: with no active PR, suggest "
+            "the next unused PR; with one active PR, emit an Active PR Continuation "
+            "Packet; with multiple active PRs, hard-stop on ambiguity. No branch "
+            "creation, run creation, or queue mutation."
+        ),
         epilog=_render_help_epilog(
             "Next step:",
-            "  review the short state block and minimum execution packet as operator assist only; if an active PR already exists, this command stops instead of suggesting another PR",
+            "  review the emitted read-only assist-only surface only: no active PR -> next unused PR suggestion; one active PR -> Active PR Continuation Packet; multiple active PRs -> ambiguity hard-stop; no branch creation, run creation, or queue mutation",
             "",
             "Example:",
             "  factory suggest-next-pr --root .",
