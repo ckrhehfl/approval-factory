@@ -391,6 +391,7 @@ def _render_review_packet_assist(packet: dict[str, object]) -> str:
         lines.append(f"- stale_pending_count: {runtime_facts.get('stale_pending_count')}")
         lines.append(f"- open_clarification_count: {runtime_facts.get('open_clarification_count')}")
         lines.append(f"- AGENTS.md: {runtime_facts.get('agents_md') or 'missing'}")
+        lines.append(f"- review_mode: {runtime_facts.get('review_mode') or 'committed-range'}")
         lines.append(f"- review_base: {runtime_facts.get('review_base') or 'origin/main...HEAD'}")
     else:
         lines.append("- none")
@@ -1194,7 +1195,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Draft a deterministic assist-only review packet for the current repo state and branch diff",
         description=(
             "Draft a deterministic assist-only review packet for the current repo state and current branch diff. "
-            "This surface is read-only and does not automate review conclusions, queue mutation, branch creation, or run creation."
+            "This surface is read-only, emits working-tree or committed-range diff evidence commands based on the current repo state, including untracked-file evidence when needed, "
+            "and does not automate review conclusions, queue mutation, branch creation, or run creation."
         ),
         epilog=_render_help_epilog(
             "Next step:",
