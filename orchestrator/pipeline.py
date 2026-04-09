@@ -2409,6 +2409,80 @@ def suggest_next_pr(root_dir: Path) -> dict[str, Any]:
     }
 
 
+def draft_review_packet_assist(root_dir: Path) -> dict[str, Any]:
+    status = get_factory_status(root_dir)
+    branch_name = _current_git_branch(root_dir)
+    active_pr = status.get("active_pr")
+    latest_run = status.get("latest_run")
+    approval = status.get("approval")
+    approval_queue = status.get("approval_queue")
+
+    runtime_facts = {
+        "branch": branch_name or "unavailable",
+        "active_pr": active_pr.get("pr_id") if isinstance(active_pr, dict) else "none",
+        "latest_run_id": latest_run.get("run_id") if isinstance(latest_run, dict) else "none",
+        "latest_run_state": latest_run.get("state") if isinstance(latest_run, dict) else "none",
+        "approval_status": approval.get("status") if isinstance(approval, dict) else "none",
+        "pending_total": approval_queue.get("pending_total") if isinstance(approval_queue, dict) else "none",
+        "stale_pending_count": approval_queue.get("stale_pending_count") if isinstance(approval_queue, dict) else "none",
+        "open_clarification_count": len(status.get("open_clarifications") or []),
+        "agents_md": "present" if (root_dir / "AGENTS.md").exists() else "missing",
+        "review_base": "origin/main...HEAD",
+        "review_surface": "review-packet-assist",
+    }
+
+    review_command_block = [
+        "python -m factory status --root .",
+        "python -m factory inspect-approval-queue --root .",
+        "git status -sb",
+        "git --no-pager log --oneline --decorate -10",
+        "test -f AGENTS.md && echo present || echo missing",
+        "python -m factory review-packet-assist --root .",
+        "PYTHONPATH=. pytest -q",
+        "git --no-pager diff --stat origin/main...HEAD",
+        "git --no-pager diff origin/main...HEAD",
+    ]
+
+    review_prompt_draft = [
+        "Findings-first review for the current branch diff only.",
+        f"Input refs: branch={runtime_facts['branch']}, diff_base={runtime_facts['review_base']}, latest_run_id={runtime_facts['latest_run_id']}, approval_status={runtime_facts['approval_status']}.",
+        "Scope: assess only the assist-only review packet drafting surface plus README/tests sync; do not widen into approval, queue, selector, or decision semantics.",
+        "Review order:",
+        "1. List material bugs, behavioral regressions, or contract drift with file/line refs first.",
+        "2. Then list risks, missing evidence, or test gaps that could affect operator interpretation.",
+        "3. If no material issues are found, say so explicitly and cite the evidence reviewed.",
+        "Human decision required: do not auto-conclude approval, merge readiness, or review outcome.",
+    ]
+
+    state_block_draft = [
+        f"- branch: {runtime_facts['branch']}",
+        f"- active_pr: {runtime_facts['active_pr']}",
+        f"- latest_run_id: {runtime_facts['latest_run_id']}",
+        f"- latest_run_state: {runtime_facts['latest_run_state']}",
+        f"- approval_status: {runtime_facts['approval_status']}",
+        f"- pending_total: {runtime_facts['pending_total']}",
+        f"- stale_pending_count: {runtime_facts['stale_pending_count']}",
+        f"- open_clarification_count: {runtime_facts['open_clarification_count']}",
+        f"- AGENTS.md: {runtime_facts['agents_md']}",
+        f"- review_base: {runtime_facts['review_base']}",
+    ]
+
+    omission_note_draft = [
+        "Assist-only packet draft only; runtime facts are deterministic and read-only.",
+        "Omits review conclusion, approval decision, queue mutation, selector semantics, branch creation, run creation, and automatic next-action selection.",
+        "Execute the review command block directly to collect primary evidence; the packet is a drafting surface, not a decision engine.",
+    ]
+
+    return {
+        "mode": "assist-only",
+        "runtime_facts": runtime_facts,
+        "review_command_block": review_command_block,
+        "review_prompt_draft": review_prompt_draft,
+        "state_block_draft": state_block_draft,
+        "omission_note_draft": omission_note_draft,
+    }
+
+
 def _find_work_item_artifact(root_dir: Path, work_item_id: str) -> Path:
     work_items_dir = root_dir / "docs" / "work-items"
     exact_path = work_items_dir / f"{work_item_id}.md"
