@@ -50,6 +50,7 @@ from orchestrator.pipeline import (
     trace_run,
     trace_lineage,
 )
+from orchestrator.pr_loop import inspect_pr_loop_fixture
 from orchestrator.yaml_io import read_yaml
 
 
@@ -179,6 +180,62 @@ def _render_approval_queue_inspection(inspection: dict[str, object]) -> str:
             )
         lines.append(f"  note: {item.get('note') or 'none'}")
     return "\n".join(lines)
+
+
+def _render_pr_loop_fixture_inspection(inspection: dict[str, object]) -> str:
+    lines = ["PR Loop Fixture Inspect:"]
+    lines.append(f"- pr_id: {inspection['pr_id']}")
+    lines.append(f"- source: {inspection['source']}")
+    lines.append(f"- fixture_status: {inspection['fixture_status']}")
+    lines.append(f"- fixture_root: {inspection['fixture_root']}")
+    lines.append(f"- manifest_path: {inspection['manifest_path']}")
+    lines.append(f"- runtime_authority: {inspection['runtime_authority']}")
+    lines.append(f"- mutation: {inspection['mutation']}")
+
+    lines.append("")
+    lines.append("Fixture Files:")
+    lines.append(f"- required_file_count: {inspection.get('required_file_count', 0)}")
+    lines.append(f"- present_file_count: {inspection.get('present_file_count', 0)}")
+    missing_files = inspection.get("missing_files")
+    if isinstance(missing_files, list) and missing_files:
+        for missing_file in missing_files:
+            lines.append(f"- missing_file: {missing_file}")
+    else:
+        lines.append("- missing_file: none")
+
+    lines.append("")
+    lines.append("Stored State Facts:")
+    for key in (
+        "target_pr",
+        "runner_id",
+        "phase",
+        "policy_source_status",
+        "policy_source_authority",
+        "repo",
+        "branch",
+        "base",
+        "reviews_required",
+        "reviews_state",
+        "checks_required",
+        "checks_state",
+        "fixture_notice_inert",
+        "fixture_notice_runtime_authority",
+    ):
+        lines.append(f"- {key}: {_display_value(inspection.get(key))}")
+
+    lines.append("")
+    lines.append(f"Read Only Note: {inspection.get('note') or 'none'}")
+    return "\n".join(lines)
+
+
+def _display_value(value: object) -> str:
+    if value is None:
+        return "none"
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    return str(value)
 
 
 def _render_suggest_next_pr(suggestion: dict[str, object]) -> str:
@@ -1167,6 +1224,33 @@ def build_parser() -> argparse.ArgumentParser:
     )
     inspect_approval_queue_parser.add_argument("--root", default=".", help="Repository root path")
 
+    pr_loop_parser = subparsers.add_parser(
+        "pr-loop",
+        help="Inspect PR Loop local fixtures without changing runtime state",
+        description="Inspect PR Loop local non-runtime fixtures in read-only mode.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    pr_loop_subparsers = pr_loop_parser.add_subparsers(dest="pr_loop_command", required=True)
+    pr_loop_inspect_parser = pr_loop_subparsers.add_parser(
+        "inspect",
+        help="Inspect one explicit PR Loop fixture by PR ID",
+        description="Inspect one explicit PR Loop local non-runtime fixture by PR ID.",
+        epilog=_render_help_epilog(
+            "Read only:",
+            "  reads tests/fixtures/pr_loop/examples/artifacts/pr_loop/PR-<number> only; no runtime artifacts, queue state, gate evaluation, merge action, or implicit selector fallback",
+            "",
+            "Example:",
+            "  factory pr-loop inspect --root . --pr-id PR-113",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    pr_loop_inspect_parser.add_argument("--root", default=".", help="Repository root path")
+    pr_loop_inspect_parser.add_argument(
+        "--pr-id",
+        required=True,
+        help="Exact PR id in the form PR-<number>; no latest/current fallback",
+    )
+
     suggest_next_pr_parser = subparsers.add_parser(
         "suggest-next-pr",
         help=(
@@ -1897,6 +1981,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "inspect-approval-queue":
         print(_render_approval_queue_inspection(inspect_approval_queue(root_dir=Path(args.root))))
         return 0
+
+    if args.command == "pr-loop":
+        if args.pr_loop_command == "inspect":
+            try:
+                inspection = inspect_pr_loop_fixture(root_dir=Path(args.root), pr_id=str(args.pr_id))
+            except ValueError as exc:
+                parser.error(str(exc))
+            print(_render_pr_loop_fixture_inspection(inspection))
+            return 0
+        parser.error(f"Unsupported pr-loop command: {args.pr_loop_command}")
 
     if args.command == "suggest-next-pr":
         print(_render_suggest_next_pr(suggest_next_pr(root_dir=Path(args.root))))
