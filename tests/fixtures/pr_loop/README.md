@@ -4,7 +4,7 @@ These files are inert examples for the future `artifacts/pr_loop/PR-<number>/...
 
 They are not runtime artifacts, runtime source of truth, approval inputs, queue inputs, or merge-gate inputs. They live under `tests/fixtures/pr_loop/` so tests can verify expected example shape without introducing PR Loop runtime state load/save behavior, phase-machine behavior, or top-level active state.
 
-`factory pr-loop inspect --pr-id PR-<number>` may read these files as local non-runtime fixtures for operator-visible fact summaries only. Non-canonical selectors such as `latest`, `current`, `PR-1A`, or `PR-1-FOO` are refused. That inspect path does not make the fixtures live runtime state, approved policy, gate evidence, queue input, status input, or merge authority.
+`factory pr-loop inspect --pr-id PR-<number>` may read these files as local non-runtime fixtures for operator-visible fact summaries only. `factory pr-loop gate-check --pr-id PR-<number>` may read the same local non-runtime fixtures for deterministic condition summaries only. Non-canonical selectors such as `latest`, `current`, `PR-1A`, or `PR-1-FOO` are refused. These paths do not make the fixtures live runtime state, approved policy, gate evidence, queue input, status input, approval authority, or merge authority.
 
 ## Fixture scope
 

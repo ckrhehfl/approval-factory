@@ -50,7 +50,7 @@ from orchestrator.pipeline import (
     trace_run,
     trace_lineage,
 )
-from orchestrator.pr_loop import inspect_pr_loop_fixture
+from orchestrator.pr_loop import evaluate_pr_loop_fixture_gate, inspect_pr_loop_fixture
 from orchestrator.yaml_io import read_yaml
 
 
@@ -225,6 +225,38 @@ def _render_pr_loop_fixture_inspection(inspection: dict[str, object]) -> str:
 
     lines.append("")
     lines.append(f"Read Only Note: {inspection.get('note') or 'none'}")
+    return "\n".join(lines)
+
+
+def _render_pr_loop_fixture_gate_check(evaluation: dict[str, object]) -> str:
+    lines = ["PR Loop Fixture Gate Check:"]
+    lines.append(f"- pr_id: {evaluation['pr_id']}")
+    lines.append(f"- source: {evaluation['source']}")
+    lines.append(f"- fixture_status: {evaluation['fixture_status']}")
+    lines.append(f"- fixture_root: {evaluation['fixture_root']}")
+    lines.append(f"- manifest_path: {evaluation['manifest_path']}")
+    lines.append(f"- gate_status: {evaluation['gate_status']}")
+    lines.append(f"- evaluated_condition_count: {evaluation['evaluated_condition_count']}")
+    lines.append(f"- failed_condition_count: {evaluation['failed_condition_count']}")
+    lines.append(f"- runtime_authority: {evaluation['runtime_authority']}")
+    lines.append(f"- merge_authority: {evaluation['merge_authority']}")
+    lines.append(f"- decision_authority: {evaluation['decision_authority']}")
+    lines.append(f"- mutation: {evaluation['mutation']}")
+
+    lines.append("")
+    lines.append("Failed Conditions:")
+    failed_conditions = evaluation.get("failed_conditions")
+    if isinstance(failed_conditions, list) and failed_conditions:
+        for failed_condition in failed_conditions:
+            if not isinstance(failed_condition, dict):
+                continue
+            lines.append(f"- failed_condition: {failed_condition.get('name') or 'unknown'}")
+            lines.append(f"  reason: {failed_condition.get('reason') or 'none'}")
+    else:
+        lines.append("- failed_condition: none")
+
+    lines.append("")
+    lines.append(f"Read Only Note: {evaluation.get('note') or 'none'}")
     return "\n".join(lines)
 
 
@@ -1250,6 +1282,25 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Exact PR id in the form PR-<number>; no latest/current fallback",
     )
+    pr_loop_gate_check_parser = pr_loop_subparsers.add_parser(
+        "gate-check",
+        help="Evaluate one explicit PR Loop fixture without runtime authority",
+        description="Evaluate one explicit PR Loop local non-runtime fixture in read-only mode.",
+        epilog=_render_help_epilog(
+            "Read only:",
+            "  reads tests/fixtures/pr_loop/examples/artifacts/pr_loop/PR-<number> only; no runtime artifacts, queue state, merge authority, approval authority, or implicit selector fallback",
+            "",
+            "Example:",
+            "  factory pr-loop gate-check --root . --pr-id PR-113",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    pr_loop_gate_check_parser.add_argument("--root", default=".", help="Repository root path")
+    pr_loop_gate_check_parser.add_argument(
+        "--pr-id",
+        required=True,
+        help="Exact PR id in the form PR-<number>; no latest/current fallback",
+    )
 
     suggest_next_pr_parser = subparsers.add_parser(
         "suggest-next-pr",
@@ -1989,6 +2040,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             except ValueError as exc:
                 parser.error(str(exc))
             print(_render_pr_loop_fixture_inspection(inspection))
+            return 0
+        if args.pr_loop_command == "gate-check":
+            try:
+                evaluation = evaluate_pr_loop_fixture_gate(root_dir=Path(args.root), pr_id=str(args.pr_id))
+            except ValueError as exc:
+                parser.error(str(exc))
+            print(_render_pr_loop_fixture_gate_check(evaluation))
             return 0
         parser.error(f"Unsupported pr-loop command: {args.pr_loop_command}")
 
