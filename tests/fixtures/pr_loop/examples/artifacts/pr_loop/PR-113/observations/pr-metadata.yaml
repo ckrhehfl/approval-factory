@@ -1,0 +1,10 @@
+target_pr: PR-113
+source: fixture_only
+observed_state:
+  id: PR-113
+  branch: pr/113-pr-loop-slot2-artifact-fixtures
+  base: main
+  status: fixture_unknown
+fixture_notice:
+  inert: true
+  runtime_authority: none

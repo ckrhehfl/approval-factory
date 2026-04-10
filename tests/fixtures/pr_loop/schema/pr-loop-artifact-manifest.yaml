@@ -1,0 +1,96 @@
+schema_name: pr-loop-artifact-fixture-manifest
+schema_version: 0.1.0
+status: inert_fixture_contract
+authority: none
+future_runtime_root: artifacts/pr_loop/<PR-ID>
+example_root: examples/artifacts/pr_loop/PR-113
+notes:
+  - Fixture-only shape check for the future PR Loop Runner artifact layout.
+  - Does not define runtime load/save behavior, phase-machine authority, CLI behavior, approval status, queue state, or merge-gate semantics.
+required_files:
+  - path: state.yaml
+    type: yaml
+    required_paths:
+      - runner_id
+      - target_pr
+      - phase
+      - policy_source.status
+      - policy_source.authority
+      - runtime_refs.repo
+      - runtime_refs.branch
+      - runtime_refs.base
+      - observations.reviews.required
+      - observations.reviews.state
+      - observations.checks.required
+      - observations.checks.state
+      - gate.merge_allowed
+      - gate.reason
+      - artifacts.root
+      - fixture_notice.inert
+      - fixture_notice.runtime_authority
+  - path: policy-snapshot.md
+    type: markdown
+    required_text:
+      - inert fixture
+      - no runtime authority
+  - path: observations/pr-metadata.yaml
+    type: yaml
+    required_paths:
+      - target_pr
+      - source
+      - observed_state
+      - fixture_notice.inert
+  - path: observations/reviews.yaml
+    type: yaml
+    required_paths:
+      - target_pr
+      - reviews.required
+      - reviews.state
+      - fixture_notice.inert
+  - path: observations/checks.yaml
+    type: yaml
+    required_paths:
+      - target_pr
+      - checks.required
+      - checks.state
+      - fixture_notice.inert
+  - path: observations/docs-sync.yaml
+    type: yaml
+    required_paths:
+      - target_pr
+      - docs_sync.state
+      - docs_sync.policy_status
+      - fixture_notice.inert
+  - path: rendering/review-packet.md
+    type: markdown
+    required_text:
+      - fixture-only review packet
+      - not a gate input
+  - path: rendering/operator-summary.md
+    type: markdown
+    required_text:
+      - fixture-only operator summary
+      - not an approval decision
+  - path: gates/merge-gate.yaml
+    type: yaml
+    required_paths:
+      - target_pr
+      - gate.merge_allowed
+      - gate.reason
+      - decision_authority
+      - fixture_notice.inert
+  - path: gates/blocked-reasons.md
+    type: markdown
+    required_text:
+      - fixture-only blocked reasons
+      - no merge authority
+  - path: evidence/commands.md
+    type: markdown
+    required_text:
+      - fixture-only command log
+      - not execution evidence
+  - path: evidence/diff-summary.md
+    type: markdown
+    required_text:
+      - fixture-only diff summary
+      - not review evidence

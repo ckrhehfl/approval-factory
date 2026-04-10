@@ -1,0 +1,8 @@
+target_pr: PR-113
+reviews:
+  required: true
+  state: fixture_unknown
+  blocking_findings: fixture_unknown
+fixture_notice:
+  inert: true
+  runtime_authority: none

@@ -1,0 +1,8 @@
+target_pr: PR-113
+checks:
+  required: true
+  state: fixture_unknown
+  failed_checks: fixture_unknown
+fixture_notice:
+  inert: true
+  runtime_authority: none

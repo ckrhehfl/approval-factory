@@ -100,6 +100,8 @@ artifacts/pr_loop/<PR-ID>/
 
 The layout is scoped to future runner artifacts only. It must not replace `runs/latest`, `approval_queue`, `prs/active`, or `prs/archive`.
 
+PR-SLOT-2 may add inert schemas and fixture examples for this layout under a non-runtime location such as `tests/fixtures/pr_loop/...`. Those fixtures must not be treated as live `artifacts/pr_loop/<PR-ID>/...` runtime state, approved policy, gate evidence, queue input, status input, or merge authority.
+
 ## proposed FSM phases
 - `initialized`
 - `policy_loaded`
@@ -138,7 +140,7 @@ These commands are not implemented by this PR. Future implementation must keep i
 
 ## PR-SLOT roadmap
 - PR-SLOT-1: land this proposal-only contract and review the subsystem boundary.
-- PR-SLOT-2: add inert artifact schemas and fixture examples for `artifacts/pr_loop/<PR-ID>/...`.
+- PR-SLOT-2: add inert artifact schemas and fixture examples for `artifacts/pr_loop/<PR-ID>/...` under a non-runtime fixture location; this is not state runtime core and does not introduce runtime authority.
 - PR-SLOT-3: add read-only inspect command over explicit PR id and local artifact fixtures.
 - PR-SLOT-4: add deterministic gate evaluation against fixture-backed state, without merge execution.
 - PR-SLOT-5: add optional LLM rendering for review packet text, explicitly excluded from gate decisions.

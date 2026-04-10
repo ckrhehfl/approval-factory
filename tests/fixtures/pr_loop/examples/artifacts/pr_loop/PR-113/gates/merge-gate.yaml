@@ -1,0 +1,8 @@
+target_pr: PR-113
+gate:
+  merge_allowed: false
+  reason: inert fixture only; no merge authority
+decision_authority: none
+fixture_notice:
+  inert: true
+  runtime_authority: none

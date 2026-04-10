@@ -1,0 +1,26 @@
+runner_id: PR-LOOP-FIXTURE-001
+target_pr: PR-113
+phase: initialized
+policy_source:
+  status: unresolved_future_contract
+  authority: none
+runtime_refs:
+  repo: approval-factory
+  branch: pr/113-pr-loop-slot2-artifact-fixtures
+  base: main
+observations:
+  reviews:
+    required: true
+    state: fixture_unknown
+  checks:
+    required: true
+    state: fixture_unknown
+gate:
+  merge_allowed: false
+  reason: inert fixture only; no runtime authority
+artifacts:
+  root: artifacts/pr_loop/PR-113
+fixture_notice:
+  inert: true
+  runtime_authority: none
+  fixture_root: tests/fixtures/pr_loop/examples/artifacts/pr_loop/PR-113
