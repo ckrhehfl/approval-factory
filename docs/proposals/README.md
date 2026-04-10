@@ -5,3 +5,4 @@ repo code, tests, git history, runtime artifacts를 대체하는 runtime source 
 
 - [PR Loop Runner / Review-Gated Merge Runner](pr-loop-runner.md)
 - [PR Loop Live Runtime Authority Contract](pr-loop-live-runtime-authority-contract.md)
+- [PR Loop State Runtime Gate](pr-loop-state-runtime-gate.md)
