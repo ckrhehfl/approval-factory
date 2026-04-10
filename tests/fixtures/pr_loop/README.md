@@ -4,7 +4,7 @@ These files are inert examples for the future `artifacts/pr_loop/PR-<number>/...
 
 They are not runtime artifacts, runtime source of truth, approval inputs, queue inputs, or merge-gate inputs. They live under `tests/fixtures/pr_loop/` so tests can verify expected example shape without introducing PR Loop runtime state load/save behavior, phase-machine behavior, or top-level active state.
 
-`factory pr-loop inspect --pr-id PR-<number>` may read these files as local non-runtime fixtures for operator-visible fact summaries only. `factory pr-loop gate-check --pr-id PR-<number>` may read the same local non-runtime fixtures for deterministic condition summaries only. Non-canonical selectors such as `latest`, `current`, `PR-1A`, or `PR-1-FOO` are refused. These paths do not make the fixtures live runtime state, approved policy, gate evidence, queue input, status input, approval authority, or merge authority.
+`factory pr-loop inspect --pr-id PR-<number>` may read these files as local non-runtime fixtures for operator-visible fact summaries only. `factory pr-loop gate-check --pr-id PR-<number>` may read the same local non-runtime fixtures for deterministic condition summaries only. `factory pr-loop render-review --pr-id PR-<number>` may combine the same read-only fixture inspect and gate-check summaries into a markdown review packet draft only. Non-canonical selectors such as `latest`, `current`, `PR-1A`, or `PR-1-FOO` are refused. These paths and rendered packets do not make the fixtures live runtime state, policy authority, gate evidence, queue input, status input, approval authority, review verdict, or merge authority.
 
 ## Fixture scope
 
@@ -14,4 +14,4 @@ They are not runtime artifacts, runtime source of truth, approval inputs, queue 
 
 ## Authority boundary
 
-The fixture examples do not introduce a policy source, runtime authority, or merge authority. Any future runtime use of `artifacts/pr_loop/PR-<number>/...` still requires a separate approved design and implementation PR.
+The fixture examples do not introduce a policy source, runtime authority, or merge authority. Any future runtime use of `artifacts/pr_loop/PR-<number>/...` still requires a separate accepted design and implementation PR.
