@@ -54,6 +54,7 @@ from orchestrator.pr_loop import (
     evaluate_pr_loop_fixture_gate,
     inspect_pr_loop_fixture,
     render_pr_loop_review_packet,
+    summarize_pr_loop_merge_dry_run,
 )
 from orchestrator.yaml_io import read_yaml
 
@@ -261,6 +262,37 @@ def _render_pr_loop_fixture_gate_check(evaluation: dict[str, object]) -> str:
 
     lines.append("")
     lines.append(f"Read Only Note: {evaluation.get('note') or 'none'}")
+    return "\n".join(lines)
+
+
+def _render_pr_loop_merge_dry_run(summary: dict[str, object]) -> str:
+    lines = ["PR Loop Merge Dry Run Summary:"]
+    lines.append(f"- pr_id: {summary['pr_id']}")
+    lines.append(f"- source: {summary['source']}")
+    lines.append(f"- fixture_status: {summary['fixture_status']}")
+    lines.append(f"- gate_status: {summary['gate_status']}")
+    lines.append(f"- merge_dry_run_status: {summary['merge_dry_run_status']}")
+    lines.append(f"- evaluated_precondition_count: {summary['evaluated_precondition_count']}")
+    lines.append(f"- failed_precondition_count: {summary['failed_precondition_count']}")
+    lines.append(f"- runtime_authority: {summary['runtime_authority']}")
+    lines.append(f"- merge_authority: {summary['merge_authority']}")
+    lines.append(f"- approval_authority: {summary['approval_authority']}")
+    lines.append(f"- mutation: {summary['mutation']}")
+
+    lines.append("")
+    lines.append("Failed Preconditions:")
+    failed_preconditions = summary.get("failed_preconditions")
+    if isinstance(failed_preconditions, list) and failed_preconditions:
+        for failed_precondition in failed_preconditions:
+            if not isinstance(failed_precondition, dict):
+                continue
+            lines.append(f"- failed_precondition: {failed_precondition.get('name') or 'unknown'}")
+            lines.append(f"  reason: {failed_precondition.get('reason') or 'none'}")
+    else:
+        lines.append("- failed_precondition: none")
+
+    lines.append("")
+    lines.append(f"Read Only Note: {summary.get('note') or 'none'}")
     return "\n".join(lines)
 
 
@@ -1327,6 +1359,34 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Exact PR id in the form PR-<number>; no latest/current fallback",
     )
+    pr_loop_merge_parser = pr_loop_subparsers.add_parser(
+        "merge",
+        help="Render one explicit PR Loop fixture merge dry-run summary without authority",
+        description=(
+            "Render one explicit PR Loop local non-runtime fixture into a merge dry-run summary. "
+            "This is read-only operator visibility, not merge authority, approval authority, gate evidence, or runtime source of truth."
+        ),
+        epilog=_render_help_epilog(
+            "Read only:",
+            "  requires --dry-run; reads tests/fixtures/pr_loop/examples/artifacts/pr_loop/PR-<number> only through fixture inspect, fixture gate-check, and review packet surfaces; no runtime artifacts, queue state, merge authority, approval authority, or implicit selector fallback",
+            "",
+            "Example:",
+            "  factory pr-loop merge --root . --pr-id PR-113 --dry-run",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    pr_loop_merge_parser.add_argument("--root", default=".", help="Repository root path")
+    pr_loop_merge_parser.add_argument(
+        "--pr-id",
+        required=True,
+        help="Exact PR id in the form PR-<number>; no latest/current fallback",
+    )
+    pr_loop_merge_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        required=True,
+        help="Required read-only summary mode; no apply mode is available",
+    )
 
     suggest_next_pr_parser = subparsers.add_parser(
         "suggest-next-pr",
@@ -2080,6 +2140,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             except ValueError as exc:
                 parser.error(str(exc))
             print(packet)
+            return 0
+        if args.pr_loop_command == "merge":
+            if not bool(args.dry_run):
+                parser.error("pr-loop merge requires --dry-run; no apply mode is available")
+            try:
+                summary = summarize_pr_loop_merge_dry_run(root_dir=Path(args.root), pr_id=str(args.pr_id))
+            except ValueError as exc:
+                parser.error(str(exc))
+            print(_render_pr_loop_merge_dry_run(summary))
             return 0
         parser.error(f"Unsupported pr-loop command: {args.pr_loop_command}")
 
