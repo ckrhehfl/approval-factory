@@ -50,7 +50,11 @@ from orchestrator.pipeline import (
     trace_run,
     trace_lineage,
 )
-from orchestrator.pr_loop import evaluate_pr_loop_fixture_gate, inspect_pr_loop_fixture
+from orchestrator.pr_loop import (
+    evaluate_pr_loop_fixture_gate,
+    inspect_pr_loop_fixture,
+    render_pr_loop_review_packet,
+)
 from orchestrator.yaml_io import read_yaml
 
 
@@ -1301,6 +1305,28 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Exact PR id in the form PR-<number>; no latest/current fallback",
     )
+    pr_loop_render_review_parser = pr_loop_subparsers.add_parser(
+        "render-review",
+        help="Render one explicit PR Loop fixture review packet draft without authority",
+        description=(
+            "Render one explicit PR Loop local non-runtime fixture into a markdown review packet draft. "
+            "This is read-only drafting input, not a review verdict, approval authority, merge authority, or runtime source of truth."
+        ),
+        epilog=_render_help_epilog(
+            "Read only:",
+            "  reads tests/fixtures/pr_loop/examples/artifacts/pr_loop/PR-<number> only through fixture inspect and fixture gate-check summaries; no runtime artifacts, queue state, merge authority, approval authority, or implicit selector fallback",
+            "",
+            "Example:",
+            "  factory pr-loop render-review --root . --pr-id PR-113",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    pr_loop_render_review_parser.add_argument("--root", default=".", help="Repository root path")
+    pr_loop_render_review_parser.add_argument(
+        "--pr-id",
+        required=True,
+        help="Exact PR id in the form PR-<number>; no latest/current fallback",
+    )
 
     suggest_next_pr_parser = subparsers.add_parser(
         "suggest-next-pr",
@@ -2047,6 +2073,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             except ValueError as exc:
                 parser.error(str(exc))
             print(_render_pr_loop_fixture_gate_check(evaluation))
+            return 0
+        if args.pr_loop_command == "render-review":
+            try:
+                packet = render_pr_loop_review_packet(root_dir=Path(args.root), pr_id=str(args.pr_id))
+            except ValueError as exc:
+                parser.error(str(exc))
+            print(packet)
             return 0
         parser.error(f"Unsupported pr-loop command: {args.pr_loop_command}")
 
