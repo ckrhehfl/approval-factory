@@ -17,7 +17,7 @@ _EXAMPLE_PR_LOOP_ROOT = _FIXTURE_BASE / "examples" / "artifacts" / "pr_loop"
 
 def validate_pr_id(pr_id: str) -> str:
     if not _PR_ID_PATTERN.fullmatch(pr_id):
-        raise ValueError("pr-loop inspect requires explicit --pr-id in the form PR-<number>")
+        raise ValueError("pr-loop command requires explicit --pr-id in the form PR-<number>")
     return pr_id
 
 
