@@ -7,3 +7,4 @@ repo code, tests, git history, runtime artifacts를 대체하는 runtime source 
 - [PR Loop Live Runtime Authority Contract](pr-loop-live-runtime-authority-contract.md)
 - [PR Loop State Runtime Gate](pr-loop-state-runtime-gate.md)
 - [PR Loop Policy Authority Source Contract](pr-loop-policy-authority-source-contract.md)
+- [PR Loop Merge Authority / Dry-Run Apply Contract](pr-loop-merge-authority-dry-run-apply-contract.md)
