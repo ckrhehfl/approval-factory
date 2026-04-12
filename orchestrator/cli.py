@@ -52,7 +52,9 @@ from orchestrator.pipeline import (
 )
 from orchestrator.pr_loop import (
     evaluate_pr_loop_fixture_gate,
+    init_pr_loop_live_state,
     inspect_pr_loop_fixture,
+    inspect_pr_loop_live_state,
     render_pr_loop_review_packet,
     summarize_pr_loop_merge_dry_run,
 )
@@ -293,6 +295,27 @@ def _render_pr_loop_merge_dry_run(summary: dict[str, object]) -> str:
 
     lines.append("")
     lines.append(f"Read Only Note: {summary.get('note') or 'none'}")
+    return "\n".join(lines)
+
+
+def _render_pr_loop_live_state(summary: dict[str, object], *, title: str) -> str:
+    lines = [title]
+    lines.append(f"- pr_id: {summary['pr_id']}")
+    lines.append(f"- source: {summary['source']}")
+    lines.append(f"- state_status: {summary['state_status']}")
+    lines.append(f"- state_root: {summary['state_root']}")
+    lines.append(f"- state_path: {summary['state_path']}")
+    lines.append(f"- runtime_authority: {summary['runtime_authority']}")
+    lines.append(f"- mutation: {summary['mutation']}")
+
+    lines.append("")
+    lines.append("Stored State:")
+    lines.append(f"- runner_id: {_display_value(summary.get('runner_id'))}")
+    lines.append(f"- phase: {_display_value(summary.get('phase'))}")
+    lines.append(f"- phase_display: {_display_value(summary.get('phase_display'))}")
+
+    lines.append("")
+    lines.append(f"State Note: {summary.get('note') or 'none'}")
     return "\n".join(lines)
 
 
@@ -1294,8 +1317,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     pr_loop_parser = subparsers.add_parser(
         "pr-loop",
-        help="Inspect PR Loop local fixtures without changing runtime state",
-        description="Inspect PR Loop local non-runtime fixtures in read-only mode.",
+        help="Inspect PR Loop fixtures or manage minimal live state for one explicit PR id",
+        description="Inspect PR Loop local fixtures or manage minimal live state with explicit canonical PR ids only.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     pr_loop_subparsers = pr_loop_parser.add_subparsers(dest="pr_loop_command", required=True)
@@ -1386,6 +1409,60 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         required=True,
         help="Required read-only summary mode; no apply mode is available",
+    )
+    pr_loop_state_parser = pr_loop_subparsers.add_parser(
+        "state",
+        help="Manage minimal PR Loop live state for one explicit PR id",
+        description=(
+            "Manage minimal PR Loop live state rooted only at artifacts/pr_loop/PR-<number>/state.yaml. "
+            "This surface does not inspect fixtures, infer selectors, evaluate gates, or grant decision authority."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    pr_loop_state_subparsers = pr_loop_state_parser.add_subparsers(dest="pr_loop_state_command", required=True)
+    pr_loop_state_init_parser = pr_loop_state_subparsers.add_parser(
+        "init",
+        help="Initialize minimal PR Loop live state for one explicit PR id",
+        description=(
+            "Initialize minimal PR Loop live state for one explicit PR id. "
+            "Creates only artifacts/pr_loop/PR-<number>/state.yaml and does not reuse fixture data."
+        ),
+        epilog=_render_help_epilog(
+            "Minimal live state only:",
+            "  writes artifacts/pr_loop/PR-<number>/state.yaml only; no latest/current selector fallback, no fixture reuse, gate evidence, merge authority, approval authority, or apply mode",
+            "",
+            "Example:",
+            "  factory pr-loop state init --root . --pr-id PR-123",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    pr_loop_state_init_parser.add_argument("--root", default=".", help="Repository root path")
+    pr_loop_state_init_parser.add_argument(
+        "--pr-id",
+        required=True,
+        help="Exact PR id in the form PR-<number>; no latest/current fallback",
+    )
+    pr_loop_state_show_parser = pr_loop_state_subparsers.add_parser(
+        "show",
+        help="Show minimal PR Loop live state for one explicit PR id",
+        description=(
+            "Show minimal PR Loop live state for one explicit PR id. "
+            "Reads only artifacts/pr_loop/PR-<number>/state.yaml and does not read fixture data."
+        ),
+        epilog=_render_help_epilog(
+            "Read only:",
+            "  reads artifacts/pr_loop/PR-<number>/state.yaml only; no latest/current selector fallback, no fixture reuse, gate evidence, merge authority, approval authority, or apply mode",
+            "",
+            "Example:",
+            "  factory pr-loop state show --root . --pr-id PR-123",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    pr_loop_state_show_parser.add_argument("--root", default=".", help="Repository root path")
+    pr_loop_state_show_parser.add_argument(
+        "--pr-id",
+        required=True,
+        help="Exact PR id in the form PR-<number>; no latest/current fallback",
     )
 
     suggest_next_pr_parser = subparsers.add_parser(
@@ -2150,6 +2227,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                 parser.error(str(exc))
             print(_render_pr_loop_merge_dry_run(summary))
             return 0
+        if args.pr_loop_command == "state":
+            if args.pr_loop_state_command == "init":
+                try:
+                    summary = init_pr_loop_live_state(root_dir=Path(args.root), pr_id=str(args.pr_id))
+                except ValueError as exc:
+                    parser.error(str(exc))
+                print(_render_pr_loop_live_state(summary, title="PR Loop Live State Init:"))
+                return 0
+            if args.pr_loop_state_command == "show":
+                try:
+                    summary = inspect_pr_loop_live_state(root_dir=Path(args.root), pr_id=str(args.pr_id))
+                except ValueError as exc:
+                    parser.error(str(exc))
+                print(_render_pr_loop_live_state(summary, title="PR Loop Live State:"))
+                return 0
+            parser.error(f"Unsupported pr-loop state command: {args.pr_loop_state_command}")
         parser.error(f"Unsupported pr-loop command: {args.pr_loop_command}")
 
     if args.command == "suggest-next-pr":
